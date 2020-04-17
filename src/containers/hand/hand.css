@@ -1,0 +1,12 @@
+.hand {
+    
+    width :80%;
+    height:20%;
+    margin:auto;
+    position:absolute;
+    bottom:5%;
+    left:10%;
+    display:flex;
+    flex-wrap:nowrap;
+    align-content:center;
+}

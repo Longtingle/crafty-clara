@@ -1,0 +1,33 @@
+.card-wrapper {
+    overflow:hidden;
+    height:100%;
+    display:inline-block;
+    border-color:black;
+    border-width:10px;
+}
+
+
+.card-wrapper:last-child {
+    overflow: visible;
+}
+
+.card-wrapper:hover {
+    overflow:visible;
+    
+    
+}
+
+.card {
+    height:inherit;     
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-color: black;
+    border-width: 100px;
+}
+
+.card:hover {
+    position:relative;
+    top:-50px;
+}
