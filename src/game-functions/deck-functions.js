@@ -15,9 +15,33 @@ const generateDeck = (numDecks) => {
 
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
-      let j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
-      [array[i], array[j]] = [array[j], array[i]];
+        let j = Math.floor(Math.random() * (i + 1)); 
+        [array[i], array[j]] = [array[j], array[i]];
     }
-  }
+}
 
-  export default generateDeck;
+
+const deal = (deck, numPlayers) => {
+    let players = [];
+
+    for (let i = 0; i<numPlayers;i++){
+        players[i] = [];
+        for (let j = 0; j < 12; j++){
+            players[i].push(deck[0]);
+            deck.shift(0);
+        }
+    }
+    console.log(deck);
+    console.log(players);
+    
+    return players;
+  
+}
+
+const deckFunctions = {
+    deal : deal,
+    shuffle : shuffle,
+    generateDeck : generateDeck
+}
+
+export default deckFunctions;

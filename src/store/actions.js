@@ -1,5 +1,7 @@
 const actions = {
-    START_NEW_GAME : "START_NEW_GAME"
+    START_NEW_GAME : "START_NEW_GAME",
+    FROM_DECK_TO_PLAYER : "FROM_DECK_TO_PLAYER",
+    FROM_DISCARD_TO_PLAYER : "FROM_DISCARD_TO_PLAYER"
 }
 
 export default actions
