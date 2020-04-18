@@ -1,12 +1,12 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import actions from './store/actions.js';
-
+import GAME_STATES from './store/constants.js';
+import generateDeck from './game-functions/deck-functions.js';
 
 import Hand from './containers/hand/hand.js';
 import Table from './containers/table/table.js';
 
-import {Connect} from 'react-redux';
 
 
 
@@ -19,14 +19,26 @@ class App extends Component {
     }
 
     render() {
-        console.log(this.props.state.table.deck);
+        let output;
+        if (this.props.state.game.gameState === GAME_STATES.NO_GAME) {
+            output = (
+                <button onClick = {this.newGameHandler}>
+                    START NEW GAME
+                </button>    
+            );
+        }
         return(
             <div className = "App">
                <Table />
+               {output}
             </div>
         )
     }
 
+    newGameHandler = () => {
+        let cards = generateDeck(2);
+        this.props.startNewGame(cards);
+    }
 }
 
 const mapStateToProps = state => {
@@ -37,8 +49,11 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => {
     return {
-        startNewGame : () => dispatch({
-            type : actions.START_NEW_GAME
+        startNewGame : (cards) => dispatch({
+            type : actions.START_NEW_GAME,
+            payload : {
+                cards : cards
+            }
         })
     }
 }
