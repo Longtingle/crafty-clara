@@ -14,6 +14,7 @@ var Table = function (props) {
             />
             <Hand 
                 hand = {props.state.player.hand}
+                handClickHandler = {props.handClickHandler}
             />
         </div>
     );

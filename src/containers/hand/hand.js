@@ -10,6 +10,8 @@ var Hand = function (props) {
                 <Card 
                     cardName = {card}
                     key = {index}
+                    cardNum = {index}
+                    handClickHandler = {props.handClickHandler}
                 />
             )
         })

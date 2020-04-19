@@ -6,7 +6,6 @@ import deckFunctions from './game-functions/deck-functions.js';
 import objAI from './game-functions/AI.js';
 import params from './game-functions/params.js';
 
-import Hand from './containers/hand/hand.js';
 import Table from './containers/table/table.js';
 import Home from './ui/home/home.js';
 
@@ -31,6 +30,7 @@ class App extends Component {
                 <div className = "App">
                     <Table
                         deckClickHandler = {this.deckClickHandler}
+                        handClickHandler = {this.handClickHandler}
                         state = {this.props.state}
                     />
                 </div>
@@ -70,7 +70,8 @@ class App extends Component {
 
     }
 
-    handClickHandler = () => { 
+    handClickHandler = (event) => { 
+        console.log(event.target.class);
         if (this.props.state.player.isGoingDown === false) {
             //we're not in going down mode, so get the card selected ready for going onto the table or going onto the discard.
         }

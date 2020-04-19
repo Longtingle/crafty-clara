@@ -1,5 +1,5 @@
 import React from 'react';
-
+import {ENV_VAR} from '../../store/constants.js';
 import './card.css';
 
 var Card = function (props) {
@@ -7,8 +7,10 @@ var Card = function (props) {
         <div className = 'card-wrapper' style = {{zIndex : props.zIndex}}>
             <img 
                 className = 'card' 
-                src={"http://81.103.140.192:3000/img/cards/" + props.cardName + ".png"}
+                src={ ENV_VAR.IMG_DIR + "/cards/" + props.cardName + ".png"}
                 style={{zIndex : props.zIndex}}
+                cardnum = {props.cardNum}
+                onClick = {props.handClickHandler}
             ></img>
         </div>
     );
