@@ -11,11 +11,11 @@
     overflow: visible;
 }
 
+/*
 .card-wrapper:hover {
     overflow:visible;
-    
-    
 }
+*/
 
 .card {
     height:inherit;     
@@ -27,7 +27,19 @@
     border-width: 100px;
 }
 
+.card-selected {
+    position:relative;
+    top:-50px;
+
+}
+
+.wrapper-selected {
+    overflow:visible;
+}
+
+/*
 .card:hover {
     position:relative;
     top:-50px;
 }
+*/

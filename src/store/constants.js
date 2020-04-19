@@ -9,7 +9,13 @@ const GAME_STATES = {
     ROUND_END : "ROUND_END"
 };
 
-const CARD_SELECT = { 
+const AI_STAGES = {
+    AI_DRAW : "AI_DRAW",
+    AI_PLAY : "AI_PLAY",
+    AI_WAIT : "AI_WAIT"
+}
+
+const AI_CARD_SELECT = { 
     SELECT_DECK : "SELECT_DECK",
     SELECT_DISCARD : "SELECT_DISCARD"
 };
@@ -22,4 +28,4 @@ const ENV_VAR = {
 
 
 export default GAME_STATES;
-export {CARD_SELECT, ENV_VAR};
+export {AI_STAGES, AI_CARD_SELECT, ENV_VAR};

@@ -11,9 +11,11 @@ var Table = function (props) {
                 deck = {props.state.deck}
                 discard = {props.state.discard[0]}
                 deckClickHandler = {props.deckClickHandler}
+                discardClickHandler = {props.discardClickHandler}
             />
             <Hand 
                 hand = {props.state.player.hand}
+                cardSelected = {props.state.player.cardSelected}
                 handClickHandler = {props.handClickHandler}
             />
         </div>

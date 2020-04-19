@@ -1,4 +1,4 @@
-import {CARD_SELECT} from '../store/constants.js';
+import {AI_CARD_SELECT} from '../store/constants.js';
 
 class AI {
 
@@ -11,7 +11,7 @@ class AI {
     //Methods
 
     selectDraw = (discard) => {
-        return CARD_SELECT.SELECT_DECK;
+        return AI_CARD_SELECT.SELECT_DECK;
     }
 
     addCard = (card) => {
