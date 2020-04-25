@@ -1,21 +1,23 @@
+//react/redux imports
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
+
+//import constants
 import actions from './store/actions.js';
 import GAME_STATES from './store/constants.js';
 import {AI_STAGES} from './store/constants.js';
 import {AI_CARD_SELECT} from './store/constants.js';
 
-
+//import helper functions
 import deckFunctions from './game-functions/deck-functions.js';
-import objAI from './game-functions/AI.js';
 import params from './game-functions/params.js';
+import AIFunctions from './game-functions/AI-functions.js';
 
+//import react/css components
 import Table from './containers/table/table.js';
 import Home from './ui/home/home.js';
-
-
-
 import './App.css';
+
 
 class App extends Component {
 
@@ -49,18 +51,15 @@ class App extends Component {
     }
 
     newGameHandler = () => {
+        //generate deck with 2 shuffled packs of cards
         let deck = deckFunctions.generateDeck(2);
-        console.log("DECK GENERATED");
+        //deal into numbers of hands required.
         let hands = deckFunctions.deal(deck, params.numberOfPlayers);
-        
-        let AI = []
-        for (let i = 0; i < params.numberOfPlayers - 1 ; i++){
-            AI.push(new objAI(hands[i+1]));
-        }
+    
         let discard = [];
         discard.push(deck[0])
         deck.shift();
-        this.props.startNewGame(deck, hands, AI, discard);
+        this.props.startNewGame(deck, hands, discard);
     }
 
     deckClickHandler = () => {
@@ -92,15 +91,44 @@ class App extends Component {
     }
     componentDidUpdate() {
         console.log("componentDidUpdate");
-        if (this.props.state.AI.AIPhase && this.props.state.AI.AIStage === AI_STAGES.AI_DRAW) { 
-            //the AI that's playing needs to pick which card to draw.
-            if(this.props.state.AI.players[this.props.state.AI.AIPlaying].selectDraw(this.props.state.discard[0]) === AI_CARD_SELECT.SELECT_DECK){
-                this.props.state.AI.players[this.props.state.AI.AIPlaying].addCard(this.props.state.deck[0]);
+        //If the state show that the active AI needs to draw a card, then trigger that action.
+        if (this.props.state.game.gameState === GAME_STATES.AI_DRAW) { 
+            if (AIFunctions.selectDraw(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, 
+                this.props.state.game.requirement, 
+                this.props.state.discard[0]) === AI_CARD_SELECT.SELECT_DECK){
                 this.props.AIPickedFromDeck();
             }
-            
-
         }
+
+        //If the state shows that the active AI needs to wait, trigger that action.
+        if (this.props.state.game.gameState === GAME_STATES.AI_WAIT) {
+            setTimeout(() => {
+                this.props.AIWaitComplete();
+            }, 5000);
+            return;
+        }
+
+        if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
+            if (AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement)){
+                //can go down
+            }else {
+                //can't go down, select card to discard
+                let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+                this.props.fromAIToDiscard(discardIndex);
+            }
+        }
+
+        //If the state shows that all AI need to decide whether to draw out of turn, trigger that action
+        
+        
+        
+        
+        //If that state shows that the active AI needs to play their turn (go down, discard etc), trigger that action
+
+
+
+
+        
     }
 }
 
@@ -112,12 +140,11 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => {
     return {
-        startNewGame : (deck, hands, AI, discard) => dispatch({
+        startNewGame : (deck, hands, discard) => dispatch({
             type : actions.START_NEW_GAME,
             payload : {
                 deck : deck,
                 hands : hands,
-                AI : AI,
                 discard : discard
             }
         }),
@@ -138,6 +165,12 @@ const mapDispatchToProps = dispatch => {
         }),
         AIPickedFromDeck : () => dispatch({
             type : actions.AI_PICKED_FROM_DECK
+        }),
+        AIWaitComplete : () => dispatch({
+            type : actions.AI_WAIT_COMPLETE
+        }),
+        fromAIToDiscard : () => dispatch({
+            type : actions.FROM_AI_TO_DISCARD
         })
     }
 }

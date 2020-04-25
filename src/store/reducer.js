@@ -2,43 +2,23 @@ import update from 'immutability-helper';
 import actions from './actions.js';
 import GAME_STATES from './constants.js';
 import {AI_STAGES} from './constants.js';
-
-import generateDeck from '../game-functions/deck-functions.js';
-
-
-const initialState = {
-    debug : true,
-    game : {
-        gameState : GAME_STATES.NO_GAME,
-        round : 0,
-        requirement : 0,
-    },
-    player : {
-        hand : [],
-        cardSelected : null,
-        table : {
-
-        },
-        isDown : false,
-        canGoDown : false,
-        isGoingDown : false
-    },
-    AI : {
-        players : null,
-        AIPhase : false,
-        AIPlaying : null,
-        AIStage : null
-    },
-    deck : [],
-    discard : []
-}
+import params from '../game-functions/params.js';
+import initialState from './initial-state.js';
 
 const reducer = (state = initialState, action) => {
     var newState;
     if (state.debug === true) console.log ("REDUCER TRIGGERED: " + action.type);
 
     if (action.type === actions.START_NEW_GAME) {
-        let newAI= [];
+        let playersArray = [];
+        for (let i = 0; i < state.AI.AICount ; i++){
+            playersArray.push({
+                hand : action.payload.hands[i+1],
+                isDown : false,
+                table : []
+            });
+        }
+
 
         newState = update(state, {
             game : {
@@ -49,7 +29,7 @@ const reducer = (state = initialState, action) => {
             player : {
                 hand : { $set : Array.from(action.payload.hands[0])}
             },
-            AI : { players : {$set : action.payload.AI}}, 
+            AI : { players : {$set : playersArray}}, 
             deck : {$set : action.payload.deck},
             discard : {$set : action.payload.discard}
         })
@@ -88,17 +68,15 @@ const reducer = (state = initialState, action) => {
         var newDiscard = [...state.discard];
         newDiscard.unshift(discarded[0]);
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_DRAW}},
+            game : {
+                gameState : {$set : GAME_STATES.AI_DRAW}
+            },
             player : {
                 hand : {$set : newHand},
                 cardSelected : {$set : null},
             },
             discard : {$set : newDiscard},
-            AI : {
-                AIPhase : {$set : true},
-                AIPlaying : {$set : 0},
-                AIStage : {$set : AI_STAGES.AI_DRAW}
-            }
+            AI : {AIInPlay : {$set : 0}}
         });
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
@@ -108,10 +86,22 @@ const reducer = (state = initialState, action) => {
 
     if (action.type === actions.AI_PICKED_FROM_DECK) {
         var newDeck = [...state.deck];
-        newDeck.shift();
+        var newHand = [...state.AI.players[state.AI.AIInPlay].hand]
+        newHand.push(...newDeck.splice(0, 1));
+
+        var newAIPlayers = state.AI.players.map((player, index) => {
+            if (index !== state.AI.AIInPlay ){
+                return player;
+            } 
+            return update(player, {
+                hand : {$set : newHand}
+            });
+        });
+        
         newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.AI_WAIT}},
             deck : {$set : newDeck},
-            AI : {AIStage : {$set : AI_STAGES.AI_WAIT}}
+            AI : {players : {$set : newAIPlayers}}
         });
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
@@ -119,7 +109,29 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
+    if (action.type === actions.AI_WAIT_COMPLETE) {
+        
+        newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.AI_PLAY}}
+        });
 
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.FROM_AI_TO_DISCARD) {
+        // if this is the last AI in the loop, then move back to player, if not, next AI
+        
+        newState = update (state, {
+        
+
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
 
     if (action.type === actions.TEMPLATE) {
         
