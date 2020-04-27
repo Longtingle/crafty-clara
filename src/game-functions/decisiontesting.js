@@ -1,7 +1,11 @@
+//TODO 
+//Need to expose more paramters about the 'best hand', including individual run/set scores and run/set completion status. 
+//This will help when deciding whether it's worth picking up out of turn or not.
+
 
 const hand = [
-    "2D", "3D", "4D", "5D", "7D", "9H",
-    "13S", "12S", "11S", "3H", "9S", "4S"
+    "2D", "3D", "4D", "5D", "9D", "9H",
+    "13S", "12S", "11S", "9C", "9S", "7D", "13C"
     //"12D", "4H", "2D",
     //"2C", "2H", "13H",
     //"3C", "4C", "5C",
@@ -11,7 +15,7 @@ const hand = [
 
 const requirement = {
     R : 2,
-    S : 0
+    S : 1
 }
 
 const scoreHand = (hand, requirement) => {
@@ -51,7 +55,7 @@ const scoreHand = (hand, requirement) => {
             }
         }else {
             for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
-                bestHand.push(setsResult.sets[i].keys);
+                bestHand.push({type : "set", keys : setsResult.sets[i].keys});
                 score = score + setsResult.sets[i].score;
             }
             for (let i = 0; i < setsResult.sets.length; i++){
@@ -85,7 +89,7 @@ const scoreHand = (hand, requirement) => {
         }else {
 
             for (let i = 0; i<runsResult.runs.length && i < requirement.R ; i++){
-                bestHand.push(runsResult.runs[i].keys);
+                bestHand.push({ type : "run", keys : runsResult.runs[i].keys});
                 score = score + runsResult.runs[i].score;
             }
             for (let i = 0; i < runsResult.runs.length; i++){
@@ -110,22 +114,94 @@ const scoreHand = (hand, requirement) => {
         //we have both runs and sets to deal with!
         let runsResult = getRuns(handArray);
         console.log(runsResult);
+        let runScore = {};
+        if (runsResult.runs.length === 0) {
+            //we have no runs return zero score (initialised values for variables.)
+            runScore =  {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
+        }else {
 
-        if (runsResult.runs.length != 0) {
-            //we have some runs to look at.
+            for (let i = 0; i<runsResult.runs.length && i < requirement.R ; i++){
+                bestHand.push({type : "run", keys : runsResult.runs[i].keys});
+                score = score + runsResult.runs[i].score;
+            }
+            for (let i = 0; i < runsResult.runs.length; i++){
+                usefulCards.push(...runsResult.runs[i].keys);
+                usefulCards.push(...runsResult.runs[i].potentialKeys);
+            }
+            
+            usefulCards = [...new Set(usefulCards)];
+               
+            if (runsResult.numFullRuns >= requirement.R) {readyToGoDown = true;}
+                
+            runScore = {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
+        }
+        //NEED TO TAKE RUN CARDS OUT OF THE CARDS USED FOR THE SET
+
+        // TO DOOO!!!!!!!!!!!!!!!!!!!!!!
+        let handArrayCopy = [...handArray];
+        handArrayCopy.forEach((card, index)=> {
+            for (let i = 0; i < runScore.bestHand.length; i++){
+                if (runScore.bestHand[i].keys.includes(card.index)) {
+                    handArrayCopy.splice(index,1);
+                }
+            } 
+        })
+        
+        let setScore = {};
+        score = 0;
+        readyToGoDown = false;
+        bestHand = [];
+        usefulCards = [];
+        console.log (handArrayCopy);
+        let setsResult = getSets(handArrayCopy);       
+        console.log("Set results: ");
+        console.log(setsResult);        
+        if (setsResult.sets.length === 0) {
+            //we have no sets return zero score (initialised values for variables.)
+            setScore = {
+                score : 0,
+                readyToGoDown : false,
+                bestHand : [],
+                usefulCards : []
+            }
+        }else {
+            for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
+                bestHand.push({type : "set", keys : setsResult.sets[i].keys});
+                score = score + setsResult.sets[i].score;
+            }
+            for (let i = 0; i < setsResult.sets.length; i++){
+                usefulCards.push(...setsResult.sets[i].keys)
+            }
+            if (setsResult.numFullSets >= requirement.S) {readyToGoDown = true;}
+                //ready to go down and full score.
+            setScore = {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
+        }
+        bestHand = [...setScore.bestHand, ...runScore.bestHand];
+        usefulCards = [...setScore.usefulCards, ...runScore.usefulCards];
+        return { 
+            score : setScore.score + runScore.score,
+            readyToGoDown : setScore.readyToGoDown && runScore.readyToGoDown,
+            bestHand : bestHand,
+            usefulCards : usefulCards
 
         }
     }
-    
-    
-    
 
-    return {
-        readyToGoDown : false,
-        bestHand : [
-            [5, 6, 7], [8, 9]
-        ]
-    };
 }
 
 const sortHand = (sortArray, param) => {
