@@ -12,6 +12,15 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}\\start"
-        }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Decision Test",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\src\\game-functions\\decisiontesting.js"
+        },
     ]
 }

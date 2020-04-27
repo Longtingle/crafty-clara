@@ -1,20 +1,31 @@
 
 const hand = [
-    //"2D", "3D", "4D", "6D", "7D", "9H",
-    //"2C", "12C", "11S", "3H", "9S", "4S"
-    "12D", "4H", "2D",
-    "2C", "2H", "13H",
-    "3C", "4C", "5C",
-    "8D", "9D", "10D"
+    "2D", "3D", "4D", "5D", "7D", "9H",
+    "13S", "12S", "11S", "3H", "9S", "4S"
+    //"12D", "4H", "2D",
+    //"2C", "2H", "13H",
+    //"3C", "4C", "5C",
+    //"8D", "9D", "10D"
       
 ];
 
 const requirement = {
-    R : 0,
-    S : 2
+    R : 2,
+    S : 0
 }
 
 const scoreHand = (hand, requirement) => {
+
+    if (requirement.S === 0 && requirement.R === 0){
+        console.log("requirement should include both R and S");
+        throw "requirement should include both R and S";
+    }
+
+    let score = 0;
+    let readyToGoDown = false;
+    let bestHand = [];
+    let usefulCards = [];
+
     //turn hand into sorting array
     let handArray = hand.map((card, index) => {
         let value = null;
@@ -24,22 +35,20 @@ const scoreHand = (hand, requirement) => {
         return {value : parseInt(value), suit : suit, index : index}
     });
 
-    if (requirement.R != 0){
-        //we have runs!
-        let runsResult = getRuns(handArray);
-    }
     if (requirement.R === 0){
-        let setsResult = getSets(handArray);
-        let score = 0;
-        let readyToGoDown = false;
-        let bestHand = [];
-        let usefulCards = [];
-        
+
+        //no runs, only sets.
+        let setsResult = getSets(handArray);       
         console.log("Set results: ");
         console.log(setsResult);        
         if (setsResult.sets.length === 0) {
-            //we have no sets 
-            //score is zero, whatever that means.
+            //we have no sets return zero score (initialised values for variables.)
+            return {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
         }else {
             for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
                 bestHand.push(setsResult.sets[i].keys);
@@ -58,10 +67,56 @@ const scoreHand = (hand, requirement) => {
             }
         }
         
-    }else {
-        //behaviour for runs needs to be added.
-        return;
     }
+
+    if (requirement.S === 0){
+        //no sets only runs
+        let runsResult = getRuns(handArray);
+        console.log(runsResult);
+
+        if (runsResult.runs.length === 0) {
+            //we have no runs return zero score (initialised values for variables.)
+            return {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
+        }else {
+
+            for (let i = 0; i<runsResult.runs.length && i < requirement.R ; i++){
+                bestHand.push(runsResult.runs[i].keys);
+                score = score + runsResult.runs[i].score;
+            }
+            for (let i = 0; i < runsResult.runs.length; i++){
+                usefulCards.push(...runsResult.runs[i].keys);
+                usefulCards.push(...runsResult.runs[i].potentialKeys);
+            }
+            
+            usefulCards = [...new Set(usefulCards)];
+               
+            if (runsResult.numFullRuns >= requirement.R) {readyToGoDown = true;}
+                
+            return {
+                score : score,
+                readyToGoDown : readyToGoDown,
+                bestHand : bestHand,
+                usefulCards : usefulCards
+            }
+        }
+    }
+
+    if (requirement.R != 0 && requirement.S != 0){
+        //we have both runs and sets to deal with!
+        let runsResult = getRuns(handArray);
+        console.log(runsResult);
+
+        if (runsResult.runs.length != 0) {
+            //we have some runs to look at.
+
+        }
+    }
+    
     
     
 
@@ -95,7 +150,9 @@ const sortHand = (sortArray, param) => {
 }
 
 getRuns = (handArray) => {
+    //sort hand for runs.
     let sortedHand = sortHand(handArray, "RUNS");
+
     let activeSuit = sortedHand[0].suit;
     let runLength = 1;
     let complete = false;
@@ -103,7 +160,7 @@ getRuns = (handArray) => {
     let runValues = [sortedHand[0].value];
     let potentialKeys = [];
     let runs = [];
-    console.log(sortedHand);
+   
     for (let i = 1; i < sortedHand.length; i++){ 
         if (sortedHand[i].suit === sortedHand[i-1].suit && sortedHand[i].value === sortedHand[i-1].value + 1){
             //we have 2 consecutive cards.
@@ -147,7 +204,6 @@ getRuns = (handArray) => {
     //add potential tag-ons to runs
     runs.forEach(run => {
         potentialKeys = [];
-        console.log(run);
         sortedHand.forEach(card => {
             if(card.suit === run.suit && 
                 !(run.keys.includes(card.index)) && 
@@ -167,9 +223,17 @@ getRuns = (handArray) => {
         if (a.values.reduce((a,b) => a+b) < b.values.reduce((a,b) => a+b)){return 1}
     });
 
-    
+    let fullRunCount = 0;
+    runs.forEach(run => {
+        if (run.complete) {fullRunCount++}
+    });
 
-    console.log(runs);
+    let runsSummarised = {
+        numFullRuns : fullRunCount,
+        runs : runs
+    }
+
+    return runsSummarised;
 }
 
 getSets = (handArray) => {
