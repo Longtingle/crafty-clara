@@ -1,5 +1,5 @@
 import {AI_CARD_SELECT} from '../store/constants.js';
-import scoreHand from './score-hand.js';
+import {scoreHand} from './hand-functions.js';
 import {getValue, getSuit} from '../game-functions/deck-functions.js';
 
 //exported functions
@@ -38,6 +38,11 @@ const AIFunctions = {
         });
         
         let handResult = scoreHand(hand, requirement);
+        if (handResult.usefulCards.length === hand.length) {
+            //all the cards in the hand are useful and we need to pick the least useful useful card.
+
+        }
+
         handResult.usefulCards.sort((a,b) => b-a);    
         console.log(handResult.usefulCards);
         handResult.usefulCards.forEach(index=> {

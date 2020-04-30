@@ -365,4 +365,18 @@ const getSets = (handArray) => {
     return setsSummarised;
 }
 
-export default scoreHand;
+const handFunctions = {
+    getRuns,
+    getSets,
+    scoreHand,
+    sortHand
+}
+
+export {
+    getRuns,
+    getSets,
+    scoreHand,
+    sortHand
+}
+
+export default handFunctions;

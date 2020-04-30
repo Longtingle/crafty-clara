@@ -1,0 +1,18 @@
+Work in Progress
+
+AI
+Need to add some logic for what to discard if every card in the hand is classed as 'useful'
+
+
+New Features
+    Add the ability for the user to 'go down'
+    Add the ability for the AI to 'go down'
+    Add the ability to build on each others hands
+    Add the ability to use red aces as wild cards
+    Add logic for end of round 
+        trigger when someone has no cards
+        count up points
+        store score in state and advance the game   
+    Add ability for user to sort hand for sets or runs
+
+
