@@ -104,7 +104,7 @@ class App extends Component {
         if (this.props.state.game.gameState === GAME_STATES.AI_WAIT) {
             setTimeout(() => {
                 this.props.AIWaitComplete();
-            }, 5000);
+            }, 1000);
             return;
         }
 
@@ -169,8 +169,9 @@ const mapDispatchToProps = dispatch => {
         AIWaitComplete : () => dispatch({
             type : actions.AI_WAIT_COMPLETE
         }),
-        fromAIToDiscard : () => dispatch({
-            type : actions.FROM_AI_TO_DISCARD
+        fromAIToDiscard : (cardIndex) => dispatch({
+            type : actions.FROM_AI_TO_DISCARD,
+            payload : {cardIndex}
         })
     }
 }

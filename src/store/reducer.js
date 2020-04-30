@@ -122,9 +122,32 @@ const reducer = (state = initialState, action) => {
 
     if (action.type === actions.FROM_AI_TO_DISCARD) {
         // if this is the last AI in the loop, then move back to player, if not, next AI
-        
+        let newAIHand = [...state.AI.players[state.AI.AIInPlay].hand]
+        newAIHand.splice(action.payload.cardIndex, 1);
+        let newGameState;
+        let newAIInPlay;
+        if (state.AI.AIInPlay === state.AI.AICount - 1 ){
+            newAIInPlay = null;
+            newGameState = GAME_STATES.PW_DRAW_CARD;
+        }else { 
+            newAIInPlay = state.AI.AIInPlay + 1;
+            newGameState = GAME_STATES.AI_DRAW;
+        }
+        var newAIPlayers = state.AI.players.map((player, index) => {
+            if (index !== state.AI.AIInPlay ){
+                return player;
+            } 
+            return update(player, {
+                hand : {$set : newAIHand}
+            });
+        });
+
         newState = update (state, {
-        
+            game : {gameState : {$set : newGameState}},
+            AI : {
+                AIInPlay : {$set : newAIInPlay},
+                players : {$set : newAIPlayers}
+            }
 
         });
 

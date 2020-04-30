@@ -38,10 +38,22 @@ const deal = (deck, numPlayers) => {
   
 }
 
-const deckFunctions = {
-    deal : deal,
-    shuffle : shuffle,
-    generateDeck : generateDeck
+const getSuit = card => {
+    return card.substring(card.length -1);
 }
+
+const getValue = card => {
+     return (card.length === 3) ? card.substring(0, 2) :  card.substring(0, 1);
+}
+
+const deckFunctions = {
+    deal,
+    shuffle,
+    generateDeck,
+    getSuit,
+    getValue
+}
+
+export {getSuit, getValue};
 
 export default deckFunctions;
