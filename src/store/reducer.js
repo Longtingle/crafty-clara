@@ -123,9 +123,11 @@ const reducer = (state = initialState, action) => {
     if (action.type === actions.FROM_AI_TO_DISCARD) {
         // if this is the last AI in the loop, then move back to player, if not, next AI
         let newAIHand = [...state.AI.players[state.AI.AIInPlay].hand]
-        newAIHand.splice(action.payload.cardIndex, 1);
+        let discardedCard = newAIHand.splice(action.payload.cardIndex, 1);
         let newGameState;
         let newAIInPlay;
+        let newDiscard = [...state.discard];
+        newDiscard.unshift(discardedCard[0]);
         if (state.AI.AIInPlay === state.AI.AICount - 1 ){
             newAIInPlay = null;
             newGameState = GAME_STATES.PW_DRAW_CARD;
@@ -147,7 +149,8 @@ const reducer = (state = initialState, action) => {
             AI : {
                 AIInPlay : {$set : newAIInPlay},
                 players : {$set : newAIPlayers}
-            }
+            },
+            discard : {$set : newDiscard}
 
         });
 
