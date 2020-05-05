@@ -5,9 +5,11 @@ import {AI_STAGES} from './constants.js';
 import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
 
+
 const reducer = (state = initialState, action) => {
-    var newState;
-    if (state.debug === true) console.log ("REDUCER TRIGGERED: " + action.type);
+    let newState;  
+    let d = new Date;
+    if (state.debug === true) console.log ("REDUCER TRIGGERED - " + action.type + " - " + d.toLocaleTimeString());
 
     if (action.type === actions.START_NEW_GAME) {
         let playersArray = [];
@@ -47,6 +49,20 @@ const reducer = (state = initialState, action) => {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}},
             player : { hand : {$set : newPlayerHand}},
             deck : {$set : newDeck},
+        });
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.FROM_DISCARD_TO_PLAYER) {
+        let newHand = [...state.player.hand];
+        let newDiscard = [...state.discard];
+        newHand.push(newDiscard.shift());
+        newState = update(state, {
+            game : {gameState : {$set : GAME_STATES.PW_PLAY}},
+            player : {hand : {$set : newHand}},
+            discard : {$set : newDiscard}
         });
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
         if (state.debug === true) console.log(newState);
@@ -99,7 +115,7 @@ const reducer = (state = initialState, action) => {
         });
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_WAIT}},
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}},
             deck : {$set : newDeck},
             AI : {players : {$set : newAIPlayers}}
         });
@@ -109,12 +125,111 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
-    if (action.type === actions.AI_WAIT_COMPLETE) {
+    if (action.type === actions.AI_PICKED_FROM_DISCARD) {
+        var newDiscard = [...state.discard];
+        var newHand = [...state.AI.players[state.AI.AIInPlay].hand]
+        newHand.push(...newDiscard.splice(0, 1));
+
+        var newAIPlayers = state.AI.players.map((player, index) => {
+            if (index !== state.AI.AIInPlay ){
+                return player;
+            } 
+            return update(player, {
+                hand : {$set : newHand}
+            });
+        });
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_PLAY}}
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}},
+            discard : {$set : newDiscard},
+            AI : {players : {$set : newAIPlayers}}
         });
 
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+
+    if (action.type === actions.AI_WAIT_ONE_COMPLETE) {
+        
+        newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.AI_DRAW_OOT}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.AI_DRAW_OOT) {
+        newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_TWO}},
+            OOTRequests : {$set : action.payload.OOTRequests}
+        });
+      
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.AI_WAIT_TWO_COMPLETE) {
+        
+        newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.AI_OOT_RESOLVE}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.DRAW_OOT_RESOLVE) {
+        if (action.payload.winner.winnerType === "none") {
+            newState = update (state, {
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
+                OOTRequests : {$set : []}
+            });
+            return newState;
+        }
+
+        let newDiscard = [...state.discard];
+
+        if (action.payload.winner.winnerType === "player") {
+            newHand = [...state.player.hand];
+        } else {
+            newHand = [...state.AI.players[action.payload.winner.index].hand];
+        }
+        
+        newHand.push(state.discard[0]);
+        newDiscard.shift();
+        if (action.payload.winner.winnerType === "player") {
+            console.log("OOT to player");
+            newState = update (state, {
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
+                discard : {$set : newDiscard},
+                player : {hand : {$set : newHand}},
+                OOTRequests : {$set : []}
+            });
+
+        } else {
+            console.log("card to AI");
+            let newAIPlayers = state.AI.players.map((player, index) => {
+                if (index !== action.payload.winner.index ){
+                    return player;
+                } 
+                return update(player, {
+                    hand : {$set : newHand}
+                });
+            });
+            newState = update (state, {
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
+                discard : {$set : newDiscard},
+                AI : {players : {$set : newAIPlayers}},
+                OOTRequests : {$set : []}
+            });
+        }
+        
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
         if (state.debug === true) console.log(newState);
         return newState;
@@ -151,7 +266,6 @@ const reducer = (state = initialState, action) => {
                 players : {$set : newAIPlayers}
             },
             discard : {$set : newDiscard}
-
         });
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");

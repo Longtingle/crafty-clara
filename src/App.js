@@ -20,6 +20,8 @@ import './App.css';
 
 
 class App extends Component {
+    
+    playerOOTRequest = null;
 
     constructor (props) {
         super(props);
@@ -70,14 +72,22 @@ class App extends Component {
 
     discardClickHandler = () => {
         console.log("discardClickHandler triggered.");
-        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD || this.props.state.game.gameState === GAME_STATES.PW_DRAW_OOT) {
+        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
             this.props.fromDiscardToPlayer();
         } else if ( 
             this.props.state.game.gameState === GAME_STATES.PW_PLAY && 
             this.props.state.player.cardSelected && 
             !this.props.state.player.isGoingDown
         ){
+            let OOTResult = AIFunctions.resolveOOT(this.props.state.OOTRequests, this.props.state.AI.AIInPlay);
+            console.log(OOTResult);
+            if (OOTResult.winnerType !== "none") {
+                this.props.drawOOTResolve(OOTResult);
+            }
             this.props.fromHandToDiscard();
+        } else if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
+            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD){
+            this.playerOOTRequest = {type : "player", index : params.numberOfPlayers - 1}
         }
 
     }
@@ -89,46 +99,73 @@ class App extends Component {
             this.props.selectCardFromHand(cardNum);
         }
     }
+
     componentDidUpdate() {
-        console.log("componentDidUpdate");
+        console.log("componentDidUpdate:");
+        console.log("AI IN PLAY: " + this.props.state.AI.AIInPlay + "  - GAMESTATE : " + this.props.state.game.gameState);
         //If the state show that the active AI needs to draw a card, then trigger that action.
+
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW) { 
-            if (AIFunctions.selectDraw(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, 
+            let drawResult = AIFunctions.selectDraw(
+                this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, 
                 this.props.state.game.requirement, 
-                this.props.state.discard[0]) === AI_CARD_SELECT.SELECT_DECK){
-                this.props.AIPickedFromDeck();
-            }
+                this.props.state.discard[0]);
+
+            (drawResult === AI_CARD_SELECT.SELECT_DECK) ? this.props.AIPickedFromDeck() : this.props.AIPickedFromDiscard();
+
+            return;
         }
 
         //If the state shows that the active AI needs to wait, trigger that action.
-        if (this.props.state.game.gameState === GAME_STATES.AI_WAIT) {
-            setTimeout(() => {
-                this.props.AIWaitComplete();
-            }, 1000);
+        if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_ONE) {
+            setTimeout(() => {this.props.AIWaitOneComplete()}, 1500);
+            return;
+        }
+
+        if (this.props.state.game.gameState === GAME_STATES.AI_DRAW_OOT) {
+            //generate draw OOT requests.
+            let OOTRequests = [];
+            this.props.state.AI.players.forEach((player, index) => {
+                if (AIFunctions.drawOOT(player.hand, this.props.state.game.requirement, this.props.state.discard[0])) {
+                    if (player.index !== this.props.state.AI.AIInPlay){
+                        OOTRequests.push({type : "AI", index}) ;       
+                    }
+                }
+            });
+            this.props.AIOOTRequests(OOTRequests);
+            return;
+        }
+
+        if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_TWO) {
+            setTimeout(() => {this.props.AIWaitTwoComplete()}, 1500);
+            return;
+        }
+
+        if (this.props.state.game.gameState === GAME_STATES.AI_OOT_RESOLVE) {
+            
+
+            let OOTRequests = [...this.props.state.OOTRequests];
+            console.log(OOTRequests);
+            if (this.playerOOTRequest) OOTRequests.push(this.playerOOTRequest);
+            console.log(OOTRequests);
+            let OOTResult = AIFunctions.resolveOOT(OOTRequests, this.props.state.AI.AIInPlay);
+            console.log(OOTResult);
+            this.props.drawOOTResolve(OOTResult);
+            this.playerOOTRequest = null;
             return;
         }
 
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
+            
             if (AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement)){
                 //can go down
             }else {
-                //can't go down, select card to discard
+                //can't go down, discard.                
                 let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
                 this.props.fromAIToDiscard(discardIndex);
             }
+            return;
         }
-
-        //If the state shows that all AI need to decide whether to draw out of turn, trigger that action
-        
-        
-        
-        
-        //If that state shows that the active AI needs to play their turn (go down, discard etc), trigger that action
-
-
-
-
-        
     }
 }
 
@@ -166,8 +203,25 @@ const mapDispatchToProps = dispatch => {
         AIPickedFromDeck : () => dispatch({
             type : actions.AI_PICKED_FROM_DECK
         }),
-        AIWaitComplete : () => dispatch({
-            type : actions.AI_WAIT_COMPLETE
+        AIPickedFromDiscard : () => dispatch({
+            type : actions.AI_PICKED_FROM_DISCARD
+        }),
+        AIWaitOneComplete : () => dispatch({
+            type : actions.AI_WAIT_ONE_COMPLETE
+        }),
+        AIOOTRequests : (OOTRequests) => dispatch({
+            type : actions.AI_DRAW_OOT,
+            payload : {OOTRequests}
+        }),
+        AIWaitTwoComplete : () => dispatch({
+            type : actions.AI_WAIT_TWO_COMPLETE
+        }),
+        playerDrawOOT : () => dispatch({
+            type : actions.PLAYER_DRAW_OOT
+        }),
+        drawOOTResolve : (winner) => dispatch({
+            type : actions.DRAW_OOT_RESOLVE,
+            payload : {winner}
         }),
         fromAIToDiscard : (cardIndex) => dispatch({
             type : actions.FROM_AI_TO_DISCARD,

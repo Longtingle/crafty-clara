@@ -2,17 +2,26 @@ Work in Progress
 
 AI
 Need to add some logic for what to discard if every card in the hand is classed as 'useful'
+DONE Need to make it so that AI can pick up from discard deck
+Need to track if discard pile has been covered
+DONE Need to make it so that AI cannot pick out of turn on during it's go. 
 
 
 New Features
+
     Add the ability for the user to 'go down'
+
     Add the ability for the AI to 'go down'
+
     Add the ability to build on each others hands
+
     Add the ability to use red aces as wild cards
+
     Add logic for end of round 
         trigger when someone has no cards
         count up points
         store score in state and advance the game   
+
     Add ability for user to sort hand for sets or runs
 
-
+    Discarded cards need to be marked when they're covered.

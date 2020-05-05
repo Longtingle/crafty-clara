@@ -31,7 +31,8 @@ const initialState = {
         AIInPlay : null,
     },
     deck : [],
-    discard : []
+    discard : [],
+    OOTRequests : []
 }
 
 export default initialState;

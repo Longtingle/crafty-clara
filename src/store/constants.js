@@ -3,8 +3,10 @@ const GAME_STATES = {
     PW_DRAW_CARD : "PW_DRAW_CARD",
     PW_PLAY : "PW_PLAY",
     AI_DRAW : "AI_DRAW",
-    AI_WAIT : "AI_WAIT",
+    AI_WAIT_ONE : "AI_WAIT_ONE",
     AI_DRAW_OOT : "AI_DRAW_OOT",
+    AI_WAIT_TWO : "AI_WAIT_TWO",
+    AI_OOT_RESOLVE : "AI_OOT_RESOLVE",
     AI_PLAY : "AI_PLAY",
     ROUND_END : "ROUND_END"
 };
@@ -21,8 +23,8 @@ const AI_CARD_SELECT = {
 };
 
 const ENV_VAR = {
-    IMG_DIR : "http://localhost:3000/img"
-    //IMG_DIR : "http://81.103.140.192:3000/img"
+    //IMG_DIR : "http://localhost:3000/img"
+    IMG_DIR : "http://81.103.140.192:3000/img"
 }
 
 
