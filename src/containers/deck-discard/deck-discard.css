@@ -2,12 +2,13 @@
     height:35%;
     width:50%;
     display:inline-block;
+    vertical-align:top;
     background-color:white;
 }
 .deck-discard-flex {
     height:80%;
     width:100%;
-    margin-top:10%;
+    margin-top:5%;
     /*margin-left:10%;
     position:absolute;
     top:45%;*/
@@ -19,8 +20,10 @@
 
 .deck-image {
     max-height:100%;
+    max-width:50%;
 }
 
 .discard-image {
     max-height:100%;
+    max-width:50%;
 }

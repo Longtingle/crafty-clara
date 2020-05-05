@@ -5,11 +5,17 @@ import PlayerTable from '../player-table/player-table.js';
 import OpponentArea from '../opponent-area/opponent-area.js';
 import './table.css';
 
+
+const testHand = [
+    {type : "set", cards : ["2C", "2H", "2D"]},
+    {type : "run", cards : ["4S", "5S", "6S", "7S"]}
+]
+
 var Table = function (props) {
     return(
         <div className = 'table'>
             <OpponentArea  />
-            <PlayerTable />
+            <PlayerTable setRuns = {testHand}/>
             <Deck 
                 deck = {props.state.deck}
                 discard = {props.state.discard[0]}

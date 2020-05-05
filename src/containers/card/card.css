@@ -11,12 +11,6 @@
     overflow: visible;
 }
 
-/*
-.card-wrapper:hover {
-    overflow:visible;
-}
-*/
-
 .card {
     height:inherit;     
     display: flex;
@@ -37,9 +31,3 @@
     overflow:visible;
 }
 
-/*
-.card:hover {
-    position:relative;
-    top:-50px;
-}
-*/
