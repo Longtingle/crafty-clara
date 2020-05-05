@@ -21,8 +21,10 @@ var Hand = function (props) {
         })
     }
     return (
-        <div className = "hand">
-            {hand}
+        <div className = "player-hand-container">
+            <div className = "hand">
+                {hand}
+            </div>
         </div>
     );
 }

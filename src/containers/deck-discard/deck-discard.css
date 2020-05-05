@@ -1,9 +1,17 @@
-.deck-discard-container {
-    height:20%;
-    width:30%;
-    margin-left:35%;
+.deck-discard-container{
+    height:35%;
+    width:50%;
+    display:inline-block;
+    background-color:white;
+}
+.deck-discard-flex {
+    height:80%;
+    width:100%;
+    margin-top:10%;
+    /*margin-left:10%;
     position:absolute;
-    top:45%;
+    top:45%;*/
+
     display:flex;
     justify-content: space-evenly;
 }
