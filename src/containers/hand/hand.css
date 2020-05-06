@@ -1,8 +1,55 @@
-.hand {
-    
-    width :80%;
+
+.player-area {
+    height:30%;
+}
+.player-buttons-container{
+    display:inline-block;
+    height:100%;
+    width:15%;
+    vertical-align:top;
+}
+
+.player-buttons-flex{
     height:80%;
     margin:auto;
+    margin-top:10%;
+    display:flex;
+    flex-direction: column;
+    flex-wrap:nowrap;
+    align-content:center;
+    justify-content: space-evenly;
+}
+
+.button {
+    box-sizing: border-box;
+    border-radius: 1em;
+    height:30%;
+    width: 80%;
+    margin:auto;
+    background-color:white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.button p {
+    
+    text-align:center;
+    margin:0;
+}
+
+.player-hand-container{
+    
+    display:inline-block;
+    width:85%;
+    height:100%;
+   
+}
+
+.hand {
+    width :97.5%;
+    height:80%;
+    margin-right:2.5%;
     padding-top:2.5%;
     /*position:absolute;
     bottom:5%;
@@ -12,8 +59,3 @@
     align-content:center;
 }
 
-.player-hand-container{
-    width:100%;
-    height:30%;
-    background-color:orange;
-}

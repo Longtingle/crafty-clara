@@ -3,7 +3,6 @@ Work in Progress
 AI
 Need to add some logic for what to discard if every card in the hand is classed as 'useful'
 DONE Need to make it so that AI can pick up from discard deck
-Need to track if discard pile has been covered
 DONE Need to make it so that AI cannot pick out of turn on during it's go. 
 
 

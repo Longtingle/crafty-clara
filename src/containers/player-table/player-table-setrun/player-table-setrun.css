@@ -1,7 +1,6 @@
 .setrun-flex {
     width :100%;
     height:100%;
-    margin:auto;
     display:flex;
     flex-wrap:nowrap;
     align-content:center;
@@ -10,9 +9,5 @@
 .setrun-container {
     height:30%;
     width:80%;
-    margin:auto;
-    display:flex;
-    flex-direction: column;
-    ;
-    
+    margin:auto;    
 }

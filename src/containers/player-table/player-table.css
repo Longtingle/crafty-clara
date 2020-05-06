@@ -12,5 +12,5 @@
     display:flex;
     flex-wrap:nowrap;
     flex-direction:column; 
-    justify-content: space-between;
+    justify-content: space-around;
 }
