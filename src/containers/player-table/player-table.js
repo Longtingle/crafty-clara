@@ -15,7 +15,9 @@ const PlayerTable = (props) => {
     })
     return (
         <div className = "player-table-container">
-            {output}
+            <div className = "player-table-flex">
+                {output}
+            </div>
         </div>
     )
 }

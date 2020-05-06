@@ -5,3 +5,12 @@
     background-color:pink;
     display:inline-block;
 }
+
+.player-table-flex{
+    height:100%;
+    width:100%;
+    display:flex;
+    flex-wrap:nowrap;
+    flex-direction:column; 
+    justify-content: space-between;
+}

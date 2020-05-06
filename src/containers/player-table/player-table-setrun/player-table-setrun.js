@@ -11,7 +11,9 @@ const playerTableSetrun = (props) => {
     })
     return (
         <div className = "setrun-container">
-            {output}
+            <div className = "setrun-flex">
+                {output}
+            </div>
         </div>
     )
 }
