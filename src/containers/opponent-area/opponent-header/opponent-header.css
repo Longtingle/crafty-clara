@@ -1,3 +1,43 @@
-.opponent-header-container{ 
+.opponent-container {
+    display:inline-block;
+    width:33.33%;
+    height:100%;
+    vertical-align: top;
     
+}
+
+.opponent-header-container { 
+    height:12.5%;
+    display:inline-block;
+    width:100%;
+    vertical-align: top;
+    
+   
+}
+.opponent-header-text {
+    height:100%;
+    display:flex;       
+    flex-direction: column;
+    justify-content: space-evenly;
+
+}
+.opponent-header-container p {
+    font-size: 2vh;
+    color:lightgrey;
+    margin:0;
+    text-align: center;
+}
+
+.opponent-table-container {
+    height:87.5%;
+    width:100%;
+}
+
+.opponent-table-flex {
+    height:100%;
+    width:100%;
+    display:flex;
+    flex-wrap:nowrap;
+    flex-direction:column; 
+    justify-content: space-around;
 }

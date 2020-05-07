@@ -15,6 +15,7 @@ const reducer = (state = initialState, action) => {
         let playersArray = [];
         for (let i = 0; i < state.AI.AICount ; i++){
             playersArray.push({
+                name : "Opponent",
                 hand : action.payload.hands[i+1],
                 isDown : false,
                 table : []

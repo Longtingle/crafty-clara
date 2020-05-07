@@ -11,15 +11,14 @@ const initialState = {
     player : {
         hand : [],
         cardSelected : null,
-        table : {
-
-        },
+        table : [],
         isDown : false,
         canGoDown : false,
         isGoingDown : false
     },
     AI : {
         players : [{
+            name : "",
             hand : [], //cards in hand
             isDown : false, //has cards on table
             table : [{

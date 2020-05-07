@@ -15,8 +15,13 @@ const testHand = [
 var Table = function (props) {
     return(
         <div className = 'table'>
-            <OpponentArea  />
-            <PlayerTable setRuns = {testHand}/>
+            <OpponentArea  
+                AI = {props.state.AI}
+                testHand = {testHand}
+            />
+            <PlayerTable 
+                setRuns = {props.state.player.table}
+            />
             <Deck 
                 deck = {props.state.deck}
                 discard = {props.state.discard[0]}
