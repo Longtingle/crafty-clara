@@ -29,6 +29,8 @@ var Table = function (props) {
                 discardClickHandler = {props.discardClickHandler}
             />
             <Hand 
+                playerHandSortSets = {props.playerHandSortSets}
+                playerHandSortRuns = {props.playerHandSortRuns}
                 hand = {props.state.player.hand}
                 cardSelected = {props.state.player.cardSelected}
                 handClickHandler = {props.handClickHandler}

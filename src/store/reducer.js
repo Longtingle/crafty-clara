@@ -274,6 +274,17 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
+    if (action.type === actions.SORT_PLAYER_HAND) {
+        
+        newState = update (state, {
+            player : {hand : {$set : action.payload.newHand}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
     if (action.type === actions.TEMPLATE) {
         
         newState = update (state, {

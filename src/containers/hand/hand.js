@@ -24,10 +24,10 @@ var Hand = function (props) {
         <div className = "player-area">
             <div className = "player-buttons-container">
                 <div className = "player-buttons-flex">
-                    <div className = "button">
+                    <div className = "button" onClick = {() => props.playerHandSortRuns()}>
                             <p>Sort for Runs</p>
                     </div>
-                    <div className = "button">
+                    <div className = "button" onClick = {() => props.playerHandSortSets()}>
                             <p>Sort for Sets</p>
                     </div>
                 </div>

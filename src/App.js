@@ -12,6 +12,7 @@ import {AI_CARD_SELECT} from './store/constants.js';
 import deckFunctions from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
+import handFunctions from './game-functions/hand-functions.js';
 
 //import react/css components
 import Table from './containers/table/table.js';
@@ -25,6 +26,8 @@ class App extends Component {
 
     constructor (props) {
         super(props);
+        this.playerHandSortRuns = this.playerHandSortRuns.bind(this);
+        this.playerHandSortSets = this.playerHandSortSets.bind(this);
     }
     
     render() {
@@ -38,6 +41,8 @@ class App extends Component {
             output = (
                 <div className = "App">
                     <Table
+                        playerHandSortSets = {this.playerHandSortSets}
+                        playerHandSortRuns = {this.playerHandSortRuns}
                         deckClickHandler = {this.deckClickHandler}
                         handClickHandler = {this.handClickHandler}
                         discardClickHandler = {this.discardClickHandler}
@@ -167,6 +172,21 @@ class App extends Component {
             return;
         }
     }
+
+    playerHandSortRuns(event) {
+        console.log(this);
+        console.log(this.props);
+        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
+        this.props.sortPlayerHand(newHand);
+    }
+
+    playerHandSortSets(event) {
+        console.log(this);
+        console.log(this.props);
+        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
+        this.props.sortPlayerHand(newHand);
+    }
+
 }
 
 const mapStateToProps = state => {
@@ -226,6 +246,10 @@ const mapDispatchToProps = dispatch => {
         fromAIToDiscard : (cardIndex) => dispatch({
             type : actions.FROM_AI_TO_DISCARD,
             payload : {cardIndex}
+        }),
+        sortPlayerHand : (newHand) => dispatch({
+            type : actions.SORT_PLAYER_HAND,
+            payload: {newHand}
         })
     }
 }

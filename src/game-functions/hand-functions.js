@@ -365,18 +365,41 @@ const getSets = (handArray) => {
     return setsSummarised;
 }
 
+const sortPlayerHand = (hand, param) => {
+    //param = "SETS" or "RUNS"
+    let newHand = [];
+
+    let handArray = hand.map((card, index) => {
+        let value = null;
+        let suit = null;
+        card.length === 3 ? value = card.substring(0, 2) : value = card.substring(0, 1);
+        suit = card.substring(card.length -1);
+        return {value : parseInt(value), suit : suit, index : index}
+    });
+
+    let sortedHandArray = sortHand(handArray, param);
+
+    console.log(sortedHandArray);
+    sortedHandArray.forEach((card) => {
+        
+        newHand.push(card.value + card.suit);
+    })
+    return newHand;
+}
 const handFunctions = {
     getRuns,
     getSets,
     scoreHand,
-    sortHand
+    sortHand,
+    sortPlayerHand
 }
 
 export {
     getRuns,
     getSets,
     scoreHand,
-    sortHand
+    sortHand,
+    sortPlayerHand
 }
 
 export default handFunctions;
