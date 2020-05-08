@@ -7,6 +7,12 @@
     z-index: 101;
     background: white;
 }
+.go-down-banner {
+    width:100%;
+    height:4%;
+    text-align:center;
+    line-height:100%;
+}
 
 .cancel-button {
     position:absolute;
@@ -63,7 +69,7 @@
 
 .submitted-container {
     height:45%;
-    padding-top:5%;
+    padding-top:1%;
     width:80%;
     margin:auto;
 }

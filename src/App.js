@@ -49,6 +49,7 @@ class App extends Component {
                         isGoingDown = {this.props.state.player.isGoingDown}
                         cancelClickHandler = {this.props.cancelPlayerGoDown}
                         hand = {this.props.state.player.hand}
+                        requirement = {this.props.state.game.requirement}
                         selectedCards = {this.props.state.UI.goingDown.selectedCards}
                         submittedSetruns = {this.props.state.UI.goingDown.submittedSetruns}
                         selectCardHandler = {this.goDownSelectCard}
@@ -210,14 +211,14 @@ class App extends Component {
         this.props.goDownSelectCard(cardNum);
     }
 
-    goDownSubmitSetrun = (event) => {
+    goDownSubmitSetrun = (event, requirement) => {
         if (this.props.state.UI.goingDown.selectedCards.length === 0) return;
         let setrun = this.props.state.UI.goingDown.selectedCards.map(cardNum => {
             return this.props.state.player.hand[cardNum];
         })
         console.log("SET CHECK: ");
         console.log(setrun);
-        console.log(handFunctions.checkSetrun(setrun, "SET"));
+        console.log(handFunctions.checkSetrun(setrun, requirement));
         //need to check that setrun is valid
         this.props.goDownSubmitSetrun();
     }
