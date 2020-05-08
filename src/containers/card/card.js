@@ -12,7 +12,6 @@ var Card = function (props) {
             <img 
                 className = {cardClass}
                 src={ ENV_VAR.IMG_DIR + "/cards/" + props.cardName + ".png"}
-                style={{zIndex : props.zIndex}}
                 onClick = {(event) => props.handClickHandler(event, props.cardNum)}
             ></img>
         </div>

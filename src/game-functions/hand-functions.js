@@ -2,6 +2,8 @@
 //Need to expose more paramters about the 'best hand', including individual run/set scores and run/set completion status. 
 //This will help when deciding whether it's worth picking up out of turn or not.
 
+import OpponentArea from "../containers/opponent-area/opponent-area";
+
 
 const scoreHand = (hand, requirement) => {
 
@@ -16,13 +18,7 @@ const scoreHand = (hand, requirement) => {
     let usefulCards = [];
 
     //turn hand into sorting array
-    let handArray = hand.map((card, index) => {
-        let value = null;
-        let suit = null;
-        card.length === 3 ? value = card.substring(0, 2) : value = card.substring(0, 1);
-        suit = card.substring(card.length -1);
-        return {value : parseInt(value), suit : suit, index : index}
-    });
+    let handArray = createHandArray(hand);
 
     if (requirement.R === 0){
 
@@ -198,6 +194,16 @@ const scoreHand = (hand, requirement) => {
         }
     }
 
+}
+const createHandArray = (hand) => {
+    let handArray = hand.map((card, index) => {
+        let value = null;
+        let suit = null;
+        card.length === 3 ? value = card.substring(0, 2) : value = card.substring(0, 1);
+        suit = card.substring(card.length -1);
+        return {value : parseInt(value), suit : suit, index : index}
+    });
+    return handArray;
 }
 
 const sortHand = (sortArray, param) => {
@@ -386,12 +392,37 @@ const sortPlayerHand = (hand, param) => {
     })
     return newHand;
 }
+
+const checkSetrun = (setrun, type) => {
+
+    let valid = 1;
+    let setrunArray = createHandArray(setrun);
+    if (type === "SET") {
+        let setValue = setrunArray[0].value
+        setrunArray.forEach(card => {if (card.value !== setValue) valid = 0;})
+    }
+
+    if (type === "RUNS") {
+        let runSuit = setrunArray[0].suit;
+        setrunArray.forEach((card,index) => {
+            if (index !== 0) {
+                if ((card.suit !== runSuit) || (card.value !== setrunArray[index-1].value + 1)) {
+                    valid = 0;
+                }
+            }
+        })
+    }
+    return (valid === 1) ? true : false;
+
+}
+
 const handFunctions = {
     getRuns,
     getSets,
     scoreHand,
     sortHand,
-    sortPlayerHand
+    sortPlayerHand,
+    checkSetrun
 }
 
 export {
@@ -399,7 +430,8 @@ export {
     getSets,
     scoreHand,
     sortHand,
-    sortPlayerHand
+    sortPlayerHand,
+    checkSetrun
 }
 
 export default handFunctions;
