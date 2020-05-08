@@ -17,7 +17,6 @@ var Table = function (props) {
         <div className = 'table'>
             <OpponentArea  
                 AI = {props.state.AI}
-                testHand = {testHand}
             />
             <PlayerTable 
                 setRuns = {props.state.player.table}

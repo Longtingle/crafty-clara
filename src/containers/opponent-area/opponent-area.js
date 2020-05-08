@@ -9,7 +9,6 @@ const OpponentArea = (props) => {
         let inPlay = (props.AI.AIInPlay === index) ? true : false;
         return (
             <OpponentHeader 
-                testHand = {props.testHand}
                 name = {player.name}
                 inPlay = {inPlay}
                 isDown = {player.isDown}

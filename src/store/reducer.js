@@ -352,6 +352,22 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
+    if (action.type === actions.GO_DOWN_SUBMIT_HAND) {
+        newHand = [...state.player.hand];
+        state.UI.goingDown.submittedSetruns.forEach((setrun, index) => {
+            
+        });
+        newState = update (state, {
+            
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    return state;
+
     if (action.type === actions.TEMPLATE) {
         
         newState = update (state, {

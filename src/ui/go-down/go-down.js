@@ -8,14 +8,22 @@ const GoDown = (props) => {
     let remainingHand = [...props.hand];
     let submittedOutput = null;
     let requirement = null;
+    
     if (props.requirement.R === 0 && props.requirement.S > props.submittedSetruns.length) {
         requirement = "SET";
     } else if ((props.requirement.R <= props.submittedSetruns.length) && (props.requirement.S + props.requirement.R > props.submittedSetruns.length)) {
         requirement = "SET";
     } else if (props.requirement.R > props.submittedSetruns.length) {
         requirement = "RUN";
-    }
-    
+    } else {
+        // don't need anything else
+        requirement = "NONE";
+    }    
+
+    let requirementText = "";
+    if (requirement === "SET"){ requirementText = "Please provide a valid SET."};
+    if (requirement === "RUN"){ requirementText = "Please provide a valid RUN."};
+    if (requirement === "NONE"){ requirementText = "Requirement met, press go down to submit to table"};
 
     if (props.submittedSetruns.length !== 0){
 
@@ -58,7 +66,7 @@ const GoDown = (props) => {
             <div className = "go-down-container">
                 <div className = "cancel-button" onClick = {props.cancelClickHandler}><p>X</p></div>
                 <div className = "go-down-banner">
-                     
+                     {requirementText}
                 </div>
                 <div className = "submitted-container">
                     <div className = "submitted-flex">
@@ -69,7 +77,7 @@ const GoDown = (props) => {
                     <div className = "modal-button" onClick = {(event) => props.submitSetrunHandler(event, requirement)}>
                         <p>Submit Set/Run</p>
                     </div>
-                    <div className = "modal-button" onClick = {props.submitSetrunHandler}>
+                    <div className = "modal-button" onClick = {() => props.submitHandHandler()}>
                         <p>Go Down</p>
                     </div>
                 </div>

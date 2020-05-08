@@ -398,11 +398,13 @@ const checkSetrun = (setrun, type) => {
     let valid = 1;
     let setrunArray = createHandArray(setrun);
     if (type === "SET") {
+        if (setrun.length < 3) valid = 0;
         let setValue = setrunArray[0].value
         setrunArray.forEach(card => {if (card.value !== setValue) valid = 0;})
     }
 
     if (type === "RUNS") {
+        if (setrun.length < 4) valid = 0;
         let runSuit = setrunArray[0].suit;
         setrunArray.forEach((card,index) => {
             if (index !== 0) {

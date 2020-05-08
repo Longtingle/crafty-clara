@@ -18,10 +18,9 @@ const OpponentHeader = (props) => {
         nameStyle = {fontWeight : "bold", color : "white"};
     };
     let tableOutput = null;
-    if (true) { //GET RID OF THIS
-    //if (props.isDown) {
-        tableOutput = props.testHand.map((setrun, index) => { // GET RID OF THIS
-        //let tableOutput = props.table.map((setrun, index) => {
+    
+    if (props.isDown) {
+        let tableOutput = props.table.map((setrun, index) => {
             let key = "OpponentSetrun"+index;
             return(
                 <OpponentSetrun 
