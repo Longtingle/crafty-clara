@@ -1,0 +1,9 @@
+.modal-back {
+    width:100vw;
+    height:100vh;
+    position:absolute;
+    top:0;
+    left:0;
+    background-color:rgba(50,50,50,0.8);
+    z-index: 100;
+}

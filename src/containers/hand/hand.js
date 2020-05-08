@@ -30,6 +30,9 @@ var Hand = function (props) {
                     <div className = "button" onClick = {() => props.playerHandSortSets()}>
                             <p>Sort for Sets</p>
                     </div>
+                    <div className = "button" onClick = {() => props.goDownClickHandler()}>
+                            <p>Go Down</p>  
+                    </div>
                 </div>
             </div>
             <div className = "player-hand-container">

@@ -8,6 +8,13 @@ const initialState = {
         round : 0,
         requirement : 0,
     },
+    UI : {
+        showModalBack : false,
+        goingDown : {
+            selectedCards : [],
+            submittedSetruns : []
+        }
+    },
     player : {
         hand : [],
         cardSelected : null,

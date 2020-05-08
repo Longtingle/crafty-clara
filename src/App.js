@@ -14,9 +14,13 @@ import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
 import handFunctions from './game-functions/hand-functions.js';
 
-//import react/css components
+//import react components
 import Table from './containers/table/table.js';
 import Home from './ui/home/home.js';
+import ModalBack from './ui/modal-back/modal-back.js';
+import GoDown from './ui/go-down/go-down';
+
+//import CSS
 import './App.css';
 
 
@@ -40,9 +44,16 @@ class App extends Component {
         } else { 
             output = (
                 <div className = "App">
+                    <ModalBack showModalBack = {this.props.state.UI.showModalBack}/>
+                    <GoDown 
+                        isGoingDown = {this.props.state.player.isGoingDown}
+                        cancelClickHandler = {this.props.cancelPlayerGoDown}
+                        hand = {this.props.state.player.hand}
+                    />
                     <Table
                         playerHandSortSets = {this.playerHandSortSets}
                         playerHandSortRuns = {this.playerHandSortRuns}
+                        goDownClickHandler = {this.goDownClickHandler}
                         deckClickHandler = {this.deckClickHandler}
                         handClickHandler = {this.handClickHandler}
                         discardClickHandler = {this.discardClickHandler}
@@ -173,19 +184,33 @@ class App extends Component {
         }
     }
 
-    playerHandSortRuns(event) {
-        console.log(this);
-        console.log(this.props);
+    playerHandSortRuns() {
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
         this.props.sortPlayerHand(newHand);
     }
 
-    playerHandSortSets(event) {
-        console.log(this);
-        console.log(this.props);
+    playerHandSortSets() {
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
         this.props.sortPlayerHand(newHand);
     }
+
+    goDownClickHandler = () => {
+        this.props.showGoingDownModal();
+    }
+
+    cancelPlayerGoDown = () => {
+        this.props.cancelPlayerGoDown();
+    }
+
+    goDownSelectCard = (event, cardNum) => {
+        this.props.goDownSelectCard(cardNum);
+    }
+
+    goDownSubmitSetrun = (event) => {
+        this.props.goDownSubmitSetrun();
+    }
+
+    
 
 }
 
@@ -250,6 +275,19 @@ const mapDispatchToProps = dispatch => {
         sortPlayerHand : (newHand) => dispatch({
             type : actions.SORT_PLAYER_HAND,
             payload: {newHand}
+        }),
+        showGoingDownModal : () => dispatch({
+            type : actions.SHOW_GOING_DOWN_MODAL
+        }),
+        cancelPlayerGoDown : () => dispatch({
+            type : actions.CANCEL_PLAYER_GO_DOWN
+        }),
+        goDownSelectCard : (cardNum) => dispatch({
+            type : actions.GO_DOWN_SELECT_CARD,
+            payload : {cardNum}
+        }),
+        goDownSubmitSetrun : () => dispatch({
+            type : actions.GO_DOWN_SUBMIT_SETRUN,
         })
     }
 }

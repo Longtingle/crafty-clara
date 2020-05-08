@@ -31,6 +31,7 @@ var Table = function (props) {
             <Hand 
                 playerHandSortSets = {props.playerHandSortSets}
                 playerHandSortRuns = {props.playerHandSortRuns}
+                goDownClickHandler = {props.goDownClickHandler}
                 hand = {props.state.player.hand}
                 cardSelected = {props.state.player.cardSelected}
                 handClickHandler = {props.handClickHandler}

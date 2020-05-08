@@ -285,6 +285,67 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
+    if (action.type === actions.SHOW_GOING_DOWN_MODAL) {
+        
+        newState = update (state, {
+            UI : {showModalBack : {$set : true}},
+            player : {isGoingDown : {$set : true}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.CANCEL_PLAYER_GO_DOWN) {
+        
+        newState = update (state, {
+            UI : {showModalBack : {$set : false}},
+            player : {isGoingDown : {$set : false}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.GO_DOWN_SELECT_CARD) {
+        let selectedCards = [...state.UI.goingDown.selectedCards];
+        if(selectedCards.includes(state.player.hand[action.payload.cardNum])){
+            selectedCards.push(state.player.hand[action.payload.cardNum]);
+        }else{
+            return state;
+        }
+        
+        newState = update (state, {
+            UI : {goingDown : {selectedCards : {$set : selectedCards}}}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.GO_DOWN_SUBMIT_SETRUN) {
+        let selectedCards = [...state.UI.goingDown.selectedCards];
+        let submittedSetruns = [...state.UI.goingDown.submittedSetruns];
+        
+        submittedSetruns.push(selectedCards);
+
+        newState = update (state, {
+            UI : { 
+                goingDown : { 
+                    selectedCards : {$set : []},
+                    submittedSetruns : {$set : submittedSetruns}
+                }
+            }
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
     if (action.type === actions.TEMPLATE) {
         
         newState = update (state, {

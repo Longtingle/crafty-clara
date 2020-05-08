@@ -1,0 +1,42 @@
+.go-down-container {
+    height:80vh;
+    width:80vw;
+    position:absolute;
+    top:10vh;
+    left:10vw;
+    z-index: 101;
+    background: white;
+}
+
+.cancel-button {
+    position:absolute;
+    right:5px;
+    top:5px;
+    height:2vh;
+    width:2vh;
+    display:flex;
+    z-index: 102;
+    background-color:rgb(50,50,50);
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.cancel-button:hover {
+    cursor: pointer;
+}
+
+.cancel-button p{    
+    margin:0;
+    color:white;
+    text-align:center;
+}
+
+.hand-container {
+    width :90%;
+    margin:auto;
+    height:30%;
+    display:flex;
+    flex-wrap:nowrap;
+    align-content:center;
+}
