@@ -221,10 +221,30 @@ class App extends Component {
         let result = handFunctions.checkSetrun(setrun, requirement);
         if (!handFunctions.checkSetrun(setrun, requirement)) return;
         //need to check that setrun is valid
-        this.props.goDownSubmitSetrun();
+        let setrunSubmit = {
+            type : requirement.toLowerCase(),
+            cards : this.props.state.UI.goingDown.selectedCards
+        }
+        this.props.goDownSubmitSetrun(setrunSubmit);
     }
 
-    goDownSubmitHand = () => {
+    goDownSubmitHand = (event, requirement) => {
+        if (requirement !== "NONE") return;
+        let newHand = [...this.props.state.player.hand];
+        let usedCards = [];
+        let table = [];
+        // create new hand with used cards removed.
+        // create player's 'table' object.
+        this.props.state.UI.goingDown.submittedSetruns.forEach((setrun, index) => {
+        
+            setrun.cards.forEach((cardNum, index) => {
+                usedCards.push(cardNum);
+            })
+        })
+
+        usedCards.sort((a,b) => b-a);
+        console.log("usedCards");
+        console.log(usedCards);
         this.props.goDownSubmitHand();
     }
     
@@ -303,8 +323,9 @@ const mapDispatchToProps = dispatch => {
             type : actions.GO_DOWN_SELECT_CARD,
             payload : {cardNum}
         }),
-        goDownSubmitSetrun : () => dispatch({
+        goDownSubmitSetrun : (setrun) => dispatch({
             type : actions.GO_DOWN_SUBMIT_SETRUN,
+            payload : {setrun}
         })
     }
 }

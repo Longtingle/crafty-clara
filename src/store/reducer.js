@@ -5,6 +5,9 @@ import {AI_STAGES} from './constants.js';
 import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
 
+const testHand = [
+    "2C", "2H", "2D", "4S", "5S", "6S", "7S", "8H", "8S", "8D", "11H", "12H"
+]
 
 const reducer = (state = initialState, action) => {
     let newState;  
@@ -30,7 +33,8 @@ const reducer = (state = initialState, action) => {
                 requirement : {$set : {R : 0, S : 2}}
             },
             player : {
-                hand : { $set : Array.from(action.payload.hands[0])}
+                //hand : { $set : Array.from(action.payload.hands[0])}
+                hand : { $set : testHand}
             },
             AI : { players : {$set : playersArray}}, 
             deck : {$set : action.payload.deck},
@@ -336,7 +340,7 @@ const reducer = (state = initialState, action) => {
         let selectedCards = [...state.UI.goingDown.selectedCards];
         let submittedSetruns = [...state.UI.goingDown.submittedSetruns];
         
-        submittedSetruns.push(selectedCards);
+        submittedSetruns.push(action.payload.setrun);
 
         newState = update (state, {
             UI : { 

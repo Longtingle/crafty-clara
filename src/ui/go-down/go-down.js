@@ -28,7 +28,8 @@ const GoDown = (props) => {
     if (props.submittedSetruns.length !== 0){
 
         submittedOutput = props.submittedSetruns.map((setrun) => {
-            let setrunOutput = setrun.map(cardNum => {
+            console.log(setrun);
+            let setrunOutput = setrun.cards.map(cardNum => {
                 return  <Card 
                             cardName = {props.hand[cardNum]}
                             handClickHandler = {() => false}
@@ -44,7 +45,7 @@ const GoDown = (props) => {
         })
 
         props.submittedSetruns.forEach((setrun) => {
-            setrun.forEach((cardNum) => {
+            setrun.cards.forEach((cardNum) => {
                 remainingHand[cardNum] = "skip";
             })
         })
@@ -77,7 +78,7 @@ const GoDown = (props) => {
                     <div className = "modal-button" onClick = {(event) => props.submitSetrunHandler(event, requirement)}>
                         <p>Submit Set/Run</p>
                     </div>
-                    <div className = "modal-button" onClick = {() => props.submitHandHandler()}>
+                    <div className = "modal-button" onClick = {(event) => props.submitHandHandler(event, requirement)}>
                         <p>Go Down</p>
                     </div>
                 </div>
