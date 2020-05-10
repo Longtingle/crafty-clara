@@ -58,10 +58,29 @@ const AIFunctions = {
 
 
     canGoDown : (hand, requirement) => {
-        
-        //TODO
-        return false;
-        //return true;
+        let score = scoreHand(hand, requirement);
+        if (!score.readyToGoDown) return {result : false};
+        let table = [];
+        let usedCards = [];
+        score.bestHand.forEach((setrun, index) => {
+            let setrunCards = [];
+            setrun.keys.forEach(cardNum => {
+                setrunCards.push(hand[cardNum]);
+                usedCards.push(cardNum);
+            });
+            table.push({type : setrun.type, cards : setrunCards})
+        })
+        usedCards.sort((a, b) => b-a);
+        console.log(usedCards);
+        let newHand = [...hand];
+        usedCards.forEach((cardNum) => {
+            newHand.splice(cardNum, 1);
+        })
+        return {
+            result : true,
+            table,
+            newHand
+        }
     },
 
 

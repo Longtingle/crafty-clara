@@ -4,6 +4,8 @@ import GAME_STATES from './constants.js';
 import {AI_STAGES} from './constants.js';
 import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
+import _ from 'lodash';
+import { shallowEqual } from 'react-redux';
 
 const testHand = [
     "2C", "2H", "2D", "4S", "5S", "6S", "7S", "8H", "8S", "8D", "11H", "12H"
@@ -357,12 +359,21 @@ const reducer = (state = initialState, action) => {
     }
 
     if (action.type === actions.GO_DOWN_SUBMIT_HAND) {
-        newHand = [...state.player.hand];
-        state.UI.goingDown.submittedSetruns.forEach((setrun, index) => {
-            
-        });
+        console.log(action.payload.table);
+        console.log(action.payload.hand);
+        let player = _.cloneDeep(state.player);
+        player.isGoingDown = false;
+        player.hand = action.payload.hand;
+        player.isDown = true;
+        player.table = action.payload.table;
+        let UI = _.cloneDeep(state.UI);
+        UI.goingDown.selectedCards = [];
+        UI.goingDown.submittedSetruns = [];
+        UI.showModalBack = false;
+
         newState = update (state, {
-            
+            UI : {$set : UI},
+            player : {$set : player}
         });
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");

@@ -178,29 +178,32 @@ class App extends Component {
         }
 
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
-            
-            if (AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement)){
-                //can go down
-            }else {
-                //can't go down, discard.                
+            let goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+            if (goDownResult.result === false) {
                 let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
                 this.props.fromAIToDiscard(discardIndex);
             }
-            return;
+            
+            //we can go down - so what to do?
         }
     }
 
     playerHandSortRuns() {
+        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
+            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
         this.props.sortPlayerHand(newHand);
     }
 
     playerHandSortSets() {
+        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
         this.props.sortPlayerHand(newHand);
     }
 
     goDownClickHandler = () => {
+        if (this.props.state.player.isDown) return;
+        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
         this.props.showGoingDownModal();
     }
 
@@ -233,19 +236,27 @@ class App extends Component {
         let newHand = [...this.props.state.player.hand];
         let usedCards = [];
         let table = [];
+        let counter = 0;
+        let cardsArray = []
         // create new hand with used cards removed.
         // create player's 'table' object.
         this.props.state.UI.goingDown.submittedSetruns.forEach((setrun, index) => {
-        
+            
             setrun.cards.forEach((cardNum, index) => {
                 usedCards.push(cardNum);
-            })
+                cardsArray.push(this.props.state.player.hand[cardNum]);
+            });
+            table.push({
+                type : setrun.type,
+                cards : cardsArray
+            });
+            cardsArray = []
         })
 
         usedCards.sort((a,b) => b-a);
-        console.log("usedCards");
-        console.log(usedCards);
-        this.props.goDownSubmitHand();
+
+        usedCards.forEach((cardNum) => {newHand.splice(cardNum, 1)})
+        this.props.goDownSubmitHand(table, newHand);
     }
     
 
@@ -326,6 +337,10 @@ const mapDispatchToProps = dispatch => {
         goDownSubmitSetrun : (setrun) => dispatch({
             type : actions.GO_DOWN_SUBMIT_SETRUN,
             payload : {setrun}
+        }),
+        goDownSubmitHand : (table, hand) => dispatch({
+            type : actions.GO_DOWN_SUBMIT_HAND,
+            payload : {table, hand}
         })
     }
 }
