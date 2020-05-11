@@ -3,9 +3,11 @@ import React from 'react';
 import './round-end.css';
 
 const RoundEnd = (props) => {
+    console.log(props);
     let AIRows = [];
     let playerRow = [];
     let headerRow = [];
+
     headerRow.push("Player");
     for (let i = 1; i < 8 ; i++) {
         headerRow.push("Round " + i);
@@ -22,8 +24,8 @@ const RoundEnd = (props) => {
         playerRow.push("-");
     }
     playerRow.push(props.player.points.total);
-    props.AIPlayers.forEach(player, index => {
-        AIRows.push([]);
+    props.AIPlayers.forEach((player, index) => {
+        AIRows[index] = [];
         player.points.points.forEach(points => {
             AIRows[index].push(points);
         });
@@ -36,7 +38,9 @@ const RoundEnd = (props) => {
     console.log(AIRows);
     console.log(playerRow);
     console.log(headerRow);
+    
     return (
+        
         <div className = "round-end-container">
             <div className = "scoreboard-container">
                 

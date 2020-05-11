@@ -8,7 +8,7 @@ import _ from 'lodash';
 import { shallowEqual } from 'react-redux';
 
 const testHand = [
-    "2C", "2H", "2D", "4S", "8H", "8S", "8D"
+    "2C", "2H", "2D", "2S", "8H", "8S", "8D"
 ]
 
 const reducer = (state = initialState, action) => {
