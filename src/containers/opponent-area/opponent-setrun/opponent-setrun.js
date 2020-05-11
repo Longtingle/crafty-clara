@@ -6,7 +6,11 @@ const OpponentSetrun = (props) => {
     let output = props.setrun.cards.map((card, index) => {
         let key = "opponentCard"+index;
         return (
-            <Card cardName = {card}/>
+            <Card 
+                handClickHandler = {(event) => props.playerAddCardToTable(event, "AI", props.setrunIndex, props.AIIndex)}
+                cardName = {card}
+                key = {key} 
+            />
         )
     });
 

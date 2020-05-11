@@ -13,6 +13,7 @@ var Card = function (props) {
                 className = {cardClass}
                 src={ ENV_VAR.IMG_DIR + "/cards/" + props.cardName + ".png"}
                 onClick = {(event) => props.handClickHandler(event, props.cardNum)}
+                alt = { ENV_VAR.IMG_DIR + "/cards/empty-discard.png"}
             ></img>
         </div>
     );

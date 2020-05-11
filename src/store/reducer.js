@@ -8,7 +8,7 @@ import _ from 'lodash';
 import { shallowEqual } from 'react-redux';
 
 const testHand = [
-    "2C", "2H", "2D", "4S", "5S", "6S", "7S", "8H", "8S", "8D", "11H", "12H"
+    "2C", "2H", "2D", "4S", "5S", "6S", "7S", "8H", "8S", "8D", "11H", "12H", "8H"
 ]
 
 const reducer = (state = initialState, action) => {
@@ -375,6 +375,97 @@ const reducer = (state = initialState, action) => {
             UI : {$set : UI},
             player : {$set : player}
         });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.AI_GO_DOWN_SUBMIT) {
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        console.log("AI GOING DOWN");
+        let newHand = action.payload.hand;
+        //let discardCard = newHand.splice(0, 1);
+        //let newDiscard = [...state.discard];
+        //newDiscard.unshift(discardCard[0]);
+
+        let AI = _.cloneDeep(state.AI);
+
+        AI.players[state.AI.AIInPlay].hand = newHand;
+        AI.players[state.AI.AIInPlay].isDown = true;
+        AI.players[state.AI.AIInPlay].table = action.payload.table;
+  
+        newState = update (state, {
+            AI : {$set : AI}
+        });
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.AI_ADD_CARD_TO_TABLE) {
+        //this.props.AIAddCardToTable(newSetrun, newHand, playerType, setrunIndex, AIIndex)
+        let table;
+
+        let AI = _.cloneDeep(state.AI);
+        AI.players[state.AI.AIInPlay].hand = action.payload.newHand;
+        if (action.payload.playerType === "player") { 
+            table = _.cloneDeep(state.player.table);
+            table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            newState = update (state, {
+                player : {
+                    cardSelected : {$set : null},
+                    table : {$set : table}
+                },
+                AI : {$set : AI}
+            });
+        } else {
+            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+
+            newState = update (state, {
+                AI : {$set : AI}
+            });
+        }
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.PLAYER_ADD_CARD_TO_TABLE) {
+        let hand = _.clone(state.player.hand);
+        hand.splice(state.player.cardSelected, 1);
+        let table;
+        if (action.payload.playerType === "player") { 
+            table = _.cloneDeep(state.player.table);
+            table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            newState = update (state, {
+                player : {
+                    hand : {$set : hand},
+                    cardSelected : {$set : null},
+                    table : {$set : table}
+                }
+            });
+        } else {
+            let AI = _.cloneDeep(state.AI);
+            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+
+            newState = update (state, {
+                player : {
+                    hand : {$set : hand},
+                    cardSelected : {$set : null}
+                }, 
+                AI : {$set : AI}
+            });
+        }
+        
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
         if (state.debug === true) console.log(newState);

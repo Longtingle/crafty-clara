@@ -16,16 +16,19 @@ var Table = function (props) {
     return(
         <div className = 'table'>
             <OpponentArea  
+                playerAddCardToTable = {props.playerAddCardToTable}
                 AI = {props.state.AI}
             />
             <PlayerTable 
                 setRuns = {props.state.player.table}
+                playerAddCardToTable = {props.playerAddCardToTable}
             />
             <Deck 
                 deck = {props.state.deck}
                 discard = {props.state.discard[0]}
                 deckClickHandler = {props.deckClickHandler}
                 discardClickHandler = {props.discardClickHandler}
+                whatWasClicked = {props.whatWasClicked}
             />
             <Hand 
                 playerHandSortSets = {props.playerHandSortSets}
@@ -34,6 +37,7 @@ var Table = function (props) {
                 hand = {props.state.player.hand}
                 cardSelected = {props.state.player.cardSelected}
                 handClickHandler = {props.handClickHandler}
+                whatWasClicked = {props.whatWasClicked}
             />
         </div>
     );

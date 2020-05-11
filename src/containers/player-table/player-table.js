@@ -10,7 +10,12 @@ const PlayerTable = (props) => {
     output= props.setRuns.map((setrun, index) => { 
         let keyString = "player-setrun-" + index;
         return (
-            <PlayerTableSetrun setrun = {setrun} key = {keyString} />
+            <PlayerTableSetrun 
+                setrun = {setrun} 
+                key = {keyString} 
+                playerAddCardToTable = {props.playerAddCardToTable}
+                index = {index}
+            />
         )
     })
     return (

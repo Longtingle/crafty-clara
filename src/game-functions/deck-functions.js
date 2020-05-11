@@ -31,9 +31,7 @@ const deal = (deck, numPlayers) => {
             deck.shift(0);
         }
     }
-    console.log(deck);
-    console.log(players);
-    
+
     return players;
   
 }

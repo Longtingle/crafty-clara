@@ -394,16 +394,18 @@ const sortPlayerHand = (hand, param) => {
 }
 
 const checkSetrun = (setrun, type) => {
-
     let valid = 1;
     let setrunArray = createHandArray(setrun);
-    if (type === "SET") {
+    if (type.toUpperCase() === "SET") {
+
         if (setrun.length < 3) valid = 0;
         let setValue = setrunArray[0].value
-        setrunArray.forEach(card => {if (card.value !== setValue) valid = 0;})
+        setrunArray.forEach(card => {
+            if (card.value !== setValue) valid = 0;
+        })
     }
 
-    if (type === "RUNS") {
+    if (type.toUpperCase() === "RUNS") {
         if (setrun.length < 4) valid = 0;
         let runSuit = setrunArray[0].suit;
         setrunArray.forEach((card,index) => {

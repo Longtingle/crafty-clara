@@ -12,7 +12,7 @@ import {AI_CARD_SELECT} from './store/constants.js';
 import deckFunctions from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
-import handFunctions from './game-functions/hand-functions.js';
+import handFunctions, { sortHand } from './game-functions/hand-functions.js';
 
 //import react components
 import Table from './containers/table/table.js';
@@ -32,6 +32,7 @@ class App extends Component {
         super(props);
         this.playerHandSortRuns = this.playerHandSortRuns.bind(this);
         this.playerHandSortSets = this.playerHandSortSets.bind(this);
+        this.playerAddCardToTable = this.playerAddCardToTable.bind(this);
     }
     
     render() {
@@ -57,6 +58,7 @@ class App extends Component {
                         submitHandHandler = {this.goDownSubmitHand}
                     />
                     <Table
+                        playerAddCardToTable = {this.playerAddCardToTable}
                         playerHandSortSets = {this.playerHandSortSets}
                         playerHandSortRuns = {this.playerHandSortRuns}
                         goDownClickHandler = {this.goDownClickHandler}
@@ -74,55 +76,8 @@ class App extends Component {
         );
     }
 
-    newGameHandler = () => {
-        //generate deck with 2 shuffled packs of cards
-        let deck = deckFunctions.generateDeck(2);
-        //deal into numbers of hands required.
-        let hands = deckFunctions.deal(deck, params.numberOfPlayers);
-    
-        let discard = [];
-        discard.push(deck[0])
-        deck.shift();
-        this.props.startNewGame(deck, hands, discard);
-    }
-
-    deckClickHandler = () => {
-        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
-            this.props.fromDeckToPlayer();
-        }
-    }
-
-    discardClickHandler = () => {
-        console.log("discardClickHandler triggered.");
-        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
-            this.props.fromDiscardToPlayer();
-        } else if ( 
-            this.props.state.game.gameState === GAME_STATES.PW_PLAY && 
-            this.props.state.player.cardSelected && 
-            !this.props.state.player.isGoingDown
-        ){
-            let OOTResult = AIFunctions.resolveOOT(this.props.state.OOTRequests, this.props.state.AI.AIInPlay);
-            console.log(OOTResult);
-            if (OOTResult.winnerType !== "none") {
-                this.props.drawOOTResolve(OOTResult);
-            }
-            this.props.fromHandToDiscard();
-        } else if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
-            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD){
-            this.playerOOTRequest = {type : "player", index : params.numberOfPlayers - 1}
-        }
-
-    }
-
-    handClickHandler = (event, cardNum) => { 
-        console.log(cardNum);
-        if (this.props.state.game.gameState === GAME_STATES.PW_PLAY && this.props.state.player.isGoingDown === false) {
-            //we're not in going down mode, so get the card selected ready for going onto the table or going onto the discard.
-            this.props.selectCardFromHand(cardNum);
-        }
-    }
-
     componentDidUpdate() {
+
         console.log("componentDidUpdate:");
         console.log("AI IN PLAY: " + this.props.state.AI.AIInPlay + "  - GAMESTATE : " + this.props.state.game.gameState);
         //If the state show that the active AI needs to draw a card, then trigger that action.
@@ -178,13 +133,96 @@ class App extends Component {
         }
 
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
-            let goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
-            if (goDownResult.result === false) {
-                let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
-                this.props.fromAIToDiscard(discardIndex);
+
+            // can AI go down?
+
+            // can AI build on other hands?
+
+            // AI must discard
+
+            // Does discarding end round?
+            let goDownResult;
+            if (this.props.state.AI.players[this.props.state.AI.AIInPlay].isDown === false) {
+                goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+                if (goDownResult.result === false) {
+                    let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+                    this.props.fromAIToDiscard(discardIndex);
+                } else if (goDownResult.result === true){
+                    //we can go down, check for hand building with new hand
+
+                    this.props.AIGoDownSubmit(goDownResult.table, goDownResult.newHand);
+                }
+            } else {
+                //AI is down - check for hand building 
+                let AITables = [];
+                    this.props.state.AI.players.forEach((player, index) => {
+                        AITables.push({
+                            type : "AI",
+                            index,
+                            table : player.table
+                        });
+                    });
+                let handBuildResult = AIFunctions.AIHandBuild(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, AITables, this.props.state.player.table);
+                console.log("AI Hand Build Result");
+                console.log(handBuildResult);
+                
+                if (handBuildResult.result === false) { 
+                    this.props.fromAIToDiscard(0);
+                } else {
+                    this.props.AIAddCardToTable(handBuildResult.newSetrun,handBuildResult.newHand, handBuildResult.playerType, handBuildResult.setrunIndex, handBuildResult.AIIndex)
+                }
             }
             
-            //we can go down - so what to do?
+            
+
+        }
+    }
+
+    newGameHandler = () => {
+        //generate deck with 2 shuffled packs of cards
+        let deck = deckFunctions.generateDeck(2);
+        //deal into numbers of hands required.
+        let hands = deckFunctions.deal(deck, params.numberOfPlayers);
+    
+        let discard = [];
+        discard.push(deck[0])
+        deck.shift();
+        this.props.startNewGame(deck, hands, discard);
+    }
+
+    deckClickHandler = () => {
+        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
+            this.props.fromDeckToPlayer();
+        }
+    }
+
+    discardClickHandler = () => {
+        console.log("discardClickHandler triggered.");
+        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
+            this.props.fromDiscardToPlayer();
+        } else if ( 
+            this.props.state.game.gameState === GAME_STATES.PW_PLAY && 
+            this.props.state.player.cardSelected !== null && 
+            !this.props.state.player.isGoingDown
+        ){
+            let OOTResult = AIFunctions.resolveOOT(this.props.state.OOTRequests, this.props.state.AI.AIInPlay);
+            console.log(OOTResult);
+            if (OOTResult.winnerType !== "none") {
+                this.props.drawOOTResolve(OOTResult);
+            }
+            this.props.fromHandToDiscard();
+        } else if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
+            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD){
+            this.playerOOTRequest = {type : "player", index : params.numberOfPlayers - 1}
+        }
+
+    }
+
+    handClickHandler = (event, cardNum) => { 
+        console.log(cardNum);
+        if (this.props.state.game.gameState === GAME_STATES.PW_PLAY && this.props.state.player.isGoingDown === false) {
+            //we're not in going down mode, so get the card selected ready for going onto the table or going onto the discard.
+            this.props.selectCardFromHand(cardNum);
         }
     }
 
@@ -196,7 +234,8 @@ class App extends Component {
     }
 
     playerHandSortSets() {
-        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
+        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
+            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
         this.props.sortPlayerHand(newHand);
     }
@@ -257,6 +296,27 @@ class App extends Component {
 
         usedCards.forEach((cardNum) => {newHand.splice(cardNum, 1)})
         this.props.goDownSubmitHand(table, newHand);
+    }
+
+    playerAddCardToTable(event, playerType, setrunIndex, AIIndex) {
+        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
+        if (this.props.state.player.cardSelected === false) return;
+        if (!this.props.state.player.isDown) return;
+        let setrun;
+        
+        if (playerType === "player") {
+            setrun = this.props.state.player.table[setrunIndex];
+        } else if (playerType === "AI") {
+            setrun = this.props.state.AI.players[AIIndex].table[setrunIndex];
+        }
+        if (!setrun) return;
+        let newSetrun = [...setrun.cards];
+        newSetrun.push(this.props.state.player.hand[this.props.state.player.cardSelected]);
+        
+        if (!handFunctions.checkSetrun(newSetrun, setrun.type.toUpperCase())) return;
+        
+        this.props.playerAddCardToTable(newSetrun, playerType, setrunIndex, AIIndex);   
+
     }
     
 
@@ -341,6 +401,18 @@ const mapDispatchToProps = dispatch => {
         goDownSubmitHand : (table, hand) => dispatch({
             type : actions.GO_DOWN_SUBMIT_HAND,
             payload : {table, hand}
+        }),
+        AIGoDownSubmit : (table, hand, discardIndex) => dispatch ({
+            type : actions.AI_GO_DOWN_SUBMIT, 
+            payload : {table, hand, discardIndex}
+        }),
+        AIAddCardToTable : (newSetrun, newHand, playerType, setrunIndex, AIIndex) => dispatch ({
+            type : actions.AI_ADD_CARD_TO_TABLE,
+            payload : {newSetrun, newHand, playerType, setrunIndex, AIIndex}
+        }),
+        playerAddCardToTable : (newSetrun, playerType, setrunIndex, AIIndex) => dispatch ({
+            type : actions.PLAYER_ADD_CARD_TO_TABLE,
+            payload : {newSetrun, playerType, setrunIndex, AIIndex}
         })
     }
 }

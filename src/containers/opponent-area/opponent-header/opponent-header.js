@@ -5,11 +5,7 @@ import './opponent-header.css';
 import { findRenderedComponentWithType } from 'react-dom/test-utils';
 
 const OpponentHeader = (props) => {
-    //props needed.
-    //AI Cards on table
-    //AIInPlay
-    //Opponent name
-    //
+    
     let name = props.name;
     let nameStyle = {};
 
@@ -20,10 +16,13 @@ const OpponentHeader = (props) => {
     let tableOutput = null;
     
     if (props.isDown) {
-        let tableOutput = props.table.map((setrun, index) => {
+           tableOutput = props.table.map((setrun, index) => {
             let key = "OpponentSetrun"+index;
             return(
                 <OpponentSetrun 
+                    playerAddCardToTable = {props.playerAddCardToTable}
+                    setrunIndex = {index}
+                    AIIndex = {props.index}
                     setrun = {setrun}
                     key = {key} 
                 />
