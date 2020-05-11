@@ -422,7 +422,7 @@ const checkSetrun = (setrun, type) => {
 
 const getPoints = (hand) => {
     //TODO
-    return 10;
+    return 80;
 }
 
 const handFunctions = {

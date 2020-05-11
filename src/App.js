@@ -19,7 +19,7 @@ import Table from './containers/table/table.js';
 import Home from './ui/home/home.js';
 import ModalBack from './ui/modal-back/modal-back.js';
 import GoDown from './ui/go-down/go-down';
-
+import RoundEnd from './ui/round-end/round-end.js';
 //import CSS
 import './App.css';
 
@@ -46,6 +46,13 @@ class App extends Component {
             output = (
                 <div className = "App">
                     <ModalBack showModalBack = {this.props.state.UI.showModalBack}/>
+                    <RoundEnd 
+                        endOfRound = {this.props.state.UI.endOfRound}
+                        AIPlayers = {this.props.state.AI.players}
+                        player = {this.props.state.player}
+                        game = {this.props.state.game}
+                        nextRoundHandler = {this.startNextRound}
+                    />
                     <GoDown 
                         isGoingDown = {this.props.state.player.isGoingDown}
                         cancelClickHandler = {this.props.cancelPlayerGoDown}
@@ -74,6 +81,12 @@ class App extends Component {
         return(
             output
         );
+    }
+
+    startNextRound () {
+        // need to work out:
+        // what is the next round?
+        // 
     }
 
     componentDidUpdate() {
@@ -354,7 +367,7 @@ class App extends Component {
         });
         
         this.props.endRound(points);
-    }
+    }   
 
 }
 
