@@ -13,7 +13,8 @@ const initialState = {
         goingDown : {
             selectedCards : [],
             submittedSetruns : []
-        }
+        },
+        endOfRound : true
     },
     player : {
         hand : [],
@@ -21,7 +22,11 @@ const initialState = {
         table : [],
         isDown : false,
         canGoDown : false,
-        isGoingDown : false
+        isGoingDown : false,
+        points : {
+            points : [],
+            total : 0
+        }
     },
     AI : {
         players : [{
@@ -31,7 +36,11 @@ const initialState = {
             table : [{
                 type : null, //will get set to "RUN" or "SET"
                 cards : [] //array of cards in set or run
-            }]
+            }],
+            points : {
+                points : [],
+                total : 0
+            }
         }],
         AICount : params.numberOfPlayers - 1,
         AIInPlay : null,

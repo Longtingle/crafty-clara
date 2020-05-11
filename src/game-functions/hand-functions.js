@@ -420,13 +420,19 @@ const checkSetrun = (setrun, type) => {
 
 }
 
+const getPoints = (hand) => {
+    //TODO
+    return 10;
+}
+
 const handFunctions = {
     getRuns,
     getSets,
     scoreHand,
     sortHand,
     sortPlayerHand,
-    checkSetrun
+    checkSetrun, 
+    getPoints
 }
 
 export {
@@ -435,7 +441,8 @@ export {
     scoreHand,
     sortHand,
     sortPlayerHand,
-    checkSetrun
+    checkSetrun,
+    getPoints
 }
 
 export default handFunctions;

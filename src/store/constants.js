@@ -8,7 +8,8 @@ const GAME_STATES = {
     AI_WAIT_TWO : "AI_WAIT_TWO",
     AI_OOT_RESOLVE : "AI_OOT_RESOLVE",
     AI_PLAY : "AI_PLAY",
-    ROUND_END : "ROUND_END"
+    ROUND_END : "ROUND_END",
+    GAME_END : "GAME_END"
 };
 
 const AI_STAGES = {
@@ -23,11 +24,20 @@ const AI_CARD_SELECT = {
 };
 
 const ENV_VAR = {
-    //IMG_DIR : "http://localhost:3000/img"
-    IMG_DIR : "http://81.103.140.192:3000/img"
+    IMG_DIR : "http://localhost:3000/img"
+    //IMG_DIR : "http://81.103.140.192:3000/img"
 }
 
+const ROUND_REQUIREMENTS = [
+    {S : 2, R: 0},
+    {S : 1, R: 1},
+    {S : 0, R: 2},
+    {S : 3, R: 0},
+    {S : 2, R: 1},
+    {S : 1, R: 2},
+    {S : 0, R: 3}
+]
 
 
 export default GAME_STATES;
-export {AI_STAGES, AI_CARD_SELECT, ENV_VAR};
+export {AI_STAGES, AI_CARD_SELECT, ENV_VAR, ROUND_REQUIREMENTS};

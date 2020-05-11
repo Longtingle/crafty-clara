@@ -1,14 +1,14 @@
 import update from 'immutability-helper';
 import actions from './actions.js';
 import GAME_STATES from './constants.js';
-import {AI_STAGES} from './constants.js';
+import {AI_STAGES, ROUND_REQUIREMENTS} from './constants.js';
 import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
 import _ from 'lodash';
 import { shallowEqual } from 'react-redux';
 
 const testHand = [
-    "2C", "2H", "2D", "4S", "5S", "6S", "7S", "8H", "8S", "8D", "11H", "12H", "8H"
+    "2C", "2H", "2D", "4S", "8H", "8S", "8D"
 ]
 
 const reducer = (state = initialState, action) => {
@@ -23,7 +23,11 @@ const reducer = (state = initialState, action) => {
                 name : "Opponent",
                 hand : action.payload.hands[i+1],
                 isDown : false,
-                table : []
+                table : [],
+                points : {
+                    points : [],
+                    total : 0
+                }
             });
         }
 
@@ -31,7 +35,7 @@ const reducer = (state = initialState, action) => {
         newState = update(state, {
             game : {
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
-                round : {$set : 1},
+                round : {$set : 0},
                 requirement : {$set : {R : 0, S : 2}}
             },
             player : {
@@ -466,6 +470,31 @@ const reducer = (state = initialState, action) => {
             });
         }
         
+
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.END_ROUND) {
+        let player = _.cloneDeep(state.player);
+        player.points.points.push(action.payload.points.player);
+        player.points.total = player.points.total + action.payload.points.player;
+        let AI = _.cloneDeep(state.AI);
+        AI.players.forEach((AI, index) => {
+            AI.points.points.push(action.payload.points.AI[index]);
+            AI.points.total = AI.points.total + action.payload.points.AI[index];
+        });
+        let UI = _.cloneDeep(state.UI);
+        UI.showModalBack = true;
+        UI.endOfRound = true;
+        
+        newState = update (state, {
+            game : {gameState : {$set : GAME_STATES.ROUND_END}},
+            player : {$set : player},
+            AI : {$set : AI},
+            UI : {$set : UI}
+        });
 
         if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
         if (state.debug === true) console.log(newState);

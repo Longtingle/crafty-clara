@@ -82,7 +82,28 @@ class App extends Component {
         console.log("AI IN PLAY: " + this.props.state.AI.AIInPlay + "  - GAMESTATE : " + this.props.state.game.gameState);
         //If the state show that the active AI needs to draw a card, then trigger that action.
 
+        //check if anyone is out
+        if (this.props.state.player.hand.length === 0) {
+            this.endRound();
+            return;
+        } 
+        let AIOut =false;
+        this.props.state.AI.players.forEach(player => {
+            if (player.hand.length === 0) {
+                AIOut = true;
+                return;
+            }
+        });
+        if (AIOut === true) {
+            this.endRound();
+            return;
+        }
+
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW) { 
+            if (this.props.state.discard.length === 0) { 
+                this.props.AIPickedFromDeck();
+                return;
+            }
             let drawResult = AIFunctions.selectDraw(
                 this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, 
                 this.props.state.game.requirement, 
@@ -102,6 +123,10 @@ class App extends Component {
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW_OOT) {
             //generate draw OOT requests.
             let OOTRequests = [];
+            if (this.props.state.discard.length === 0) {
+                this.props.AIOOTRequests(OOTRequests);
+                return;
+            }
             this.props.state.AI.players.forEach((player, index) => {
                 if (AIFunctions.drawOOT(player.hand, this.props.state.game.requirement, this.props.state.discard[0])) {
                     if (player.index !== this.props.state.AI.AIInPlay){
@@ -122,11 +147,11 @@ class App extends Component {
             
 
             let OOTRequests = [...this.props.state.OOTRequests];
-            console.log(OOTRequests);
+            //console.log(OOTRequests);
             if (this.playerOOTRequest) OOTRequests.push(this.playerOOTRequest);
-            console.log(OOTRequests);
+            //console.log(OOTRequests);
             let OOTResult = AIFunctions.resolveOOT(OOTRequests, this.props.state.AI.AIInPlay);
-            console.log(OOTResult);
+            //console.log(OOTResult);
             this.props.drawOOTResolve(OOTResult);
             this.playerOOTRequest = null;
             return;
@@ -172,9 +197,6 @@ class App extends Component {
                     this.props.AIAddCardToTable(handBuildResult.newSetrun,handBuildResult.newHand, handBuildResult.playerType, handBuildResult.setrunIndex, handBuildResult.AIIndex)
                 }
             }
-            
-            
-
         }
     }
 
@@ -198,7 +220,8 @@ class App extends Component {
 
     discardClickHandler = () => {
         console.log("discardClickHandler triggered.");
-        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
+        if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD && 
+            this.props.state.discard.length > 0) {
             this.props.fromDiscardToPlayer();
         } else if ( 
             this.props.state.game.gameState === GAME_STATES.PW_PLAY && 
@@ -319,6 +342,19 @@ class App extends Component {
 
     }
     
+    endRound() {
+        if (this.props.state.game.gameState === GAME_STATES.ROUND_END) return;
+        let points = {
+            player : null,
+            AI : []
+        };
+        points.player = (this.props.state.player.hand.length !== 0) ? handFunctions.getPoints(this.props.state.player.hand) : 0;
+        this.props.state.AI.players.forEach((player, index) => {
+            points.AI[index] = (player.hand.length !== 0) ? handFunctions.getPoints(player.hand) : 0;
+        });
+        
+        this.props.endRound(points);
+    }
 
 }
 
@@ -413,6 +449,10 @@ const mapDispatchToProps = dispatch => {
         playerAddCardToTable : (newSetrun, playerType, setrunIndex, AIIndex) => dispatch ({
             type : actions.PLAYER_ADD_CARD_TO_TABLE,
             payload : {newSetrun, playerType, setrunIndex, AIIndex}
+        }),
+        endRound : (points) => dispatch ({
+            type : actions.END_ROUND,
+            payload : {points}
         })
     }
 }
