@@ -14,7 +14,7 @@ const initialState = {
             selectedCards : [],
             submittedSetruns : []
         },
-        endOfRound : true
+        endOfRound : false
     },
     player : {
         hand : [],

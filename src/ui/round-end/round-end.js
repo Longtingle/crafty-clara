@@ -1,9 +1,11 @@
 import React from 'react';
+import Auxhoc from '../auxhoc/auxhoc.js';
 
 import './round-end.css';
 
 const RoundEnd = (props) => {
     console.log(props);
+    if (props.endOfRound === false) return null;
     let AIRows = [];
     let playerRow = [];
     let headerRow = [];
@@ -39,13 +41,21 @@ const RoundEnd = (props) => {
     console.log(playerRow);
     console.log(headerRow);
     
-    return (
-        
-        <div className = "round-end-container">
-            <div className = "scoreboard-container">
+    let output = null;
+    if (props.endOfRound === true) {
+        let output = (
+            <div className = "round-end-container">
+                <div className = "scoreboard-container">
                 
+                </div>
             </div>
-        </div>
+        );
+    }
+    return (
+        <Auxhoc>
+            {output}        
+        </Auxhoc>
+        
     )
 }
 
