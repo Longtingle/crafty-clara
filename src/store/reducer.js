@@ -17,6 +17,7 @@ const reducer = (state = initialState, action) => {
     if (state.debug === true) console.log ("REDUCER TRIGGERED - " + action.type + " - " + d.toLocaleTimeString());
 
     if (action.type === actions.START_NEW_GAME) {
+
         let playersArray = [];
         for (let i = 0; i < state.AI.AICount ; i++){
             playersArray.push({
@@ -29,8 +30,7 @@ const reducer = (state = initialState, action) => {
                     total : 0
                 }
             });
-        }
-
+        };
 
         newState = update(state, {
             game : {
@@ -43,6 +43,40 @@ const reducer = (state = initialState, action) => {
                 hand : { $set : testHand}
             },
             AI : { players : {$set : playersArray}}, 
+            deck : {$set : action.payload.deck},
+            discard : {$set : action.payload.discard}
+        })
+        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
+        if (state.debug === true) console.log(newState);
+        return newState;
+    }
+
+    if (action.type === actions.START_NEXT_ROUND) {
+        let AI = _.cloneDeep(state.AI);
+        AI.players.forEach((player, index) => {
+            player.hand = action.payload.hands[index + 1];
+            player.table = [];
+            player.isDown = false;
+        });
+        AI.AIInPlay = null;
+        let game = _.cloneDeep(state.game);
+        game.gameState = GAME_STATES.PW_DRAW_CARD;
+        game.round = state.game.round + 1;
+        game.requirement = ROUND_REQUIREMENTS[game.round]
+
+        newState = update(state, {
+            game : {$set : game},
+            UI : {
+                endOfRound : {$set : false},
+                showModalBack : {$set : false}
+            },
+            player : {
+                hand : { $set : Array.from(action.payload.hands[0])},
+                table : {$set : []},
+                isDown : {$set : false}
+                //hand : { $set : testHand}
+            },
+            AI : {$set : AI}, 
             deck : {$set : action.payload.deck},
             discard : {$set : action.payload.discard}
         })

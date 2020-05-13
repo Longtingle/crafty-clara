@@ -422,7 +422,18 @@ const checkSetrun = (setrun, type) => {
 
 const getPoints = (hand) => {
     //TODO
-    return 80;
+    let score = 0;
+    let handArray = createHandArray(hand);
+    handArray.forEach((card, index) => {
+        if (card.value === 1) {
+            score = score + 25;
+        } else if (card.value > 9) {
+            score = score + 10;
+        } else {
+            score = score + card.value;
+        }
+    });
+    return score;
 }
 
 const handFunctions = {

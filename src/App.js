@@ -33,6 +33,7 @@ class App extends Component {
         this.playerHandSortRuns = this.playerHandSortRuns.bind(this);
         this.playerHandSortSets = this.playerHandSortSets.bind(this);
         this.playerAddCardToTable = this.playerAddCardToTable.bind(this);
+        this.startNextRound = this.startNextRound.bind(this);
     }
     
     render() {
@@ -86,7 +87,14 @@ class App extends Component {
     startNextRound () {
         // need to work out:
         // what is the next round?
-        // 
+
+        let deck = deckFunctions.generateDeck(2);
+        let hands = deckFunctions.deal(deck, params.numberOfPlayers);
+        let discard = [];
+        discard.push(deck[0])
+        deck.shift();
+
+        this.props.startNextRound(deck, discard, hands);
     }
 
     componentDidUpdate() {
@@ -466,6 +474,10 @@ const mapDispatchToProps = dispatch => {
         endRound : (points) => dispatch ({
             type : actions.END_ROUND,
             payload : {points}
+        }),
+        startNextRound : (deck, discard, hands) => dispatch({
+            type : actions.START_NEXT_ROUND,
+            payload : {deck, discard, hands}
         })
     }
 }

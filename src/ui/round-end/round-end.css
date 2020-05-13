@@ -7,3 +7,55 @@
     z-index: 101;
     background: white;
 }
+.round-end-header {
+    width: 90%;
+    padding: 4% 0 4% 0;
+    font-size : 3vw;
+    margin:auto;
+    text-align: center;
+    line-height: 100%;
+
+}
+.scoreboard-container { 
+    width:90%;
+    margin:auto;
+}
+
+table {
+    width:100%;
+    font-size:1.5vw;
+    text-align:center;
+    border-collapse: collapse;
+}
+
+table, td, th {
+    border: 1px solid black;
+}
+th {
+    font-size: 1.8vw;
+}
+
+.round-end-buttons-container {
+    display:flex;
+    justify-content: center;
+    width:80%;
+    margin:auto;
+    margin-top:5%;
+}
+
+.round-end-button {
+    width: 15vh;
+    font-size:1.5vw;
+    text-align: center;
+    padding: 3% 0 3% 0;
+    border-radius: 1vw;
+    border: 1px solid rgb(150,150,150);
+    background-color: rgb(200,200,200);
+
+}
+
+.round-end-button:hover {
+    background-color: rgb(230,230,230);
+    border-color:black;
+    cursor: pointer;
+}
