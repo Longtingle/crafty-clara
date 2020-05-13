@@ -231,6 +231,12 @@ const sortHand = (sortArray, param) => {
 const getRuns = (handArray) => {
     //sort hand for runs.
     let sortedHand = sortHand(handArray, "RUNS");
+    
+    result = removeRedAces(sortedHand);
+    sortedHand = result.handArray;
+    let redAces = result.redAces;
+    
+    //sortedHand now has all red aces removed.
 
     let activeSuit = sortedHand[0].suit;
     let runLength = 1;
@@ -314,6 +320,29 @@ const getRuns = (handArray) => {
 
     return runsSummarised;
 }
+
+
+const removeRedAces = (handArray) => {
+    redAces = [];
+    redAcesIndex = [];
+    returnArray.forEach((card, index) => {
+        if (card.value === 1 && (card.suit === "D" || card.suit === "H")) {
+            //red ace
+            redAces.push(card);
+            redAcesIndex.push(index);
+        }
+    })
+    redAcesIndex.sort((a, b) => b - a);
+    redAcesIndex.forEach((cardNum) => {
+        returnArray.splice(cardNum, 1);
+    })
+
+    return {
+        redAces,
+        handArray : returnArray
+    }
+}
+
 
 const getSets = (handArray) => {
     let sortedHand = sortHand(handArray, "SETS");
