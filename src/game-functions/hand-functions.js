@@ -1,9 +1,4 @@
-//TODO 
-//Need to expose more paramters about the 'best hand', including individual run/set scores and run/set completion status. 
-//This will help when deciding whether it's worth picking up out of turn or not.
-
-import OpponentArea from "../containers/opponent-area/opponent-area";
-
+import _ from 'lodash';
 
 const scoreHand = (hand, requirement) => {
 
@@ -47,6 +42,7 @@ const scoreHand = (hand, requirement) => {
             }
             if (setsResult.numFullSets >= requirement.S) {readyToGoDown = true;}
                 //ready to go down and full score.
+                usefulCards = [...new Set(usefulCards)];
             return {
                 score : score,
                 readyToGoDown : readyToGoDown,
@@ -88,7 +84,7 @@ const scoreHand = (hand, requirement) => {
             usefulCards = [...new Set(usefulCards)];
                
             if (runsResult.numFullRuns >= requirement.R) {readyToGoDown = true;}
-                
+            
             return {
                 score : score,
                 readyToGoDown : readyToGoDown,
@@ -185,6 +181,7 @@ const scoreHand = (hand, requirement) => {
         }
         bestHand = [...setScore.bestHand, ...runScore.bestHand];
         usefulCards = [...setScore.usefulCards, ...runScore.usefulCards];
+        usefulCards = [...new Set(usefulCards)];
         return { 
             score : setScore.score + runScore.score,
             readyToGoDown : setScore.readyToGoDown && runScore.readyToGoDown,
@@ -232,7 +229,7 @@ const getRuns = (handArray) => {
     //sort hand for runs.
     let sortedHand = sortHand(handArray, "RUNS");
     
-    result = removeRedAces(sortedHand);
+    let result = removeRedAces(sortedHand);
     sortedHand = result.handArray;
     let redAces = result.redAces;
     
@@ -323,8 +320,9 @@ const getRuns = (handArray) => {
 
 
 const removeRedAces = (handArray) => {
-    redAces = [];
-    redAcesIndex = [];
+    let redAces = [];
+    let redAcesIndex = [];
+    let returnArray = _.cloneDeep(handArray);
     returnArray.forEach((card, index) => {
         if (card.value === 1 && (card.suit === "D" || card.suit === "H")) {
             //red ace
@@ -396,7 +394,6 @@ const getSets = (handArray) => {
         numFullSets : fullSetCount,
         sets : sets
     }
-
     return setsSummarised;
 }
 
@@ -413,10 +410,7 @@ const sortPlayerHand = (hand, param) => {
     });
 
     let sortedHandArray = sortHand(handArray, param);
-
-    console.log(sortedHandArray);
-    sortedHandArray.forEach((card) => {
-        
+    sortedHandArray.forEach((card) => {        
         newHand.push(card.value + card.suit);
     })
     return newHand;
@@ -433,11 +427,13 @@ const checkSetrun = (setrun, type) => {
             if (card.value !== setValue) valid = 0;
         })
     }
-
-    if (type.toUpperCase() === "RUNS") {
+    
+    if (type.toUpperCase() === "RUN") {
+        let sortedArray = sortHand(setrunArray, "RUNS");
+        
         if (setrun.length < 4) valid = 0;
-        let runSuit = setrunArray[0].suit;
-        setrunArray.forEach((card,index) => {
+        let runSuit = sortedArray[0].suit;
+        sortedArray.forEach((card,index) => {
             if (index !== 0) {
                 if ((card.suit !== runSuit) || (card.value !== setrunArray[index-1].value + 1)) {
                     valid = 0;
@@ -445,12 +441,13 @@ const checkSetrun = (setrun, type) => {
             }
         })
     }
+
     return (valid === 1) ? true : false;
 
 }
 
+
 const getPoints = (hand) => {
-    //TODO
     let score = 0;
     let handArray = createHandArray(hand);
     handArray.forEach((card, index) => {
@@ -464,6 +461,12 @@ const getPoints = (hand) => {
     });
     return score;
 }
+
+let testHand =[
+    "2C", "3C", "4C", "5C", "7H"
+]
+
+console.log(checkSetrun(testHand, "RUN"));
 
 const handFunctions = {
     getRuns,

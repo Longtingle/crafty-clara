@@ -3,7 +3,7 @@ import handFunctions, {scoreHand, checkSetrun} from './hand-functions.js';
 import {getValue, getSuit} from '../game-functions/deck-functions.js';
 import params from './params.js';
 import _ from 'lodash';
-import { isCompositeComponent } from 'react-dom/test-utils';
+
 //exported functions
 const AIFunctions = {
 
@@ -35,12 +35,14 @@ const AIFunctions = {
         let handResult = scoreHand(hand, requirement);
         console.log(handResult);
         if (handResult.usefulCards.length !== hand.length) {
+            console.log(handResult.usefulCards);
+            console.log(hand);
             // we have cards that aren't useful, return the highest.
             handResult.usefulCards.sort((a,b) => b-a);    
             handResult.usefulCards.forEach(index=> {
                 splitHand.splice(index, 1);
             });
-        
+            console.log(splitHand);
             splitHand.sort((a, b)=> b.value-a.value);
         
             return splitHand[0].index;
@@ -78,7 +80,12 @@ const AIFunctions = {
 
 
     canGoDown : (hand, requirement) => {
+        console.log("canGoDown - hand, requirement");
+        console.log(hand);
+        console.log(requirement);
+        console.log("scoreHand result:");
         let score = scoreHand(hand, requirement);
+        console.log(score);
         if (!score.readyToGoDown) return {result : false};
         let table = [];
         let usedCards = [];
@@ -91,7 +98,6 @@ const AIFunctions = {
             table.push({type : setrun.type, cards : setrunCards})
         })
         usedCards.sort((a, b) => b-a);
-        console.log(usedCards);
         let newHand = [...hand];
         usedCards.forEach((cardNum) => {
             newHand.splice(cardNum, 1);
@@ -100,22 +106,6 @@ const AIFunctions = {
             result : true,
             table,
             newHand
-        }
-    },
-
-
-    playTurn : (hand, requirement) => {
-        var result = {};
-        //AI has drawn card and waited for visibility of discard - decide what to do next.
-        if(AIFunctions.canGoDown()){
-            //some logic for going down, should be easy(relatively)
-            result.goneDown = true;
-            result.hand = [];
-            result.table = [[],[]];
-        } else { 
-            //need to discard 
-            result.discard = AIFunctions.selectDiscard(requirement);
-            return result;
         }
     },
 
@@ -233,7 +223,10 @@ const AIFunctions = {
         return result;
     }
 }
-
+let testHand =[
+    "2C", "3C", "4C", "5C", "7H", "7D", "7C", "13S", "12H", "10D"
+]
+console.log(AIFunctions.canGoDown(testHand,{R:1, S:1}));
 
 //private functions
 
