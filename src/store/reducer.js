@@ -13,8 +13,7 @@ const testHand = [
 
 const reducer = (state = initialState, action) => {
     let newState;  
-    let d = new Date;
-    if (state.debug === true) console.log ("REDUCER TRIGGERED - " + action.type + " - " + d.toLocaleTimeString());
+  
 
     if (action.type === actions.START_NEW_GAME) {
 
@@ -28,12 +27,18 @@ const reducer = (state = initialState, action) => {
                 points : {
                     points : [],
                     total : 0
+                },
+                message : {
+                    text : "",
+                    timestamp : null
                 }
             });
         };
 
         newState = update(state, {
+            timestamp : {$set : Date.now()},
             game : {
+                gameUpdate : {$set : false},
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
                 round : {$set : 0},
                 requirement : {$set : {R : 0, S : 2}}
@@ -42,12 +47,11 @@ const reducer = (state = initialState, action) => {
                 //hand : { $set : Array.from(action.payload.hands[0])}
                 hand : { $set : testHand}
             },
-            AI : { players : {$set : playersArray}}, 
+            AI : { players : {$set : playersArray}, messageUpdate : {$set : null}}, 
             deck : {$set : action.payload.deck},
             discard : {$set : action.payload.discard}
         })
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+ 
         return newState;
     }
 
@@ -59,10 +63,17 @@ const reducer = (state = initialState, action) => {
             player.isDown = false;
         });
         AI.AIInPlay = null;
+        let rand = Math.floor(Math.random() * AI.AICount);
+        AI.players[rand].message  = {
+            text : "Oh I've got a hand like a foot!",
+            timestamp : Date.now()
+        };
+        AI.messageUpdate = [rand];
         let game = _.cloneDeep(state.game);
         game.gameState = GAME_STATES.PW_DRAW_CARD;
         game.round = state.game.round + 1;
-        game.requirement = ROUND_REQUIREMENTS[game.round]
+        game.requirement = ROUND_REQUIREMENTS[game.round];
+        game.gameUpdate = false;
 
         newState = update(state, {
             game : {$set : game},
@@ -80,8 +91,7 @@ const reducer = (state = initialState, action) => {
             deck : {$set : action.payload.deck},
             discard : {$set : action.payload.discard}
         })
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -91,12 +101,12 @@ const reducer = (state = initialState, action) => {
         newPlayerHand.push(state.deck[0])
         newDeck.shift();
         newState = update(state, {
-            game : {gameState : {$set : GAME_STATES.PW_PLAY}},
+            game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
             player : { hand : {$set : newPlayerHand}},
             deck : {$set : newDeck},
+            AI : { messageUpdate : {$set : null}}
         });
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -105,21 +115,22 @@ const reducer = (state = initialState, action) => {
         let newDiscard = [...state.discard];
         newHand.push(newDiscard.shift());
         newState = update(state, {
-            game : {gameState : {$set : GAME_STATES.PW_PLAY}},
+            game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
             player : {hand : {$set : newHand}},
-            discard : {$set : newDiscard}
+            discard : {$set : newDiscard},
+            AI : { messageUpdate : {$set : null}}
         });
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.SELECT_CARD_FROM_HAND) {
         newState = update(state, {
-            player : {cardSelected : {$set : action.payload.cardSelected}}
+            game : {gameUpdate : {$set : false}},
+            player : {cardSelected : {$set : action.payload.cardSelected}},
+            AI : { messageUpdate : {$set : null}}
         });
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -128,20 +139,25 @@ const reducer = (state = initialState, action) => {
         var discarded = newHand.splice(state.player.cardSelected, 1);
         var newDiscard = [...state.discard];
         newDiscard.unshift(discarded[0]);
+
+        let AI = _.cloneDeep(state.AI);
+        AI.players[0].message = {text : "...thinking...", timestamp : Date.now()}
+        AI.messageUpdate = [0];
+        AI.AIInPlay = 0;
         newState = update (state, {
             game : {
-                gameState : {$set : GAME_STATES.AI_DRAW}
+                gameState : {$set : GAME_STATES.AI_DRAW},
+                gameUpdate : {$set : true}
             },
             player : {
                 hand : {$set : newHand},
                 cardSelected : {$set : null},
             },
             discard : {$set : newDiscard},
-            AI : {AIInPlay : {$set : 0}}
+            AI : {$set : AI}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -155,18 +171,24 @@ const reducer = (state = initialState, action) => {
                 return player;
             } 
             return update(player, {
-                hand : {$set : newHand}
+                hand : {$set : newHand},
+                message : {
+                    text : {$set : "Picked from deck"},
+                    timestamp : {$set : Date.now()}
+                }
             });
         });
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}},
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}, gameUpdate : {$set : true}},
             deck : {$set : newDeck},
-            AI : {players : {$set : newAIPlayers}}
+            AI : {
+                players : {$set : newAIPlayers},
+                messageUpdate : {$set : [state.AI.AIInPlay]}
+            }
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -180,18 +202,21 @@ const reducer = (state = initialState, action) => {
                 return player;
             } 
             return update(player, {
-                hand : {$set : newHand}
+                hand : {$set : newHand},
+                message : {
+                    text : {$set : "Picked from discard"},
+                    timestamp : {$set : Date.now()}
+                }
             });
         });
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}},
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}, gameUpdate : {$set : true}},
             discard : {$set : newDiscard},
-            AI : {players : {$set : newAIPlayers}}
+            AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [state.AI.AIInPlay]}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -199,41 +224,42 @@ const reducer = (state = initialState, action) => {
     if (action.type === actions.AI_WAIT_ONE_COMPLETE) {
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_DRAW_OOT}}
+            game : {gameState : {$set : GAME_STATES.AI_DRAW_OOT}, gameUpdate : {$set : true}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.AI_DRAW_OOT) {
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_WAIT_TWO}},
-            OOTRequests : {$set : action.payload.OOTRequests}
+            game : {gameState : {$set : GAME_STATES.AI_WAIT_TWO}, gameUpdate : {$set : true}},
+            OOTRequests : {$set : action.payload.OOTRequests},
+            AI : {messageUpdate : {$set : null}}
         });
       
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.AI_WAIT_TWO_COMPLETE) {
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.AI_OOT_RESOLVE}}
+            game : {gameState : {$set : GAME_STATES.AI_OOT_RESOLVE}, gameUpdate : {$set : true}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.DRAW_OOT_RESOLVE) {
         if (action.payload.winner.winnerType === "none") {
             newState = update (state, {
-                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
-                OOTRequests : {$set : []}
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
+                OOTRequests : {$set : []},
+                AI : {messageUpdate : {$set : null}}
             });
             return newState;
         }
@@ -251,10 +277,11 @@ const reducer = (state = initialState, action) => {
         if (action.payload.winner.winnerType === "player") {
             console.log("OOT to player");
             newState = update (state, {
-                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
                 player : {hand : {$set : newHand}},
-                OOTRequests : {$set : []}
+                OOTRequests : {$set : []},
+                AI : {messageUpdate : {$set : null}}
             });
 
         } else {
@@ -264,19 +291,22 @@ const reducer = (state = initialState, action) => {
                     return player;
                 } 
                 return update(player, {
-                    hand : {$set : newHand}
+                    hand : {$set : newHand},
+                    message : {
+                        text : {$set : "I'll take that!"},
+                        timestamp : {$set : Date.now()}
+                    }
                 });
             });
             newState = update (state, {
-                game : {gameState : {$set : GAME_STATES.AI_PLAY}},
+                game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
-                AI : {players : {$set : newAIPlayers}},
+                AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [action.payload.winner.index]}},
                 OOTRequests : {$set : []}
             });
         }
         
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -287,63 +317,78 @@ const reducer = (state = initialState, action) => {
         let newGameState;
         let newAIInPlay;
         let newDiscard = [...state.discard];
+        let newGameUpdate, message, messageUpdate
         newDiscard.unshift(discardedCard[0]);
         if (state.AI.AIInPlay === state.AI.AICount - 1 ){
             newAIInPlay = null;
             newGameState = GAME_STATES.PW_DRAW_CARD;
+            newGameUpdate = false;
+            messageUpdate = [];
+            message = {text : null, timestamp : Date.now()}
         }else { 
             newAIInPlay = state.AI.AIInPlay + 1;
             newGameState = GAME_STATES.AI_DRAW;
+            newGameUpdate = true;
+            messageUpdate = [newAIInPlay];
+            message = {text : "...thinking...", timestamp : Date.now()}
         }
+        messageUpdate.push(state.AI.AIInPlay);
         var newAIPlayers = state.AI.players.map((player, index) => {
             if (index !== state.AI.AIInPlay ){
                 return player;
             } 
             return update(player, {
-                hand : {$set : newAIHand}
+                hand : {$set : newAIHand},
+                message : {
+                    text : {$set : "Does anyone want this?"},
+                    timestamp : {$set : Date.now()}
+                }
             });
         });
 
         newState = update (state, {
-            game : {gameState : {$set : newGameState}},
+            game : {gameState : {$set : newGameState}, gameUpdate : {$set : newGameUpdate}},
             AI : {
                 AIInPlay : {$set : newAIInPlay},
-                players : {$set : newAIPlayers}
+                players : {$set : newAIPlayers},
+                messageUpdate : {$set : messageUpdate}
             },
             discard : {$set : newDiscard}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.SORT_PLAYER_HAND) {
         
         newState = update (state, {
-            player : {hand : {$set : action.payload.newHand}}
+            game : {gameUpdate : {$set : false}},
+            player : {hand : {$set : action.payload.newHand}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.SHOW_GOING_DOWN_MODAL) {
         
         newState = update (state, {
+            game : {gameUpdate : {$set : false}},
             UI : {showModalBack : {$set : true}},
-            player : {isGoingDown : {$set : true}}
+            player : {isGoingDown : {$set : true}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.CANCEL_PLAYER_GO_DOWN) {
         
         newState = update (state, {
+            game : {gameUpdate : {$set : false}},
             UI : {
                 showModalBack : {$set : false},
                 goingDown : {
@@ -351,11 +396,11 @@ const reducer = (state = initialState, action) => {
                     submittedSetruns : {$set : []}
                 }
             },
-            player : {isGoingDown : {$set : false}}
+            player : {isGoingDown : {$set : false}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -368,11 +413,12 @@ const reducer = (state = initialState, action) => {
             selectedCards.push(action.payload.cardNum);
         }
         newState = update (state, {
-            UI : {goingDown : {selectedCards : {$set : selectedCards}}}
+            game : {gameUpdate : {$set : false}},
+            UI : {goingDown : {selectedCards : {$set : selectedCards}}},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -383,22 +429,21 @@ const reducer = (state = initialState, action) => {
         submittedSetruns.push(action.payload.setrun);
 
         newState = update (state, {
+            game : {gameUpdate : {$set : false}},
             UI : { 
                 goingDown : { 
                     selectedCards : {$set : []},
                     submittedSetruns : {$set : submittedSetruns}
                 }
-            }
+            },
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.GO_DOWN_SUBMIT_HAND) {
-        console.log(action.payload.table);
-        console.log(action.payload.hand);
         let player = _.cloneDeep(state.player);
         player.isGoingDown = false;
         player.hand = action.payload.hand;
@@ -410,24 +455,18 @@ const reducer = (state = initialState, action) => {
         UI.showModalBack = false;
 
         newState = update (state, {
+            game : {gameUpdate : {$set : false}},
             UI : {$set : UI},
-            player : {$set : player}
+            player : {$set : player},
+            AI : {messageUpdate : {$set : null}}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
     if (action.type === actions.AI_GO_DOWN_SUBMIT) {
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
-        console.log("AI GOING DOWN");
+
         let newHand = action.payload.hand;
         //let discardCard = newHand.splice(0, 1);
         //let newDiscard = [...state.discard];
@@ -438,13 +477,17 @@ const reducer = (state = initialState, action) => {
         AI.players[state.AI.AIInPlay].hand = newHand;
         AI.players[state.AI.AIInPlay].isDown = true;
         AI.players[state.AI.AIInPlay].table = action.payload.table;
-  
+        AI.players[state.AI.AIInPlay].message = {
+            text : {$set : "Right, I'm putting my cards down now."},
+            timestamp : {$set : Date.now()}
+        }
+        AI.messageUpdate = [state.AI.AIInPlay];
         newState = update (state, {
+            game : {gameUpdate : {$set : true}},
             AI : {$set : AI}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -454,10 +497,12 @@ const reducer = (state = initialState, action) => {
 
         let AI = _.cloneDeep(state.AI);
         AI.players[state.AI.AIInPlay].hand = action.payload.newHand;
+        AI.messageUpdate = null;
         if (action.payload.playerType === "player") { 
             table = _.cloneDeep(state.player.table);
             table[action.payload.setrunIndex].cards = action.payload.newSetrun;
             newState = update (state, {
+                game : {gameUpdate : {$set : true}},
                 player : {
                     cardSelected : {$set : null},
                     table : {$set : table}
@@ -468,12 +513,12 @@ const reducer = (state = initialState, action) => {
             AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
 
             newState = update (state, {
+                game : {gameUpdate : {$set : true}},
                 AI : {$set : AI}
             });
         }
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -485,17 +530,24 @@ const reducer = (state = initialState, action) => {
             table = _.cloneDeep(state.player.table);
             table[action.payload.setrunIndex].cards = action.payload.newSetrun;
             newState = update (state, {
+                game : {gameUpdate : {$set : false}},
                 player : {
                     hand : {$set : hand},
                     cardSelected : {$set : null},
                     table : {$set : table}
-                }
+                },
+                AI : {messageUpdate : {$set : null}}
             });
         } else {
             let AI = _.cloneDeep(state.AI);
             AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
-
+            AI.players[action.payload.AIIndex].message = {
+                text : {$set : "Woah, steady there!"},
+                timestamp : {$set : Date.now()}
+            }
+            AI.messageUpdate = [action.payload.AIIndex];
             newState = update (state, {
+                game : {gameUpdate : {$set : false}},
                 player : {
                     hand : {$set : hand},
                     cardSelected : {$set : null}
@@ -505,8 +557,7 @@ const reducer = (state = initialState, action) => {
         }
         
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 
@@ -519,19 +570,35 @@ const reducer = (state = initialState, action) => {
             AI.points.points.push(action.payload.points.AI[index]);
             AI.points.total = AI.points.total + action.payload.points.AI[index];
         });
+        AI.messageUpdate = null;
         let UI = _.cloneDeep(state.UI);
         UI.showModalBack = true;
         UI.endOfRound = true;
         
         newState = update (state, {
-            game : {gameState : {$set : GAME_STATES.ROUND_END}},
+            game : {gameState : {$set : GAME_STATES.ROUND_END}, gameUpdate : {$set : false}},
             player : {$set : player},
             AI : {$set : AI},
             UI : {$set : UI}
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
+        return newState;
+    }
+
+    if (action.type === actions.REMOVE_AI_MESSAGE) {
+        let AI = _.cloneDeep(state.AI);
+        action.payload.AIIndex.forEach((AIIndex) => {
+            AI.players[AIIndex].message.text = "";
+        })
+        AI.messageUpdate = null;
+        newState = update (state, {
+            AI : {$set : AI},
+            game : {gameUpdate : {$set : false}}
+            
+        });
+
+
         return newState;
     }
 
@@ -540,11 +607,11 @@ const reducer = (state = initialState, action) => {
     if (action.type === actions.TEMPLATE) {
         
         newState = update (state, {
-            
+            game : {gameUpdate : {$set : false}},
+            AI : {messageUpdate : {$set : null}} //or an array of AI indices
         });
 
-        if (state.debug === true) console.log("ABOUT TO RETURN NEW STATE: ");
-        if (state.debug === true) console.log(newState);
+
         return newState;
     }
 

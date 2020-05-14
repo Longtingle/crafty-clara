@@ -7,7 +7,7 @@
 }
 
 .opponent-header-container { 
-    height:12.5%;
+    height:15%;
     display:inline-block;
     width:100%;
     vertical-align: top;
@@ -22,14 +22,22 @@
 
 }
 .opponent-header-container p {
+    padding-top:0.5vh;
     font-size: 2vh;
     color:lightgrey;
     margin:0;
     text-align: center;
 }
 
+.ai-message {
+    font-size : 1.3vh;
+    text-align: center;
+    width:100%;
+    color:lightgrey;    
+}
+
 .opponent-table-container {
-    height:87.5%;
+    height:85%;
     width:100%;
 }
 

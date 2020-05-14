@@ -12,6 +12,7 @@ const GAME_STATES = {
     GAME_END : "GAME_END"
 };
 
+
 const AI_STAGES = {
     AI_DRAW : "AI_DRAW",
     AI_PLAY : "AI_PLAY",
@@ -24,8 +25,8 @@ const AI_CARD_SELECT = {
 };
 
 const ENV_VAR = {
-    IMG_DIR : "http://localhost:3000/img"
-    //IMG_DIR : "http://81.103.140.192:3000/img"
+    //IMG_DIR : "http://localhost:3000/img"
+    IMG_DIR : "http://81.103.140.192:3000/img"
 }
 
 const ROUND_REQUIREMENTS = [

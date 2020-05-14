@@ -18,6 +18,7 @@ var Table = function (props) {
             <OpponentArea  
                 playerAddCardToTable = {props.playerAddCardToTable}
                 AI = {props.state.AI}
+                gameState = {props.state.game.gameState}
             />
             <PlayerTable 
                 setRuns = {props.state.player.table}

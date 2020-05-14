@@ -4,7 +4,6 @@ import Auxhoc from '../auxhoc/auxhoc.js';
 import './round-end.css';
 
 const RoundEnd = (props) => {
-    console.log(props);
     if (props.endOfRound === false) return null;
     let AIRows = [];
     let playerRow = [];
@@ -38,9 +37,6 @@ const RoundEnd = (props) => {
         AIRows[index].push(player.points.total);
     })
 
-    console.log(AIRows);
-    console.log(playerRow);
-    console.log(headerRow);
     let tableHeader = headerRow.map((header,index) => {
         let key = "header-" + index;
         return (
@@ -56,7 +52,7 @@ const RoundEnd = (props) => {
 
     let tableAI = AIRows.map((AIRow, AIIndex) => {
         let rowKey = "AI-row-" + AIIndex;
-        console.log(AIRow);
+
         let tableAIRow = AIRow.map((data, index) => {
             let key = "AI-data-" + AIIndex + "-" + index;
             return (
@@ -74,7 +70,7 @@ const RoundEnd = (props) => {
     
     let output = null;
     if (props.endOfRound === true) {
-        console.log("generating output");
+
         output = (
             <div className = "round-end-container">
                 <div className = "round-end-header">End of Round {props.game.round + 1}</div>

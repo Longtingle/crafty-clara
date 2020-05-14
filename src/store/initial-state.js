@@ -7,6 +7,7 @@ const initialState = {
         gameState : GAME_STATES.NO_GAME,
         round : 0,
         requirement : 0,
+        gameUpdate : false,
     },
     UI : {
         showModalBack : false,
@@ -40,10 +41,15 @@ const initialState = {
             points : {
                 points : [],
                 total : 0
+            },
+            message : {
+                text : "",
+                timestamp : null
             }
         }],
         AICount : params.numberOfPlayers - 1,
         AIInPlay : null,
+        messageUpdate : null
     },
     deck : [],
     discard : [],

@@ -5,6 +5,7 @@ import './opponent-area.css';
 
 const OpponentArea = (props) => {
     let output = props.AI.players.map((player, index) => {
+        
         let key = "OpponentHeader" + index;
         let inPlay = (props.AI.AIInPlay === index) ? true : false;
         return (
@@ -16,6 +17,8 @@ const OpponentArea = (props) => {
                 table = {player.table}
                 key = {key}
                 index = {index}
+                gameState = {props.gameState}
+                message = {player.message}
             />
         )
     })

@@ -20,6 +20,7 @@ import Home from './ui/home/home.js';
 import ModalBack from './ui/modal-back/modal-back.js';
 import GoDown from './ui/go-down/go-down';
 import RoundEnd from './ui/round-end/round-end.js';
+
 //import CSS
 import './App.css';
 
@@ -84,24 +85,9 @@ class App extends Component {
         );
     }
 
-    startNextRound () {
-        // need to work out:
-        // what is the next round?
-
-        let deck = deckFunctions.generateDeck(2);
-        let hands = deckFunctions.deal(deck, params.numberOfPlayers);
-        let discard = [];
-        discard.push(deck[0])
-        deck.shift();
-
-        this.props.startNextRound(deck, discard, hands);
-    }
 
     componentDidUpdate() {
-
-        console.log("componentDidUpdate:");
-        console.log("AI IN PLAY: " + this.props.state.AI.AIInPlay + "  - GAMESTATE : " + this.props.state.game.gameState);
-        //If the state show that the active AI needs to draw a card, then trigger that action.
+        console.log("Component did update: ", Date.now());
 
         //check if anyone is out
         if (this.props.state.player.hand.length === 0) {
@@ -120,6 +106,16 @@ class App extends Component {
             return;
         }
 
+        if (this.props.state.AI.messageUpdate !== null) {
+            let AIIndex = this.props.state.AI.messageUpdate;
+            setTimeout(() => {
+                this.props.removeAIMessage(AIIndex);
+            }, 2000);
+        }
+
+        //HALT execution here if the state change a gameUpdate.
+        if (this.props.state.game.gameUpdate === false) return;
+
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW) { 
             if (this.props.state.discard.length === 0) { 
                 this.props.AIPickedFromDeck();
@@ -129,15 +125,17 @@ class App extends Component {
                 this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, 
                 this.props.state.game.requirement, 
                 this.props.state.discard[0]);
-
-            (drawResult === AI_CARD_SELECT.SELECT_DECK) ? this.props.AIPickedFromDeck() : this.props.AIPickedFromDiscard();
+            setTimeout(() => {
+                (drawResult === AI_CARD_SELECT.SELECT_DECK) ? this.props.AIPickedFromDeck() : this.props.AIPickedFromDiscard();
+            }, 1000);
+            
 
             return;
         }
 
         //If the state shows that the active AI needs to wait, trigger that action.
         if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_ONE) {
-            setTimeout(() => {this.props.AIWaitOneComplete()}, 1500);
+            setTimeout(() => {this.props.AIWaitOneComplete()}, 3000);
             return;
         }
 
@@ -149,9 +147,11 @@ class App extends Component {
                 return;
             }
             this.props.state.AI.players.forEach((player, index) => {
-                if (AIFunctions.drawOOT(player.hand, this.props.state.game.requirement, this.props.state.discard[0])) {
-                    if (player.index !== this.props.state.AI.AIInPlay){
-                        OOTRequests.push({type : "AI", index}) ;       
+                if (!player.isDown){
+                    if (AIFunctions.drawOOT(player.hand, this.props.state.game.requirement, this.props.state.discard[0])) {
+                        if (player.index !== this.props.state.AI.AIInPlay){
+                            OOTRequests.push({type : "AI", index}) ;       
+                        }
                     }
                 }
             });
@@ -160,7 +160,7 @@ class App extends Component {
         }
 
         if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_TWO) {
-            setTimeout(() => {this.props.AIWaitTwoComplete()}, 1500);
+            setTimeout(() => {this.props.AIWaitTwoComplete()}, 3000);
             return;
         }
 
@@ -180,13 +180,6 @@ class App extends Component {
 
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
 
-            // can AI go down?
-
-            // can AI build on other hands?
-
-            // AI must discard
-
-            // Does discarding end round?
             let goDownResult;
             if (this.props.state.AI.players[this.props.state.AI.AIInPlay].isDown === false) {
                 goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
@@ -359,6 +352,8 @@ class App extends Component {
         
         if (!handFunctions.checkSetrun(newSetrun, setrun.type.toUpperCase())) return;
         
+        newSetrun = handFunctions.sortHand(newSetrun, "RUNS");
+
         this.props.playerAddCardToTable(newSetrun, playerType, setrunIndex, AIIndex);   
 
     }
@@ -376,6 +371,17 @@ class App extends Component {
         
         this.props.endRound(points);
     }   
+
+    startNextRound () {
+        
+       let deck = deckFunctions.generateDeck(2);
+       let hands = deckFunctions.deal(deck, params.numberOfPlayers);
+       let discard = [];
+       discard.push(deck[0])
+       deck.shift();
+
+       this.props.startNextRound(deck, discard, hands);
+   }
 
 }
 
@@ -478,6 +484,10 @@ const mapDispatchToProps = dispatch => {
         startNextRound : (deck, discard, hands) => dispatch({
             type : actions.START_NEXT_ROUND,
             payload : {deck, discard, hands}
+        }),
+        removeAIMessage : (AIIndex) => dispatch({
+            type : actions.REMOVE_AI_MESSAGE,
+            payload : {AIIndex}
         })
     }
 }

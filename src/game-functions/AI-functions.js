@@ -33,16 +33,15 @@ const AIFunctions = {
         }
 
         let handResult = scoreHand(hand, requirement);
-        console.log(handResult);
+
         if (handResult.usefulCards.length !== hand.length) {
-            console.log(handResult.usefulCards);
-            console.log(hand);
+
             // we have cards that aren't useful, return the highest.
             handResult.usefulCards.sort((a,b) => b-a);    
             handResult.usefulCards.forEach(index=> {
                 splitHand.splice(index, 1);
             });
-            console.log(splitHand);
+
             splitHand.sort((a, b)=> b.value-a.value);
         
             return splitHand[0].index;
@@ -80,12 +79,8 @@ const AIFunctions = {
 
 
     canGoDown : (hand, requirement) => {
-        console.log("canGoDown - hand, requirement");
-        console.log(hand);
-        console.log(requirement);
-        console.log("scoreHand result:");
+ 
         let score = scoreHand(hand, requirement);
-        console.log(score);
         if (!score.readyToGoDown) return {result : false};
         let table = [];
         let usedCards = [];
@@ -110,18 +105,14 @@ const AIFunctions = {
     },
 
     resolveOOT : (OOTRequests, AIInPlay) => {
-        console.log("resolve OOT - triggered");
-        console.log("AIInPlay = " + AIInPlay);
+
         if (OOTRequests.length === 0){
-            console.log("Return 1");
             return {winnerType : "none"};
         } 
         if (OOTRequests.length === 1){
             if (OOTRequests[0].type === "AI") { 
-                console.log("return 2");
                 return {winnerType : "AI", index : OOTRequests[0].index}
             } else {
-                console.log("return 3");
                 return {winnerType : "player", index : params.numberOfPlayers - 1}
             }
         }
@@ -129,15 +120,10 @@ const AIFunctions = {
         let winner = null;
         
         check = (AIInPlay === null) ? 0 : AIInPlay + 1;
-        console.log(check);
         for (let i = 0; i < params.numberOfPlayers; i++) {
             OOTRequests.forEach((req, index) => {  
-                console.log("Checking: ");
-                console.log(req);
                 if (req.index === check) {
-                    console.log("Triggered");
                     if (winner === null) {
-                        console.log("Writing result");
                         winner = {
                             winnerType : req.type,
                             index : req.index
@@ -147,37 +133,22 @@ const AIFunctions = {
             }); 
             (check === params.numberOfPlayers - 1) ? check = 0 : check ++
         }
-        console.log("return 4");
-        console.log(winner);
         return winner ;
         
         
     },
 
     AIHandBuild : (hand, AITables, playerTable) => {
-        console.log("HAND : ");
-        console.log(hand);
-        console.log("AI TABLES : ");
-        console.log(AITables);
-        console.log("PLAYER TABLE : ");
-        console.log(playerTable);
-
         let result = null;
         AITables.forEach((AI, AIIndex) => {
-            console.log("AI : ");
-            console.log(AI);
             AI.table.forEach((setrun, setrunIndex) => {
                 hand.forEach((card, cardIndex) => {
                     let newCards = _.clone(setrun.cards);
                     newCards.push(card);
-                    console.log("Checking: ");
-                    console.log(newCards); 
-                    console.log(setrun.type);
                     let setrunCheck = handFunctions.checkSetrun(newCards, setrun.type);
                     if (setrunCheck === true) { 
                         let newHand = [...hand];
                         newHand.splice(cardIndex, 1);
-                        console.log("CHECK TRUE");
                         result = {
                             result : true,
                             newSetrun : newCards,
@@ -198,14 +169,10 @@ const AIFunctions = {
             hand.forEach((card, cardIndex) => {
                 let newCards = _.clone(setrun.cards);
                 newCards.push(card);
-                console.log("Checking: ");
-                console.log(newCards); 
-                console.log(setrun.type);
                 let setrunCheck = handFunctions.checkSetrun(newCards, setrun.type);
                 if (setrunCheck === true) { 
                     let newHand = [...hand];
                     newHand.splice(cardIndex, 1);
-                    console.log("CHECK TRUE");
                     result = {
                         result : true,
                         newSetrun : newCards,
@@ -223,14 +190,6 @@ const AIFunctions = {
         return result;
     }
 }
-let testHand =[
-    "2C", "3C", "4C", "5C", "7H", "7D", "7C", "13S", "12H", "10D"
-]
-console.log(AIFunctions.canGoDown(testHand,{R:1, S:1}));
-
-//private functions
-
-//const 
 
 
 export default AIFunctions;

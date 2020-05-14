@@ -9,12 +9,21 @@ const OpponentHeader = (props) => {
     let name = props.name;
     let nameStyle = {};
 
+
     if (props.inPlay) {
         name = "> " + props.name + " <";    
         nameStyle = {fontWeight : "bold", color : "white"};
     };
     let tableOutput = null;
     
+    let message = "";
+
+    if (props.message.timestamp !== null) {
+        if (props.message.timestamp > Date.now() - 1500) {
+            message = props.message.text;
+        }
+    }
+
     if (props.isDown) {
            tableOutput = props.table.map((setrun, index) => {
             let key = "OpponentSetrun"+index;
@@ -36,6 +45,7 @@ const OpponentHeader = (props) => {
                 <div className = "opponent-header-container">
                     <div className = "opponent-header-text">
                         <p style = {nameStyle}>{name}</p>
+                        <div className = "ai-message"> {message}</div>
                     </div>
                 </div>
                 <div className = "opponent-table-container"> 
