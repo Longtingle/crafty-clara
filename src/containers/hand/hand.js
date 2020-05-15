@@ -15,7 +15,8 @@ var Hand = function (props) {
                     cardNum = {index}
                     cardSelected = {selected}
                     handClickHandler = {props.handClickHandler}
-                    
+                    inHand = {true}
+                    handDragOnDrop = {props.handDragOnDrop}
                 />
             )
         })

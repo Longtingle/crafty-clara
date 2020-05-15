@@ -341,7 +341,6 @@ const removeRedAces = (handArray) => {
     }
 }
 
-
 const getSets = (handArray) => {
     let sortedHand = sortHand(handArray, "SETS");
     let numberCount = {};
@@ -446,7 +445,6 @@ const checkSetrun = (setrun, type) => {
 
 }
 
-
 const getPoints = (hand) => {
     let score = 0;
     let handArray = createHandArray(hand);
@@ -463,10 +461,11 @@ const getPoints = (hand) => {
 }
 
 let testHand =[
-    "2C", "3C", "4C", "5C", "7H"
+    "2C", "3C", "4C", "5C", "7H", "1C", "1H"
 ]
 
-console.log(checkSetrun(testHand, "RUN"));
+console.log(removeRedAces(createHandArray(testHand)));
+
 
 const handFunctions = {
     getRuns,

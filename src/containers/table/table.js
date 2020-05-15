@@ -39,6 +39,7 @@ var Table = function (props) {
                 cardSelected = {props.state.player.cardSelected}
                 handClickHandler = {props.handClickHandler}
                 whatWasClicked = {props.whatWasClicked}
+                handDragOnDrop = {props.handDragOnDrop}
             />
         </div>
     );

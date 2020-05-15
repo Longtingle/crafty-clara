@@ -49,7 +49,8 @@ const reducer = (state = initialState, action) => {
             },
             AI : { players : {$set : playersArray}, messageUpdate : {$set : null}}, 
             deck : {$set : action.payload.deck},
-            discard : {$set : action.payload.discard}
+            discard : {$set : action.payload.discard},
+            discardCovered : {$set : false}
         })
  
         return newState;
@@ -89,7 +90,8 @@ const reducer = (state = initialState, action) => {
             },
             AI : {$set : AI}, 
             deck : {$set : action.payload.deck},
-            discard : {$set : action.payload.discard}
+            discard : {$set : action.payload.discard},
+            discardCovered : {$set : false}
         })
 
         return newState;
@@ -118,6 +120,7 @@ const reducer = (state = initialState, action) => {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
             player : {hand : {$set : newHand}},
             discard : {$set : newDiscard},
+            discardCovered : {$set : true},
             AI : { messageUpdate : {$set : null}}
         });
 
@@ -154,6 +157,7 @@ const reducer = (state = initialState, action) => {
                 cardSelected : {$set : null},
             },
             discard : {$set : newDiscard},
+            discardCovered : {$set : false},
             AI : {$set : AI}
         });
 
@@ -213,6 +217,7 @@ const reducer = (state = initialState, action) => {
         newState = update (state, {
             game : {gameState : {$set : GAME_STATES.AI_WAIT_ONE}, gameUpdate : {$set : true}},
             discard : {$set : newDiscard},
+            discardCovered : {$set : true},
             AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [state.AI.AIInPlay]}}
         });
 
@@ -279,6 +284,7 @@ const reducer = (state = initialState, action) => {
             newState = update (state, {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
+                discardCovered : {$set : true},
                 player : {hand : {$set : newHand}},
                 OOTRequests : {$set : []},
                 AI : {messageUpdate : {$set : null}}
@@ -301,6 +307,7 @@ const reducer = (state = initialState, action) => {
             newState = update (state, {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
+                discardCovered : {$set : true},
                 AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [action.payload.winner.index]}},
                 OOTRequests : {$set : []}
             });
@@ -353,7 +360,8 @@ const reducer = (state = initialState, action) => {
                 players : {$set : newAIPlayers},
                 messageUpdate : {$set : messageUpdate}
             },
-            discard : {$set : newDiscard}
+            discard : {$set : newDiscard},
+            discardCovered : {$set : false}
         });
 
 

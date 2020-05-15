@@ -53,6 +53,8 @@ const initialState = {
     },
     deck : [],
     discard : [],
+    discardCovered : false,
+
     OOTRequests : []
 }
 

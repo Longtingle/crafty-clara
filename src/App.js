@@ -35,6 +35,7 @@ class App extends Component {
         this.playerHandSortSets = this.playerHandSortSets.bind(this);
         this.playerAddCardToTable = this.playerAddCardToTable.bind(this);
         this.startNextRound = this.startNextRound.bind(this);
+        this.handDragOnDrop = this.handDragOnDrop.bind(this);
     }
     
     render() {
@@ -75,6 +76,7 @@ class App extends Component {
                         handClickHandler = {this.handClickHandler}
                         discardClickHandler = {this.discardClickHandler}
                         state = {this.props.state}
+                        handDragOnDrop = {this.handDragOnDrop}
                     />
                 </div>
             )
@@ -85,6 +87,21 @@ class App extends Component {
         );
     }
 
+    //HAND DRAG AND DROP HANDLERS
+
+    handDragOnDrop(pickPosition, dropPosition) {
+        console.log("handDragOnDrop", pickPosition, dropPosition);
+        let newHand = [...this.props.state.player.hand];
+
+        if (pickPosition <  dropPosition){
+            newHand.splice(dropPosition + 1, 0, newHand[pickPosition]);
+            newHand.splice(pickPosition, 1);
+        } else if (dropPosition < pickPosition) {
+            let movedCard = newHand.splice(pickPosition, 1);
+            newHand.splice(dropPosition + 1, 0, movedCard[0]);
+        }
+        this.props.sortPlayerHand(newHand);
+    }
 
     componentDidUpdate() {
         console.log("Component did update: ", Date.now());
@@ -142,7 +159,7 @@ class App extends Component {
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW_OOT) {
             //generate draw OOT requests.
             let OOTRequests = [];
-            if (this.props.state.discard.length === 0) {
+            if ((this.props.state.discard.length === 0) || (this.props.state.discardCovered === true)){
                 this.props.AIOOTRequests(OOTRequests);
                 return;
             }
@@ -249,7 +266,8 @@ class App extends Component {
             }
             this.props.fromHandToDiscard();
         } else if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
-            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD){
+            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD &&
+            this.props.state.discardCovered !== true){
             this.playerOOTRequest = {type : "player", index : params.numberOfPlayers - 1}
         }
 
