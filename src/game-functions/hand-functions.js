@@ -35,6 +35,43 @@ const scoreHand = (hand, requirement) => {
 
             runsResult.runs.forEach((run, index) => {
                 //can we use a red ace for this run?
+                if (redAces.length !== 0) {
+                    if (run.keys.length === 3 ){ 
+                        let aceValue = (run.values[0] === 1) ? run.values[run.values.length - 1] + 1: run.values[0] - 1;
+                        run.complete = true;
+                        run.aceUsed = {
+                            aceAs : {
+                                value : aceValue,
+                                ace : run.suit
+                            },
+                            original : redAces.splice(0, 1)[0]
+                        }
+                    } else {
+                        if (run.potentialKeys) {
+                            run.potentialKeys.forEach((key, index) => {
+                                let potCard = handArray[key];                                                       
+                                if ((potCard.value === run.values[run.values.length - 1] + 2) || (potCard.value === run.values[0] - 2)) {
+                                    //use ace
+                                    let aceValue = (potCard.value === run.values[run.values.length - 1] + 2) ? potCard.value -1 : potCard.value + 1;
+                                    run.complete = true;
+                                    run.aceUsed = {
+                                        aceAs : {
+                                            value : aceValue,
+                                            ace : run.suit
+                                        },
+                                        original : redAces.splice(0, 1)[0]
+                                    };
+                                    run.keys.push(key);
+                                    run.values.push(handArray[key].value);
+                                    run.potentialKeys.splice(index, 1);
+
+                                }
+                            });
+                        }
+                    }
+                }
+                console.log("run: ", run);
+
                 if (requirement.R === index) return
                 output.bestHand.push({ 
                     type : "run",
@@ -247,8 +284,9 @@ const createHandArray = (hand) => {
     return handArray;
 }
 
-const sortHand = (sortArray, param) => {
+const sortHand = (handArray, param) => {
     //Sort for sets.
+    let sortArray = _.cloneDeep(handArray);
     if (param === "SETS") {
         return sortArray.sort((a, b) => {
             if (a.value < b.value) {
@@ -518,7 +556,7 @@ const getPoints = (hand) => {
 }
 
 let testHand =[
-    "2C", "3C", "5C", "7D", "1S", "1H", "8S", "8C", "8H"
+    "3C", "2C", "5C", "7D", "1S", "1H", "8S", "8C", "8H"
 ]
 
 console.log(scoreHand(testHand, {R:1, S:1}));
