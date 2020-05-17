@@ -6,15 +6,59 @@ const scoreHand = (hand, requirement) => {
         console.log("requirement should include both R and S");
         throw "requirement should include both R and S";
     }
-
-    let score = 0;
-    let readyToGoDown = false;
-    let bestHand = [];
-    let usefulCards = [];
+    let output = {
+        score : 0,
+        readyToGoDown : false,
+        bestHand : [],
+        usefulCards : []
+    }
+    //let score = 0;
+    //let readyToGoDown = false;
+    //let bestHand = [];
+    //let usefulCards = [];
 
     //turn hand into sorting array
-    let handArray = createHandArray(hand);
+    let result = removeRedAces(createHandArray(hand));
+    let handArray = _.cloneDeep(result.handArray);
+    let redAces = result.redAces;
 
+    console.log("red aces removed:", _.cloneDeep(handArray), redAces);
+
+    //RE-WRITE FROM HERE:
+
+    if (requirement.R > 0) {
+        let runsResult = getRuns(handArray);
+
+        console.log("runsResult", runsResult);  
+        if (runsResult.runs.length === 0 && requirement.S === 0) return output;
+        if (runsResult.runs.length > 0) {
+
+            runsResult.runs.forEach((run, index) => {
+                //can we use a red ace for this run?
+                if (requirement.R === index) return
+                output.bestHand.push({ 
+                    type : "run",
+                    keys : run.keys,
+                    complete : run.complete,
+                    score : run.score
+                });
+                output.score = output.score + run.score;
+                output.usefulCards.push(...run.keys);
+                output.usefulCards.push(...run.potentialKeys);
+            });
+            
+            output.usefulCards = [...new Set(output.usefulCards)];
+               
+            if (runsResult.numFullRuns >= requirement.R) {output.readyToGoDown = true;}
+            
+            return { output }
+        }
+    }
+
+    return;
+    //OLD FUNCTION FROM HERE
+
+    /*
     if (requirement.R === 0){
 
         //no runs, only sets.
@@ -189,7 +233,7 @@ const scoreHand = (hand, requirement) => {
             usefulCards : usefulCards
 
         }
-    }
+    }*/
 
 }
 const createHandArray = (hand) => {
@@ -227,20 +271,13 @@ const sortHand = (sortArray, param) => {
 
 const getRuns = (handArray) => {
     //sort hand for runs.
-    let sortedHand = sortHand(handArray, "RUNS");
+    let sortedHand = sortHand(handArray, "RUNS");    
     
-    let result = removeRedAces(sortedHand);
-    sortedHand = result.handArray;
-    let redAces = result.redAces;
-    
-    //sortedHand now has all red aces removed.
-
     let activeSuit = sortedHand[0].suit;
     let runLength = 1;
     let complete = false;
     let runKeys = [sortedHand[0].index];
     let runValues = [sortedHand[0].value];
-    let potentialKeys = [];
     let runs = [];
    
     for (let i = 1; i < sortedHand.length; i++){ 
@@ -252,14 +289,14 @@ const getRuns = (handArray) => {
 
         }else{
             //are we on card 13 with an ace that could be 14 in the hand?
-            if (sortedHand[i].value = 13) { 
+            if (sortedHand[i].value === 13) { 
                 //we're on a king, search for the ace ..
                 for (let j = 0; j < i; j++) {
                     if (sortedHand[j].value === 1 && sortedHand[j].suit === sortedHand[i].suit) {
                         //it's the ace we need for the end, check it's not in the used keys for a run
                         let aceUsed = false;
                         runs.forEach((run, index) => {
-                            if (runs.keys.includes(sortedHand[j].index)){aceUsed = true;}
+                            if (run.keys.includes(sortedHand[j].index)){aceUsed = true;}
                         })
                         if (runKeys.includes(sortedHand[j].index)){aceUsed = true}
 
@@ -305,17 +342,16 @@ const getRuns = (handArray) => {
     }
     //add potential tag-ons to runs
     runs.forEach(run => {
-        potentialKeys = [];
+        run.potentialKeys = [];
         sortedHand.forEach(card => {
             if(card.suit === run.suit && 
                 !(run.keys.includes(card.index)) && 
                 (Math.abs(card.value - run.values[0]) < 4 || Math.abs(card.value - run.values[run.values.length -1]) < 4 )){
                     
-                    potentialKeys.push(card.index);
+                    run.potentialKeys.push(card.index);
             }
         });
-        run.potentialKeys = potentialKeys;
-        run.score = run.score + (potentialKeys.length * 5);
+        run.score = run.score + (run.potentialKeys.length * 5);
     });
 
     runs.sort((a, b) => {
@@ -334,15 +370,15 @@ const getRuns = (handArray) => {
         numFullRuns : fullRunCount,
         runs : runs
     }
-
+    
     return runsSummarised;
 }
-
 
 const removeRedAces = (handArray) => {
     let redAces = [];
     let redAcesIndex = [];
     let returnArray = _.cloneDeep(handArray);
+
     returnArray.forEach((card, index) => {
         if (card.value === 1 && (card.suit === "D" || card.suit === "H")) {
             //red ace
@@ -350,11 +386,12 @@ const removeRedAces = (handArray) => {
             redAcesIndex.push(index);
         }
     })
+
     redAcesIndex.sort((a, b) => b - a);
     redAcesIndex.forEach((cardNum) => {
         returnArray.splice(cardNum, 1);
     })
-
+    
     return {
         redAces,
         handArray : returnArray
@@ -481,10 +518,10 @@ const getPoints = (hand) => {
 }
 
 let testHand =[
-    "2C", "3C", "4C", "5C", "7H", "1C", "1H"
+    "2C", "3C", "5C", "7D", "1S", "1H", "8S", "8C", "8H"
 ]
 
-console.log(removeRedAces(createHandArray(testHand)));
+console.log(scoreHand(testHand, {R:1, S:1}));
 
 
 const handFunctions = {
