@@ -251,6 +251,26 @@ const getRuns = (handArray) => {
             runValues.push(sortedHand[i].value);
 
         }else{
+            //are we on card 13 with an ace that could be 14 in the hand?
+            if (sortedHand[i].value = 13) { 
+                //we're on a king, search for the ace ..
+                for (let j = 0; j < i; j++) {
+                    if (sortedHand[j].value === 1 && sortedHand[j].suit === sortedHand[i].suit) {
+                        //it's the ace we need for the end, check it's not in the used keys for a run
+                        let aceUsed = false;
+                        runs.forEach((run, index) => {
+                            if (runs.keys.includes(sortedHand[j].index)){aceUsed = true;}
+                        })
+                        if (runKeys.includes(sortedHand[j].index)){aceUsed = true}
+
+                        if (aceUsed === false) {
+                            runLength ++;
+                            runKeys.push(sortedHand[j].index);
+                            runValues.push(sortedHand[i].value);
+                        }
+                    }
+                }
+            }
             //if we have a run, store it. in any case, reset.
             if (runLength >= 2) {
                 runLength >= 4 ? complete = true : complete = false;
