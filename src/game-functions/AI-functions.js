@@ -90,7 +90,12 @@ const AIFunctions = {
                 setrunCards.push(hand[cardNum]);
                 usedCards.push(cardNum);
             });
-            table.push({type : setrun.type, cards : setrunCards})
+            let aceUsed;
+            if (setrun.aceUsed) {
+                aceUsed = setrun.aceUsed;
+                usedCards.push(aceUsed.original.index);
+            }
+            table.push({type : setrun.type, cards : setrunCards, aceUsed})
         })
         usedCards.sort((a, b) => b-a);
         let newHand = [...hand];
