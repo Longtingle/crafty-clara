@@ -7,16 +7,16 @@
 }
 
 .header {
-    padding-top:150px;
+    padding-top:15vh;
 }
 
 .intro {
     font-family : "Trebuchet MS";
-    font-size : 24px;
+    font-size :5vh;
 }
 
 .title {
-    padding-top:50px;
+    padding-top:10vh;
     font-size : 112px;
     font-family : "Georgia Italic";
 }
@@ -28,17 +28,17 @@
 }
 
 .start-button-container{
-    height:100px;
-    width:250px;
+    height:5vh;
+    width:50vw;
     text-align:center;
     margin:auto;
-    margin-top: 250px;
+    margin-top: 20vh;
     border-radius:12px;
 }
 .start-button { 
     border-radius:12px;
     height:100px;
-    width:250px;
+    width:50vw;
     color:black;
     font-size:24px;
     font-family: "Trebuchet MS";

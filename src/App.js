@@ -9,7 +9,7 @@ import {AI_STAGES} from './store/constants.js';
 import {AI_CARD_SELECT} from './store/constants.js';
 
 //import helper functions
-import deckFunctions from './game-functions/deck-functions.js';
+import deckFunctions, { getSuit, getValue } from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
 import handFunctions, { sortHand } from './game-functions/hand-functions.js';
@@ -282,15 +282,15 @@ class App extends Component {
     }
 
     playerHandSortRuns() {
-        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
-            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
+        //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
+        //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
         this.props.sortPlayerHand(newHand);
     }
 
     playerHandSortSets() {
-        if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
-            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
+        //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
+        //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
         this.props.sortPlayerHand(newHand);
     }
@@ -308,15 +308,46 @@ class App extends Component {
     goDownSelectCard = (event, cardNum) => {
         this.props.goDownSelectCard(cardNum);
     }
-
+    
     goDownSubmitSetrun = (event, requirement) => {
+        let redAces;
         if (this.props.state.UI.goingDown.selectedCards.length === 0) return;
         if (requirement === "NONE") return;
-        let setrun = this.props.state.UI.goingDown.selectedCards.map(cardNum => {
-            return this.props.state.player.hand[cardNum];
+        let setrun = this.props.state.UI.goingDown.selectedCards.map((cardNum, index) => {
+            if (this.props.state.player.hand[cardNum] === "1H" || this.props.state.player.hand[cardNum] === "1D" ) {
+                let original = {
+                    value : getValue(this.props.state.player.hand[cardNum]),
+                    suit : getSuit(this.props.state.player.hand[cardNum])
+                }
+                if (requirement === "SET") {
+                    let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[0]]) : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[1]]);
+                    redAces = {
+                        aceAs : {
+                            suit : original.suit,
+                            value : aceValue
+                        },
+                        original
+                    }
+                } else {
+                    let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) + 1 : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]) -1;
+                    let aceSuit = (index !== 0) ? getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) : getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]);
+                    redAces = {
+                        aceAs : {
+                            suit : aceSuit,
+                            value : aceValue
+                        },
+                        original
+                    }
+                }
+                return;
+            } else {
+                return this.props.state.player.hand[cardNum]; //not a red ace
+            }
         })
-        let result = handFunctions.checkSetrun(setrun, requirement);
-        if (!handFunctions.checkSetrun(setrun, requirement)) return;
+
+        let result = handFunctions.checkSetrun(setrun, requirement, redAces);
+        console.log ("check setrun result", result);
+        if (!result.valid) return;
         //need to check that setrun is valid
         let setrunSubmit = {
             type : requirement.toLowerCase(),

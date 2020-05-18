@@ -41,7 +41,7 @@ const getSuit = card => {
 }
 
 const getValue = card => {
-     return (card.length === 3) ? card.substring(0, 2) :  card.substring(0, 1);
+     return (card.length === 3) ? parseInt(card.substring(0, 2)) :  parseInt(card.substring(0, 1));
 }
 
 const deckFunctions = {

@@ -8,7 +8,7 @@ import _ from 'lodash';
 import { shallowEqual } from 'react-redux';
 
 const testHand = [
-    "2C", "2H", "2D", "2S", "8H", "8S", "8D"
+    "2C", "2H", "2D", "4C", "5C", "6C", "7C", "8C", "9C", "1H"
 ]
 
 const reducer = (state = initialState, action) => {
@@ -41,7 +41,7 @@ const reducer = (state = initialState, action) => {
                 gameUpdate : {$set : false},
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
                 round : {$set : 0},
-                requirement : {$set : {R : 0, S : 2}}
+                requirement : {$set : {R : 1, S : 2}}
             },
             player : {
                 //hand : { $set : Array.from(action.payload.hands[0])}

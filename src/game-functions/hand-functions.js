@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { unstable_renderSubtreeIntoContainer } from 'react-dom';
+import {getValue, getSuit} from './deck-functions.js';
 
 const scoreHand = (hand, requirement) => {
 
@@ -135,36 +135,6 @@ const scoreHand = (hand, requirement) => {
     console.log("scoreHand", _.cloneDeep(output));
     return output;
 
-
-    
-
-    /*
-    }else {
-        for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
-            bestHand.push({
-                type : "set", 
-                keys : setsResult.sets[i].keys,
-                complete : setsResult.sets[i].complete,
-                score : setsResult.sets[i].score
-            });
-            score = score + setsResult.sets[i].score;
-        }
-        for (let i = 0; i < setsResult.sets.length; i++){
-            usefulCards.push(...setsResult.sets[i].keys)
-        }
-        if (setsResult.numFullSets >= requirement.S) {readyToGoDown = true;}
-            //ready to go down and full score.
-            usefulCards = [...new Set(usefulCards)];
-        return {
-            score : score,
-            readyToGoDown : readyToGoDown,
-            bestHand : bestHand,
-            usefulCards : usefulCards
-        }
-    }
-*/
-    return;
-    //OLD FUNCTION FROM HERE
 
     /*
     if (requirement.R === 0){
@@ -583,30 +553,32 @@ const sortPlayerHand = (hand, param) => {
 
 const checkSetrun = (setrun, type, redAces) => {
     let valid = 1;
-    let setrunArray = createHandArray(setrun);
     let aceToPlayer;
-    let aceAs;
+    let aceAs, aceAsString;
     let aceAvailable = (redAces) ? true : false;
     let returnAce;
+
 
     // if we're on the table, the ace needs to be put in the hand as what it is replacing
     if (aceAvailable && redAces.aceAs) {
         //has the ace just been swapped?
-        aceAs = redAces.aceAs.value + redAces.aceAs.suit;
-        if (setrun.includes(aceAs)) {
+        aceAs = redAces.aceAs;
+        aceAsString = aceAs.value + aceAs.suit;
+        if (setrun.includes(aceAsString)) {
             return {
                 valid : true,
                 aceToPlayer : true
             }
         } else {
-            setrun.push(aceAs);
+            setrun.push(aceAsString);
             aceAvailable = false;
         }
     }
 
-
+    console.log("setrun + ace", _.cloneDeep(setrun));
+    let setrunArray = createHandArray(setrun);
     if (type.toUpperCase() === "SET") {
-
+        let sortedArray = sortHand(setrunArray, "SETS");
         if (setrun.length < 2) valid = 0;
         if (setrun.length < 3 && !aceAvailable) valid = 0;
 
@@ -629,19 +601,17 @@ const checkSetrun = (setrun, type, redAces) => {
     if (type.toUpperCase() === "RUN") {
 
         let sortedArray = sortHand(setrunArray, "RUNS");
-        
         if (setrun.length < 4 && !aceAvailable) valid = 0;
         if (setrun.length < 3) valid = 0;
-
         let runSuit = sortedArray[0].suit;
         sortedArray.forEach((card,index) => {
             if (index !== 0) {
                 if (card.suit !== runSuit) {
                     valid = 0;
-                }else if (card.value !== setrunArray[index-1].value + 1) {
+                }else if (card.value !== sortedArray[index-1].value + 1) {                
                     if (aceAvailable) {
                         aceAs = {
-                            value : setrunArray[index-1].value + 1,
+                            value : sortedArray[index-1].value + 1,
                             suit : runSuit
                         }
                         aceAvailable = false;
@@ -668,8 +638,6 @@ const checkSetrun = (setrun, type, redAces) => {
             }
         }
     }
-
-    
 
     if (redAces) {
         returnAce = {
@@ -704,9 +672,26 @@ const getPoints = (hand) => {
 let testHand =[
     "3C", "2C", "5C", "4C", "1S", "1H", "9S", "8C", "8H"
 ]
+//let testSetrun = ["2C", "3C", "4C", "5C"]; // PLAIN RUN - PASSED
+//let testSetrun = ["2C", "2H", "2D"]; // PLAIN SET - PASSED
+//let testSetrun = ["2C", "3C", "4C"]; // RUN WITH SPECIFIED ACE - 5C - PASSED
+//let testSetrun = ["2C", "3C", "5C"]; // RUN WITH SPECIFIED ACE - 4C - PASSED
+//let testSetrun = ["2C", "3C", "1C", "4C"]; // VALID RUN WITH UNSPECIFIED ACE - PASSED
+let testSetrun = ["2C", "3C", "1C", "4C"]; // taking the ACE - PASSED
 
+let redAce = {
+    aceAs : {
+        value : 4,
+        suit : "C"
+    },
+    original : {
+        suit : "H",
+        value : 1
+    }
+}
 console.log(scoreHand(testHand, {R:1, S:1}));
 
+console.log("checksetrun", checkSetrun(testSetrun,"RUN", redAce));
 
 const handFunctions = {
     getRuns,
