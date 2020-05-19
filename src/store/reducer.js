@@ -1,14 +1,14 @@
 import update from 'immutability-helper';
 import actions from './actions.js';
 import GAME_STATES from './constants.js';
-import {AI_STAGES, ROUND_REQUIREMENTS} from './constants.js';
+import {ROUND_REQUIREMENTS} from './constants.js';
 import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
 import _ from 'lodash';
-import { shallowEqual } from 'react-redux';
+
 
 const testHand = [
-    "2C", "2H", "2D", "4C", "5C", "6C", "7C", "8C", "9C", "1H"
+    "2C", "2H", "2D", "4C", "5C", "6C", "7C", "8C", "9C", "1H", "9D", "9S"
 ]
 
 const reducer = (state = initialState, action) => {
@@ -21,7 +21,8 @@ const reducer = (state = initialState, action) => {
         for (let i = 0; i < state.AI.AICount ; i++){
             playersArray.push({
                 name : "Opponent",
-                hand : action.payload.hands[i+1],
+                //hand : action.payload.hands[i+1],
+                hand : testHand,
                 isDown : false,
                 table : [],
                 points : {
@@ -41,7 +42,7 @@ const reducer = (state = initialState, action) => {
                 gameUpdate : {$set : false},
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
                 round : {$set : 0},
-                requirement : {$set : {R : 1, S : 2}}
+                requirement : {$set : {R : 0, S : 2}}
             },
             player : {
                 //hand : { $set : Array.from(action.payload.hands[0])}

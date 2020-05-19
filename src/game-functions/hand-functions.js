@@ -31,9 +31,14 @@ const scoreHand = (hand, requirement) => {
                 //can we use a red ace for this run?
                 if (redAces.length !== 0) {
                     if (run.keys.length === 3 ){ 
+                        let acePosition = (run.values[0] === 1) ? acePosition = run.values.length : 0;
                         let aceValue = (run.values[0] === 1) ? run.values[run.values.length - 1] + 1: run.values[0] - 1;
                         run.complete = true;
                         run.score = run.score + 20;
+
+                        run.keys.splice(acePosition, 0, redAces[0].index);
+                        run.values.splice(acePosition, 0, aceValue);
+
                         run.aceUsed = {
                             aceAs : {
                                 value : aceValue,
@@ -41,15 +46,34 @@ const scoreHand = (hand, requirement) => {
                             },
                             original : redAces.splice(0, 1)[0]
                         }
+                        
+                        
                     } else {
                         if (run.potentialKeys) {
                             run.potentialKeys.forEach((key, index) => {
                                 let potCard = handArray[key];                                                       
                                 if ((potCard.value === run.values[run.values.length - 1] + 2) || (potCard.value === run.values[0] - 2)) {
                                     //use ace
+                                    let acePosition, potCardPosition;
+                                    if (potCard.value === run.values[run.values.length - 1] + 2) {
+                                        acePosition = run.values.length;
+                                        potCardPosition = run.values.length + 1;
+                                    } else {
+                                        acePosition = 0;
+                                        potCardPosition = 0;
+                                    }
                                     let aceValue = (potCard.value === run.values[run.values.length - 1] + 2) ? potCard.value -1 : potCard.value + 1;
                                     run.complete = true;
                                     run.score = run.score + 20;
+
+                                    run.keys.splice(acePosition, 0, redAces[0].index);
+                                    run.keys.splice(potCardPosition, 0, key);
+
+                                    run.values.splice(acePosition, 0, aceValue);
+                                    run.values.splice(potCardPosition, 0, handArray[key].value);
+
+                                    run.potentialKeys.splice(index, 1);
+
                                     run.aceUsed = {
                                         aceAs : {
                                             value : aceValue,
@@ -57,18 +81,15 @@ const scoreHand = (hand, requirement) => {
                                         },
                                         original : redAces.splice(0, 1)[0]
                                     };
-                                    run.keys.push(key);
-                                    run.values.push(handArray[key].value);
-                                    run.potentialKeys.splice(index, 1);
                                 }
                             });
+                            
                         }
                     }
                 }
-
-                output.bestHand.push({ 
+                output.bestHand.push(
                     run
-                });
+                );
                 output.score = output.score + run.score;
                 output.usefulCards.push(...run.keys);
                 output.usefulCards.push(...run.potentialKeys);
@@ -94,6 +115,7 @@ const scoreHand = (hand, requirement) => {
     })
 
     let setsResult = getSets(setHandArray);       
+    console.log("setsResult", setsResult);
 
     if (setsResult.sets.length === 0) {
         output.readyToGoDown = false;
@@ -107,6 +129,7 @@ const scoreHand = (hand, requirement) => {
             if (set.keys.length === 2){
                 set.complete = true;
                 set.score = set.score + 20;
+                set.keys.push(redAces[0].index)
                 set.aceUsed = {
                     aceAs : {
                         value : set.value,
@@ -116,9 +139,9 @@ const scoreHand = (hand, requirement) => {
                 }
             }
         }
-        output.bestHand.push({ 
+        output.bestHand.push(
             set
-        });
+        );
         output.score = output.score + set.score;
         output.usefulCards.push(...set.keys);
     });
@@ -128,191 +151,12 @@ const scoreHand = (hand, requirement) => {
         //we have the right number of setruns, are they all complete?
         let ready = true;
         output.bestHand.forEach(setrun => {
-            if (setrun.complete === false) ready = false;
+            if (!setrun.complete) ready = false;
         })
         output.readyToGoDown = ready;
     }else output.readyToGoDown = false;
     console.log("scoreHand", _.cloneDeep(output));
     return output;
-
-
-    /*
-    if (requirement.R === 0){
-
-        //no runs, only sets.
-        let setsResult = getSets(handArray);       
-        if (setsResult.sets.length === 0) {
-            //we have no sets return zero score (initialised values for variables.)
-            return {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }else {
-            for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
-                bestHand.push({
-                    type : "set", 
-                    keys : setsResult.sets[i].keys,
-                    complete : setsResult.sets[i].complete,
-                    score : setsResult.sets[i].score
-                });
-                score = score + setsResult.sets[i].score;
-            }
-            for (let i = 0; i < setsResult.sets.length; i++){
-                usefulCards.push(...setsResult.sets[i].keys)
-            }
-            if (setsResult.numFullSets >= requirement.S) {readyToGoDown = true;}
-                //ready to go down and full score.
-                usefulCards = [...new Set(usefulCards)];
-            return {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }
-        
-    }
-
-    if (requirement.S === 0){
-        //no sets only runs
-        let runsResult = getRuns(handArray);
-
-        if (runsResult.runs.length === 0) {
-            //we have no runs return zero score (initialised values for variables.)
-            return {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }else {
-
-            for (let i = 0; i<runsResult.runs.length && i < requirement.R ; i++){
-                bestHand.push({ 
-                    type : "run",
-                    keys : runsResult.runs[i].keys,
-                    complete : runsResult.runs[i].complete,
-                    score : runsResult.runs[i].score
-                });
-                score = score + runsResult.runs[i].score;
-            }
-            for (let i = 0; i < runsResult.runs.length; i++){
-                usefulCards.push(...runsResult.runs[i].keys);
-                usefulCards.push(...runsResult.runs[i].potentialKeys);
-            }
-            
-            usefulCards = [...new Set(usefulCards)];
-               
-            if (runsResult.numFullRuns >= requirement.R) {readyToGoDown = true;}
-            
-            return {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }
-    }
-
-    if (requirement.R !== 0 && requirement.S !== 0){
-        //we have both runs and sets to deal with!
-        let runsResult = getRuns(handArray);
-        let runScore = {};
-        if (runsResult.runs.length === 0) {
-            //we have no runs return zero score (initialised values for variables.)
-            runScore =  {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }else {
-
-            for (let i = 0; i<runsResult.runs.length && i < requirement.R ; i++){
-                bestHand.push({ 
-                    type : "run",
-                    keys : runsResult.runs[i].keys,
-                    complete : runsResult.runs[i].complete,
-                    score : runsResult.runs[i].score
-                });
-                score = score + runsResult.runs[i].score;
-            }
-            for (let i = 0; i < runsResult.runs.length; i++){
-                usefulCards.push(...runsResult.runs[i].keys);
-                usefulCards.push(...runsResult.runs[i].potentialKeys);
-            }
-            
-            usefulCards = [...new Set(usefulCards)];
-               
-            if (runsResult.numFullRuns >= requirement.R) {readyToGoDown = true;}
-                
-            runScore = {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }
-        
-        let handArrayCopy = [...handArray];
-        handArrayCopy.forEach((card, index)=> {
-            for (let i = 0; i < runScore.bestHand.length; i++){
-                if (runScore.bestHand[i].keys.includes(card.index)) {
-                    handArrayCopy.splice(index,1);
-                }
-            } 
-        })
-        
-        let setScore = {};
-        score = 0;
-        readyToGoDown = false;
-        bestHand = [];
-        usefulCards = [];
-        let setsResult = getSets(handArrayCopy);            
-        if (setsResult.sets.length === 0) {
-            //we have no sets return zero score (initialised values for variables.)
-            setScore = {
-                score : 0,
-                readyToGoDown : false,
-                bestHand : [],
-                usefulCards : []
-            }
-        }else {
-            for (let i = 0; i<setsResult.sets.length && i < requirement.S ; i++){
-                bestHand.push({
-                    type : "set", 
-                    keys : setsResult.sets[i].keys,
-                    complete : setsResult.sets[i].complete,
-                    score : setsResult.sets[i].score
-                });
-                score = score + setsResult.sets[i].score;
-            }
-            for (let i = 0; i < setsResult.sets.length; i++){
-                usefulCards.push(...setsResult.sets[i].keys)
-            }
-            if (setsResult.numFullSets >= requirement.S) {readyToGoDown = true;}
-                //ready to go down and full score.
-            setScore = {
-                score : score,
-                readyToGoDown : readyToGoDown,
-                bestHand : bestHand,
-                usefulCards : usefulCards
-            }
-        }
-        bestHand = [...setScore.bestHand, ...runScore.bestHand];
-        usefulCards = [...setScore.usefulCards, ...runScore.usefulCards];
-        usefulCards = [...new Set(usefulCards)];
-        return { 
-            score : setScore.score + runScore.score,
-            readyToGoDown : setScore.readyToGoDown && runScore.readyToGoDown,
-            bestHand : bestHand,
-            usefulCards : usefulCards
-
-        }
-    }*/
-
 }
 const createHandArray = (hand) => {
     let handArray = hand.map((card, index) => {
@@ -551,57 +395,69 @@ const sortPlayerHand = (hand, param) => {
     return newHand;
 }
 
-const checkSetrun = (setrun, type, redAces) => {
+const checkSetrun = (pSetrun, type, redAces, goDown) => {
+    let setrun = _.cloneDeep(pSetrun);
+    console.log("checkSetrun start - setrun", _.cloneDeep(setrun));
+    console.log("checkSetrun start - redAces", _.cloneDeep(redAces));
+
     let valid = 1;
     let aceToPlayer;
-    let aceAs, aceAsString;
-    let aceAvailable = (redAces) ? true : false;
-    let returnAce;
+    let availableAces = (redAces.length > 0) ? _.cloneDeep(redAces) : [];
+    let usedAces = [];
 
+    if (redAces.length > setrun.length) return {valid : false};
+
+    console.log("checkSetrun - availableAces init", _.cloneDeep(availableAces));
+    console.log("checkSetrun - usedAces init", _.cloneDeep(usedAces));
 
     // if we're on the table, the ace needs to be put in the hand as what it is replacing
-    if (aceAvailable && redAces.aceAs) {
-        //has the ace just been swapped?
-        aceAs = redAces.aceAs;
-        aceAsString = aceAs.value + aceAs.suit;
-        if (setrun.includes(aceAsString)) {
-            return {
-                valid : true,
-                aceToPlayer : true
+    if (availableAces.length > 0) {
+        availableAces.forEach((ace, index) => {
+            if (ace.aceAs) {
+                ace.aceAs.String = ace.aceAs.value + ace.aceAs.suit;
+                if (setrun.includes(ace.aceAs.String)) {    
+                    ace.aceToPlayer = true;
+                } else {
+                    setrun.push(ace.aceAs.String);
+                }
+                usedAces.push(...availableAces.splice(index, 1));
             }
-        } else {
-            setrun.push(aceAsString);
-            aceAvailable = false;
-        }
+        })        
     }
+    
+    console.log("aces allocated availableAces", availableAces);
+    console.log("aces allocated usedAces", usedAces);
+    console.log("setrun + aces", _.cloneDeep(setrun));
 
-    console.log("setrun + ace", _.cloneDeep(setrun));
     let setrunArray = createHandArray(setrun);
-    if (type.toUpperCase() === "SET") {
-        let sortedArray = sortHand(setrunArray, "SETS");
-        if (setrun.length < 2) valid = 0;
-        if (setrun.length < 3 && !aceAvailable) valid = 0;
 
-        let setValue = setrunArray[0].value
-        setrunArray.forEach(card => {
+    if (type.toUpperCase() === "SET") {
+        //sort the hand if we're not going down.
+        let sortedArray = (goDown === true) ? setrunArray : sortHand(setrunArray, "SETS");
+        console.log("sortedArray", _.cloneDeep(sortedArray));
+        if (setrun.length < 2) valid = 0;
+        if (setrun.length < 3 && availableAces.length === 0) valid = 0;
+
+        let setValue = sortedArray[0].value
+        sortedArray.forEach(card => {
             if (card.value !== setValue) valid = 0;
         })
 
         if (valid === 0) return {valid : false};
         
-        if (aceAvailable) {
-            aceAs = {
-                suit : redAces.original.suit,
+        if (availableAces.length > 0) {
+            availableAces[0].aceAs = {
+                suit : availableAces[0].original.suit,
                 value : setValue
-            };
-            aceAvailable = false;
+            }
+            usedAces.push(...availableAces.splice(0, 1));
         }
     }
     
     if (type.toUpperCase() === "RUN") {
 
-        let sortedArray = sortHand(setrunArray, "RUNS");
-        if (setrun.length < 4 && !aceAvailable) valid = 0;
+        let sortedArray = (goDown === true) ? setrunArray : sortHand(setrunArray, "RUNS");
+        if (setrun.length < 4 && availableAces.length === 0) valid = 0;
         if (setrun.length < 3) valid = 0;
         let runSuit = sortedArray[0].suit;
         sortedArray.forEach((card,index) => {
@@ -609,13 +465,13 @@ const checkSetrun = (setrun, type, redAces) => {
                 if (card.suit !== runSuit) {
                     valid = 0;
                 }else if (card.value !== sortedArray[index-1].value + 1) {                
-                    if (aceAvailable) {
-                        aceAs = {
+                    if (availableAces.length > 0) {
+                        availableAces[0].aceAs = {
                             value : sortedArray[index-1].value + 1,
                             suit : runSuit
                         }
-                        aceAvailable = false;
-                        setrunArray.splice(index, 0, {value : aceAs.value, suit : aceAs.suit})
+                        setrunArray.splice(index, 0, {value : availableAces[0].aceAs.value, suit : availableAces[0].aceAs.suit})
+                        usedAces.push(...availableAces.splice(0, 1));
                     } else { valid = 0}
                 }
             }
@@ -623,33 +479,29 @@ const checkSetrun = (setrun, type, redAces) => {
 
         if (valid === 0) return {valid : false};
 
-        if (aceAvailable) {
+        if (availableAces.length > 0) {
             if (sortedArray[0].value > 1) {
-                aceAs = {
+                availableAces[0].aceAs = {
                     value : sortedArray[0].value - 1,
                     suit : runSuit
                 }
-                aceAvailable = false;
+                usedAces.push(...availableAces.splice(0, 1));
             } else if (sortedArray[sortedArray.length - 1].value < 13) {
-                aceAs = {
+                availableAces[0].aceAs = {
                     value : sortedArray[sortedArray.length - 1].value + 1,
                     suit : runSuit
                 }
-            }
+                usedAces.push(...availableAces.splice(0, 1));
+            } else {
+                valid = 0;
+            }   
         }
     }
 
-    if (redAces) {
-        returnAce = {
-            aceAs,
-            original : redAces.original
-        }
-    } else {returnAce = null}
 
     return {
         valid : true,
-        aceToPlayer : false,
-        redAce : returnAce
+        redAce : usedAces
     }
 
 }
