@@ -12,13 +12,6 @@ const GAME_STATES = {
     GAME_END : "GAME_END"
 };
 
-
-const AI_STAGES = {
-    AI_DRAW : "AI_DRAW",
-    AI_PLAY : "AI_PLAY",
-    AI_WAIT : "AI_WAIT"
-}
-
 const AI_CARD_SELECT = { 
     SELECT_DECK : "SELECT_DECK",
     SELECT_DISCARD : "SELECT_DISCARD"
@@ -28,6 +21,9 @@ const ENV_VAR = {
     IMG_DIR : "http://localhost:3000/img"
     //IMG_DIR : "http://81.103.140.192:3000/img"
 }
+
+const SET = "SET";
+const RUN = "RUN";
 
 const ROUND_REQUIREMENTS = [
     {S : 2, R: 0},
@@ -41,4 +37,4 @@ const ROUND_REQUIREMENTS = [
 
 
 export default GAME_STATES;
-export {AI_STAGES, AI_CARD_SELECT, ENV_VAR, ROUND_REQUIREMENTS};
+export {AI_STAGES, AI_CARD_SELECT, ENV_VAR, ROUND_REQUIREMENTS, SET, RUN};

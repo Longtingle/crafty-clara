@@ -5,7 +5,7 @@ import './deck-discard.css';
 const Deck = function (props) {
 
     let output = null;
-    let discardImage = (props.discard === undefined) ? "empty-discard" : props.discard;
+    let discardImage = (props.discard === undefined) ? "empty-discard" : props.discard.displayString;
     output = (
         
             <div className = "deck-discard-flex">

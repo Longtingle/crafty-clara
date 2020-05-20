@@ -10,7 +10,7 @@ var Hand = function (props) {
             (props.cardSelected === index) ? selected = true : selected = false;
             return (
                 <Card 
-                    cardName = {card}
+                    cardName = {card.displayString}
                     key = {index}
                     cardNum = {index}
                     cardSelected = {selected}

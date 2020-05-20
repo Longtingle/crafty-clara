@@ -5,11 +5,10 @@ import {connect} from 'react-redux';
 //import constants
 import actions from './store/actions.js';
 import GAME_STATES from './store/constants.js';
-import {AI_STAGES} from './store/constants.js';
-import {AI_CARD_SELECT} from './store/constants.js';
+import {AI_CARD_SELECT, SET, RUN} from './store/constants.js';
 
 //import helper functions
-import deckFunctions, { getSuit, getValue } from './game-functions/deck-functions.js';
+import deckFunctions from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
 import handFunctions, { sortHand } from './game-functions/hand-functions.js';

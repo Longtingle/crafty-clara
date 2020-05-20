@@ -3,14 +3,27 @@ const generateDeck = (numDecks) => {
     var cards = [];
     for (let suitcount = 1; suitcount<=13; suitcount++) {
         for (let cardcount = 1; cardcount<=numDecks; cardcount++){
-            cards.push(suitcount + "C");
-            cards.push(suitcount + "D");
-            cards.push(suitcount + "H");
-            cards.push(suitcount + "S");
+            cards.push(createCard(suitcount, "C"));
+            cards.push(createCard(suitcount, "D"));
+            cards.push(createCard(suitcount, "H"));
+            cards.push(createCard(suitcount, "S"));
         }
     }
     shuffle(cards)
     return cards;
+}
+
+const createCard = (value, suit) => {
+    let card = {
+        value,
+        suit,
+        displayString : value + suit,
+    }
+    if (value === 1) {
+        let colour = (suit === "C" || suit === "S") ? "black" : "red";
+        card.ace = {value, suit, color}
+    }
+    return card;
 }
 
 function shuffle(array) {
@@ -36,22 +49,10 @@ const deal = (deck, numPlayers) => {
   
 }
 
-const getSuit = card => {
-    return card.substring(card.length -1);
-}
-
-const getValue = card => {
-     return (card.length === 3) ? parseInt(card.substring(0, 2)) :  parseInt(card.substring(0, 1));
-}
-
 const deckFunctions = {
     deal,
     shuffle,
     generateDeck,
-    getSuit,
-    getValue
 }
-
-export {getSuit, getValue};
 
 export default deckFunctions;
