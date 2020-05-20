@@ -99,8 +99,8 @@ const reducer = (state = initialState, action) => {
     }
 
     if (action.type === actions.FROM_DECK_TO_PLAYER){
-        let newDeck = Array.from(state.deck);
-        let newPlayerHand = Array.from(state.player.hand);
+        let newDeck = _.cloneDeep(state.deck);
+        let newPlayerHand = _.cloneDeep(state.player.hand);
         newPlayerHand.push(state.deck[0])
         newDeck.shift();
         newState = update(state, {
@@ -114,8 +114,8 @@ const reducer = (state = initialState, action) => {
     }
 
     if (action.type === actions.FROM_DISCARD_TO_PLAYER) {
-        let newHand = [...state.player.hand];
-        let newDiscard = [...state.discard];
+        let newHand = _.cloneDeep(state.player.hand);
+        let newDiscard = _.cloneDeep(state.discard);
         newHand.push(newDiscard.shift());
         newState = update(state, {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
@@ -139,9 +139,9 @@ const reducer = (state = initialState, action) => {
     }
 
     if (action.type === actions.FROM_HAND_TO_DISCARD) {
-        var newHand = [...state.player.hand];
+        var newHand = _.cloneDeep(state.player.hand);
         var discarded = newHand.splice(state.player.cardSelected, 1);
-        var newDiscard = [...state.discard];
+        var newDiscard = _.cloneDeep(state.discard);
         newDiscard.unshift(discarded[0]);
 
         let AI = _.cloneDeep(state.AI);
@@ -167,9 +167,9 @@ const reducer = (state = initialState, action) => {
     }
 
     if (action.type === actions.AI_PICKED_FROM_DECK) {
-        var newDeck = [...state.deck];
-        var newHand = [...state.AI.players[state.AI.AIInPlay].hand]
-        newHand.push(...newDeck.splice(0, 1));
+        var newDeck = _.cloneDeep(state.deck);
+        var newHand = _.cloneDeep(state.AI.players[state.AI.AIInPlay].hand);
+        newHand.push(newDeck.splice(0, 1)[0]);
 
         var newAIPlayers = state.AI.players.map((player, index) => {
             if (index !== state.AI.AIInPlay ){
@@ -192,15 +192,13 @@ const reducer = (state = initialState, action) => {
                 messageUpdate : {$set : [state.AI.AIInPlay]}
             }
         });
-
-
         return newState;
     }
 
     if (action.type === actions.AI_PICKED_FROM_DISCARD) {
-        var newDiscard = [...state.discard];
-        var newHand = [...state.AI.players[state.AI.AIInPlay].hand]
-        newHand.push(...newDiscard.splice(0, 1));
+        var newDiscard = _.cloneDeep(state.discard);
+        var newHand = _.cloneDeep(state.AI.players[state.AI.AIInPlay].hand);
+        newHand.push(newDiscard.splice(0, 1)[0]);
 
         var newAIPlayers = state.AI.players.map((player, index) => {
             if (index !== state.AI.AIInPlay ){
@@ -225,7 +223,6 @@ const reducer = (state = initialState, action) => {
 
         return newState;
     }
-
 
     if (action.type === actions.AI_WAIT_ONE_COMPLETE) {
         
@@ -270,18 +267,18 @@ const reducer = (state = initialState, action) => {
             return newState;
         }
 
-        let newDiscard = [...state.discard];
+        let newDiscard = _.cloneDeep(state.discard);
+        let newHand;
 
         if (action.payload.winner.winnerType === "player") {
-            newHand = [...state.player.hand];
+            newHand = _.cloneDeep(state.player.hand);
         } else {
-            newHand = [...state.AI.players[action.payload.winner.index].hand];
+            newHand = _.cloneDeep(state.AI.players[action.payload.winner.index].hand);
         }
         
         newHand.push(state.discard[0]);
         newDiscard.shift();
         if (action.payload.winner.winnerType === "player") {
-            console.log("OOT to player");
             newState = update (state, {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
@@ -292,7 +289,6 @@ const reducer = (state = initialState, action) => {
             });
 
         } else {
-            console.log("card to AI");
             let newAIPlayers = state.AI.players.map((player, index) => {
                 if (index !== action.payload.winner.index ){
                     return player;
@@ -320,12 +316,10 @@ const reducer = (state = initialState, action) => {
 
     if (action.type === actions.FROM_AI_TO_DISCARD) {
         // if this is the last AI in the loop, then move back to player, if not, next AI
-        let newAIHand = [...state.AI.players[state.AI.AIInPlay].hand]
+        let newAIHand = _.cloneDeep(state.AI.players[state.AI.AIInPlay].hand);
         let discardedCard = newAIHand.splice(action.payload.cardIndex, 1);
-        let newGameState;
-        let newAIInPlay;
-        let newDiscard = [...state.discard];
-        let newGameUpdate, message, messageUpdate
+        let newDiscard = _.cloneDeep(state.discard);
+        let newGameUpdate, message, messageUpdate, newAIInPlay, newGameState
         newDiscard.unshift(discardedCard[0]);
         if (state.AI.AIInPlay === state.AI.AICount - 1 ){
             newAIInPlay = null;
@@ -369,7 +363,7 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
-    if (action.type === actions.SORT_PLAYER_HAND) {
+    if (action.type === actions.UPDATE_PLAYER_HAND) {
         
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
@@ -433,7 +427,7 @@ const reducer = (state = initialState, action) => {
 
     if (action.type === actions.GO_DOWN_SUBMIT_SETRUN) {
         let selectedCards = [...state.UI.goingDown.selectedCards];
-        let submittedSetruns = [...state.UI.goingDown.submittedSetruns];
+        let submittedSetruns = _.cloneDeep(state.UI.goingDown.submittedSetruns);
         
         submittedSetruns.push(action.payload.setrun);
 
@@ -509,7 +503,7 @@ const reducer = (state = initialState, action) => {
         AI.messageUpdate = null;
         if (action.payload.playerType === "player") { 
             table = _.cloneDeep(state.player.table);
-            table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            table[action.payload.setrunIndex] = action.payload.newSetrun;
             newState = update (state, {
                 game : {gameUpdate : {$set : true}},
                 player : {
@@ -519,7 +513,7 @@ const reducer = (state = initialState, action) => {
                 AI : {$set : AI}
             });
         } else {
-            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex] = action.payload.newSetrun;
 
             newState = update (state, {
                 game : {gameUpdate : {$set : true}},
@@ -612,7 +606,7 @@ const reducer = (state = initialState, action) => {
 
     if (action.type === actions.ACE_TO_PLAYER_HAND) {
         newHand = _.cloneDeep(state.player.hand);
-        newHand.push(action.payload.aceString);
+        newHand.push(action.payload.ace);
         
 
         newState = update (state, {

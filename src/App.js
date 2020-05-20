@@ -285,14 +285,14 @@ class App extends Component {
         //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
         //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
-        this.props.sortPlayerHand(newHand);
+        this.props.updatePlayerHand(newHand);
     }
 
     playerHandSortSets() {
         //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
         //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
         let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
-        this.props.sortPlayerHand(newHand);
+        this.props.updatePlayerHand(newHand);
     }
 
     goDownClickHandler = () => {
@@ -537,8 +537,8 @@ const mapDispatchToProps = dispatch => {
             type : actions.FROM_AI_TO_DISCARD,
             payload : {cardIndex}
         }),
-        sortPlayerHand : (newHand) => dispatch({
-            type : actions.SORT_PLAYER_HAND,
+        updatePlayerHand : (newHand) => dispatch({
+            type : actions.UPDATE_PLAYER_HAND,
             payload: {newHand}
         }),
         showGoingDownModal : () => dispatch({
