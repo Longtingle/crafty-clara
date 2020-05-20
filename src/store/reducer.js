@@ -42,7 +42,7 @@ const reducer = (state = initialState, action) => {
                 gameUpdate : {$set : false},
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
                 round : {$set : 0},
-                requirement : {$set : {R : 0, S : 2}}
+                requirement : {$set : {R : 1, S : 1}}
             },
             player : {
                 //hand : { $set : Array.from(action.payload.hands[0])}
@@ -537,7 +537,7 @@ const reducer = (state = initialState, action) => {
         let table;
         if (action.payload.playerType === "player") { 
             table = _.cloneDeep(state.player.table);
-            table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            table[action.payload.setrunIndex] = action.payload.newSetrun;
             newState = update (state, {
                 game : {gameUpdate : {$set : false}},
                 player : {
@@ -549,7 +549,7 @@ const reducer = (state = initialState, action) => {
             });
         } else {
             let AI = _.cloneDeep(state.AI);
-            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex].cards = action.payload.newSetrun;
+            AI.players[action.payload.AIIndex].table[action.payload.setrunIndex] = action.payload.newSetrun;
             AI.players[action.payload.AIIndex].message = {
                 text : {$set : "Woah, steady there!"},
                 timestamp : {$set : Date.now()}
@@ -565,7 +565,6 @@ const reducer = (state = initialState, action) => {
             });
         }
         
-
 
         return newState;
     }
@@ -607,6 +606,20 @@ const reducer = (state = initialState, action) => {
             
         });
 
+
+        return newState;
+    }
+
+    if (action.type === actions.ACE_TO_PLAYER_HAND) {
+        newHand = _.cloneDeep(state.player.hand);
+        newHand.push(action.payload.aceString);
+        
+
+        newState = update (state, {
+            game : { gameUpdate : { $set : false }},
+            AI : {messageUpdate : { $set : false }},
+            player : {hand : {$set : newHand}}
+        });
 
         return newState;
     }

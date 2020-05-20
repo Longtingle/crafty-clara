@@ -335,7 +335,8 @@ class App extends Component {
                     redAces.push({
                         aceAs : {
                             suit : aceSuit,
-                            value : aceValue
+                            value : aceValue,
+                            position : index
                         },
                         original
                     });
@@ -402,14 +403,14 @@ class App extends Component {
         let redAces = [];
 
         if (playerType === "player") {
-            setrun = this.props.state.player.table[setrunIndex];
+            setrun = _.cloneDeep(this.props.state.player.table[setrunIndex]);
         } else if (playerType === "AI") {
-            setrun = this.props.state.AI.players[AIIndex].table[setrunIndex];
+            setrun = _.cloneDeep(this.props.state.AI.players[AIIndex].table[setrunIndex]);
         }
         if (!setrun) return;
         console.log("setrun selected", setrun);
 
-        newSetrun = setrun.cards.filter(card => {
+        let newSetrunCards = setrun.cards.filter(card => {
             return (card === "1H" || card === "1D") ? false : true;
         });
         redAces.push(...setrun.redAces);
@@ -423,21 +424,32 @@ class App extends Component {
                 }
             })
         } else {
-            newSetrun.push(newCard);
+            newSetrunCards.push(newCard);
         }
 
         console.log("redAces for checkSetrun", redAces);
-        console.log("newSetrun for checkSetrun", newSetrun);
-        let result = handFunctions.checkSetrun(newSetrun, setrun.type.toUpperCase(), redAces);
+        console.log("newSetrun for checkSetrun", newSetrunCards);
+        let result = handFunctions.checkSetrun(newSetrunCards, setrun.type.toUpperCase(), redAces);
         console.log("checkSetrun result", result);
-        //if (!handFunctions.checkSetrun(newSetrun, setrun.type.toUpperCase())) return;
-        if (result.valid === false) return;
-        result.redAce.forEach(ace => {
-            newSetrun.push(ace.original.value + ace.original.suit);
-        })
-        if (setrun.type.toUpperCase() === "RUN") newSetrun = handFunctions.sortHand(newSetrun, "RUNS");
 
-        this.props.playerAddCardToTable(newSetrun, playerType, setrunIndex, AIIndex);   
+        if (result.valid === false) return;
+
+        //TODO
+        //use new sorting alg.
+        //pass reducer entire setrun object, not just the cards
+        //need to handle ace going to player hand
+        
+        
+        result.redAce.forEach(ace => {
+            if (ace.aceToPlayer === true){
+                this.props.aceToPlayer(ace.original.value + ace.original.suit);
+            } else
+                newSetrunCards.push(ace.original.value + ace.original.suit);
+        });
+        setrun.cards = newSetrunCards;
+        if (setrun.type.toUpperCase() === "RUN") setrun = handFunctions.sortTableRun(setrun);
+        console.log("setrun", setrun);
+        this.props.playerAddCardToTable(setrun, playerType, setrunIndex, AIIndex);   
 
     }
     
@@ -571,7 +583,12 @@ const mapDispatchToProps = dispatch => {
         removeAIMessage : (AIIndex) => dispatch({
             type : actions.REMOVE_AI_MESSAGE,
             payload : {AIIndex}
+        }),
+        aceToPlayer : (aceString) => dispatch ({
+            type : actions.ACE_TO_PLAYER_HAND,
+            payload : {aceString}
         })
+
     }
 }
 export default connect(mapStateToProps, mapDispatchToProps)(App);

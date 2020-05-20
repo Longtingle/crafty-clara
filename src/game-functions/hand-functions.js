@@ -395,6 +395,49 @@ const sortPlayerHand = (hand, param) => {
     return newHand;
 }
 
+const sortTableRun = (pSetrun) => {
+    console.log("triggered");
+    if (pSetrun.type.toUpperCase() === "SET") return pSetrun;
+    console.log("runnning");
+    //only needs to be made for runs atm.
+    //remove aces
+
+    //sort remaining hand
+    let setrun = _.cloneDeep(pSetrun);
+    let newCards = setrun.cards.filter(card => {
+        return (card === "1H" || card === "1D") ? false : true;
+    })
+    console.log("new Cards", _.cloneDeep(newCards));
+    newCards.sort((a, b) => {
+        console.log(getValue(a), getValue(b));
+        return getValue(a) - getValue(b);
+    });
+    console.log("new Cards", _.cloneDeep(newCards));
+    
+    setrun.cards = newCards;
+    console.log("setrun.cards", _.cloneDeep(setrun.cards));
+    //put red aces back in where they fit
+    setrun.cards.forEach((card, cardIndex) => {
+        let cardValue = getValue(card);
+
+        //is there a card to go before the start?
+        if (cardIndex === 0) {setrun.redAces.forEach(ace => {if (ace.aceAs.value === cardValue - 1) setrun.cards.splice(0, 0, ace.aceAs.value + ace.aceAs.suit)})}
+        //is there a card to go after this one?
+        setrun.redAces.forEach((ace) => {
+            if (ace.aceAs.value === cardValue + 1){
+                if (cardIndex === setrun.cards.length - 1){
+                    setrun.cards.push(ace.aceAs.value + ace.aceAs.suit)
+                } else {
+                    setrun.cards.splice(cardIndex + 1, 0 , ace.aceAs.value + ace.aceAs.suit);
+                }
+            }
+        })
+    })
+
+    return setrun;
+
+}
+
 const checkSetrun = (pSetrun, type, redAces, goDown) => {
     let setrun = _.cloneDeep(pSetrun);
     console.log("checkSetrun start - setrun", _.cloneDeep(setrun));
@@ -415,10 +458,10 @@ const checkSetrun = (pSetrun, type, redAces, goDown) => {
         availableAces.forEach((ace, index) => {
             if (ace.aceAs) {
                 ace.aceAs.String = ace.aceAs.value + ace.aceAs.suit;
-                if (setrun.includes(ace.aceAs.String)) {    
+                if (setrun.includes(ace.aceAs.String) || type === "SET") {    
                     ace.aceToPlayer = true;
                 } else {
-                    setrun.push(ace.aceAs.String);
+                    setrun.splice(ace.aceAs.position , 0, ace.aceAs.String);
                 }
                 usedAces.push(...availableAces.splice(index, 1));
             }
@@ -529,9 +572,9 @@ let testHand =[
 //let testSetrun = ["2C", "3C", "4C"]; // RUN WITH SPECIFIED ACE - 5C - PASSED
 //let testSetrun = ["2C", "3C", "5C"]; // RUN WITH SPECIFIED ACE - 4C - PASSED
 //let testSetrun = ["2C", "3C", "1C", "4C"]; // VALID RUN WITH UNSPECIFIED ACE - PASSED
-let testSetrun = ["2C", "3C", "1C", "4C"]; // taking the ACE - PASSED
+let testSetrun = ["2C", "3C", "1H", "5C"]; // taking the ACE - PASSED
 
-let redAce = {
+let redAces = [{
     aceAs : {
         value : 4,
         suit : "C"
@@ -540,10 +583,16 @@ let redAce = {
         suit : "H",
         value : 1
     }
-}
-console.log(scoreHand(testHand, {R:1, S:1}));
+}]
 
-console.log("checksetrun", checkSetrun(testSetrun,"RUN", redAce));
+let setrun = {
+    cards : testSetrun,
+    redAces,
+    type : "run"
+};
+
+sortTableRun(setrun);
+
 
 const handFunctions = {
     getRuns,
@@ -552,7 +601,8 @@ const handFunctions = {
     sortHand,
     sortPlayerHand,
     checkSetrun, 
-    getPoints
+    getPoints,
+    sortTableRun
 }
 
 export {
@@ -562,7 +612,8 @@ export {
     sortHand,
     sortPlayerHand,
     checkSetrun,
-    getPoints
+    getPoints,
+    sortTableRun
 }
 
 export default handFunctions;
