@@ -1,27 +1,28 @@
 import _ from 'lodash';
-import {getValue, getSuit} from './deck-functions.js';
+import {SET, RUN} from '../store/constants.js';
+import {createCard} from './deck-functions';
 
-const scoreHand = (hand, requirement) => {
-
+const scoreHand = (pHand, requirement) => { //done
+    
     if (requirement.S === 0 && requirement.R === 0){
         console.log("requirement should include both R and S");
         throw "requirement should include both R and S";
     }
-
+    let hand = _.cloneDeep(pHand);
+    addIndices(hand);
+    let redAces = removeRedAces(hand);
     let output = {
         score : 0,
         readyToGoDown : false,
         bestHand : [],
         usefulCards : []
     }
-    let result = removeRedAces(createHandArray(hand));
-    let handArray = _.cloneDeep(result.handArray);
-    let redAces = result.redAces;
+    
     let runCards = [];
     let runsResult;
 
     if (requirement.R > 0) {
-        runsResult = getRuns(handArray);
+        runsResult = getRuns(hand); 
 
         if (runsResult.runs.length === 0 && requirement.S === 0) return output;
         if (runsResult.runs.length > 0) {
@@ -30,57 +31,26 @@ const scoreHand = (hand, requirement) => {
                 if (requirement.R <= index) return
                 //can we use a red ace for this run?
                 if (redAces.length !== 0) {
-                    if (run.keys.length === 3 ){ 
-                        let acePosition = (run.values[0] === 1) ? acePosition = run.values.length : 0;
-                        let aceValue = (run.values[0] === 1) ? run.values[run.values.length - 1] + 1: run.values[0] - 1;
+                    if (run.cards.length === 3 ){ 
+                        let aceValue = (run.cards[0].value === 1) ? run.cards[run.cards.length -1].value + 1: run.cards[0].value - 1;
                         run.complete = true;
                         run.score = run.score + 20;
+                        redAce[0].value = aceValue;
+                        redAce[0].suit = run.cards[0].suit;
+                        run.cards.push(redAces.splice(0, 1)[0]);
 
-                        run.keys.splice(acePosition, 0, redAces[0].index);
-                        run.values.splice(acePosition, 0, aceValue);
-
-                        run.aceUsed = {
-                            aceAs : {
-                                value : aceValue,
-                                suit : run.suit
-                            },
-                            original : redAces.splice(0, 1)[0]
-                        }
-                        
-                        
                     } else {
-                        if (run.potentialKeys) {
-                            run.potentialKeys.forEach((key, index) => {
-                                let potCard = handArray[key];                                                       
-                                if ((potCard.value === run.values[run.values.length - 1] + 2) || (potCard.value === run.values[0] - 2)) {
-                                    //use ace
-                                    let acePosition, potCardPosition;
-                                    if (potCard.value === run.values[run.values.length - 1] + 2) {
-                                        acePosition = run.values.length;
-                                        potCardPosition = run.values.length + 1;
-                                    } else {
-                                        acePosition = 0;
-                                        potCardPosition = 0;
-                                    }
-                                    let aceValue = (potCard.value === run.values[run.values.length - 1] + 2) ? potCard.value -1 : potCard.value + 1;
+                        if (run.potentialCards) {
+                            run.potentialCards.forEach((card, index) => {                                                      
+                                if ((card.value === run.cards[run.cards.length-1].value + 2) || (card.value === run.cards[0].value - 2)) {                                 
+                                    let aceValue = (card.value === run.cards[run.cards.length -1].value + 2) ? card.value -1 : card.value + 1;
                                     run.complete = true;
-                                    run.score = run.score + 20;
+                                    run.score = run.score + 40 - 5;
+                                    redAce[0].value = aceValue;
+                                    redAce[0].suit = run.cards[0].suit;
 
-                                    run.keys.splice(acePosition, 0, redAces[0].index);
-                                    run.keys.splice(potCardPosition, 0, key);
-
-                                    run.values.splice(acePosition, 0, aceValue);
-                                    run.values.splice(potCardPosition, 0, handArray[key].value);
-
-                                    run.potentialKeys.splice(index, 1);
-
-                                    run.aceUsed = {
-                                        aceAs : {
-                                            value : aceValue,
-                                            suit : run.suit
-                                        },
-                                        original : redAces.splice(0, 1)[0]
-                                    };
+                                    run.cards.push(redAces.splice(0, 1)[0]);
+                                    run.cards.push(run.potentialCards.splice(index, 1)[0]);
                                 }
                             });
                             
@@ -91,30 +61,30 @@ const scoreHand = (hand, requirement) => {
                     run
                 );
                 output.score = output.score + run.score;
-                output.usefulCards.push(...run.keys);
-                output.usefulCards.push(...run.potentialKeys);
+                output.usefulCards.push(...run.cards);
+                output.usefulCards.push(...run.potentialCards);
                 
-                run.keys.forEach(key => {
-                    runCards.push(handArray[key]);
+                run.cards.forEach(card => {
+                    runCards.push(card.index);
                 });
             });
             
             output.usefulCards = [...new Set(output.usefulCards)];
         }
-    }
+    } 
 
     if (requirement.S === 0) {
         //no sets needed, just return the runs result.
         if (runsResult.numFullRuns >= requirement.R) {output.readyToGoDown = true;}
         return output;
     }
-    let setHandArray = _.cloneDeep(handArray);
-    runCards.sort((a, b) => b.index - a.index);
-    runCards.forEach(card => {
-        setHandArray.splice(card.index, 1);
+    let setHand = _.cloneDeep(hand);
+    runCards.sort((a, b) => b - a);
+    runCards.forEach(index => {
+        setHand.splice(index, 1);
     })
-
-    let setsResult = getSets(setHandArray);       
+    
+    let setsResult = getSets(setHand);       
     console.log("setsResult", setsResult);
 
     if (setsResult.sets.length === 0) {
@@ -126,25 +96,21 @@ const scoreHand = (hand, requirement) => {
         if (requirement.S <= index) return;
         if (redAces.length !== 0) {
             //can we use an ace?
-            if (set.keys.length === 2){
+            if (set.cards.length === 2){
                 set.complete = true;
                 set.score = set.score + 20;
-                set.keys.push(redAces[0].index)
-                set.aceUsed = {
-                    aceAs : {
-                        value : set.value,
-                        suit : redAces[0].suit
-                    },
-                    original : redAces.splice(0, 1)[0]
-                }
+                redAces[0].value = set.cards[0].value;
+                set.cards.push(redAces.splice(0,1)[0]);
             }
         }
         output.bestHand.push(
             set
         );
         output.score = output.score + set.score;
-        output.usefulCards.push(...set.keys);
+        output.usefulCards.push(...set.cards);
     });
+
+    output.usefulCards = [...new Set(output.usefulCards)];
 
     //are we ready to go down?
     if (output.bestHand.length === requirement.R + requirement.S) {
@@ -155,24 +121,53 @@ const scoreHand = (hand, requirement) => {
         })
         output.readyToGoDown = ready;
     }else output.readyToGoDown = false;
+
+    if (output.readyToGoDown) {
+        //add possible add-on cards
+        output.bestHand.forEach(setrun => {
+            insertBuildOptions(setrun);
+        })
+    }
+
     console.log("scoreHand", _.cloneDeep(output));
     return output;
 }
-const createHandArray = (hand) => {
-    let handArray = hand.map((card, index) => {
-        let value = null;
-        let suit = null;
-        card.length === 3 ? value = card.substring(0, 2) : value = card.substring(0, 1);
-        suit = card.substring(card.length -1);
-        return {value : parseInt(value), suit : suit, index : index}
-    });
-    return handArray;
+
+const insertBuildOptions = (setrun) => { //done
+    addons = [];
+    if (setrun.type === SET) { 
+        //red ace always valid on a set.
+        addons.push(createCard(setrun.cards[0].value, "H"));
+        addons.push(createCard(setrun.cards[0].value, "D"));
+        addons.push(createCard(setrun.cards[0].value, "C"));
+        addons.push(createCard(setrun.cards[0].value, "S"));
+
+    } else if (setrun.type === RUN) {
+        if (setrun.cards.length != 14) {
+            if (setrun.cards[0].value != 1) { 
+                addons.push(createCard(setrun.cards[0].value - 1, setrun.cards[0].suit));
+            }
+            if (setrun.cards[setrun.cards.length -1].value != 14) {
+                addons.push(createCard(setrun.cards[setrun.cards.length -1].value + 1, setrun.cards[0].suit));
+            }
+        }
+        setrun.cards.forEach((card) => {
+            if (card.ace) { 
+                if (card.ace.colour === "red") { 
+                    if (!(card.ace.value === card.value && card.ace.suit === card.suit)){
+                        addons.push(createCard(card.value, card.suit));
+                    }
+                }
+            }
+        })
+    }
+    setrun.addons = addons;
 }
 
-const sortHand = (handArray, param) => {
+const sortHand = (hand, param) => { //done
     //Sort for sets.
-    let sortArray = _.cloneDeep(handArray);
-    if (param === "SETS") {
+    let sortArray = _.cloneDeep(hand);
+    if (param === SET) {
         return sortArray.sort((a, b) => {
             if (a.value < b.value) {
                 return -1;
@@ -181,7 +176,7 @@ const sortHand = (handArray, param) => {
             }
         });
     }
-    if (param === "RUNS") { 
+    if (param === RUN) { 
         return sortArray.sort((a, b) => {
             if (a.suit < b.suit) return - 1;
             if (b.suit < a.suit) return 1;
@@ -192,96 +187,76 @@ const sortHand = (handArray, param) => {
     }
 }
 
-const getRuns = (handArray) => {
-    //sort hand for runs.
-    let sortedHand = sortHand(handArray, "RUNS");    
-    
-    let activeSuit = sortedHand[0].suit;
-    let runLength = 1;
-    let complete = false;
-    let runKeys = [sortedHand[0].index];
-    let runValues = [sortedHand[0].value];
+const getRuns = (hand) => { //done
+
+    let sortedHand = sortHand(hand, RUN);  
+
     let runs = [];
-   
-    for (let i = 1; i < sortedHand.length; i++){ 
-        if (sortedHand[i].suit === sortedHand[i-1].suit && sortedHand[i].value === sortedHand[i-1].value + 1){
-            //we have 2 consecutive cards.
-            runLength ++;
-            runKeys.push(sortedHand[i].index);
-            runValues.push(sortedHand[i].value);
-
-        }else{
-            //are we on card 13 with an ace that could be 14 in the hand?
-            if (sortedHand[i].value === 13) { 
-                //we're on a king, search for the ace ..
-                for (let j = 0; j < i; j++) {
-                    if (sortedHand[j].value === 1 && sortedHand[j].suit === sortedHand[i].suit) {
-                        //it's the ace we need for the end, check it's not in the used keys for a run
-                        let aceUsed = false;
-                        runs.forEach((run, index) => {
-                            if (run.keys.includes(sortedHand[j].index)){aceUsed = true;}
-                        })
-                        if (runKeys.includes(sortedHand[j].index)){aceUsed = true}
-
-                        if (aceUsed === false) {
-                            runLength ++;
-                            runKeys.push(sortedHand[j].index);
-                            runValues.push(sortedHand[i].value);
-                        }
-                    }
+    let run = {
+        cards : [sortedHand[0]]
+    };
+    
+    sortedHand.forEach((card, i) => {
+        if (i === 0) return;
+        if (card.suit === sortedHand[i-1].suit && card.value === sortedHand[i-1].value + 1 ){
+            run.cards.push(card);
+            if (i === sortedHand.length - 1 ) {
+                if (run.cards.length >=2) {
+                    run.complete = (run.cards.length >= 4) ? true : false;
+                    run.score = run.cards.length * 20;
+                    run.type = RUN;
+                    runs.push(run);
                 }
             }
-            //if we have a run, store it. in any case, reset.
-            if (runLength >= 2) {
-                runLength >= 4 ? complete = true : complete = false;
-                //store the run
-                runs.push({
-                    type : "run",
-                    complete : complete,
-                    values : runValues,
-                    suit : activeSuit,
-                    keys : runKeys,
-                    score : runLength * 20
-                });
+        } else {
+            if (sortedHand[i-1].value === 13) {
+                sortedHand.forEach(chkAce => {
+                    if (!chkAce.ace) return;
+                    if (chkAce.ace.suit === sortedHand[i-1].suit){
+                        let aceAvailable = true;
+                        runs.forEach(run => {
+                            run.cards.forEach(card => {
+                                if (card.index === chkAce.index) {
+                                    aceAvailable = false;
+                                }
+                            });
+                        });
+                        if (aceAvailable){
+                            chkAce.value === 14;
+                            run.cards.push(chkAce);
+                        }
+                    }
+                })
             }
-            runKeys = [sortedHand[i].index];
-            runLength = 1;
-            activeSuit = sortedHand[i].suit;
-            complete = false;
-            runValues = [sortedHand[i].value]
+            if (run.cards.length >=2) {
+               run.complete = (run.cards.length >= 4) ? true : false;
+               run.score = run.cards.length * 20;
+               run.type = RUN;
+               runs.push(run);
+            }
+            run = {
+                cards : [sortedHand[i]]
+            };
         }
-        if (i === sortedHand.length -1 && runLength >= 2){
-            runLength >= 4 ? complete = true : complete = false;
-            //store the run
-            runs.push({
-                type : "run",
-                complete : complete,
-                values : runValues,
-                suit : activeSuit,
-                keys : runKeys,
-                score : runLength * 20
-            });
-        }
-    }
-    //add potential tag-ons to runs
+    })
+   
     runs.forEach(run => {
-        run.potentialKeys = [];
+        run.potentialCards = [];
         sortedHand.forEach(card => {
-            if(card.suit === run.suit && 
-                !(run.keys.includes(card.index)) && 
-                (Math.abs(card.value - run.values[0]) < 4 || Math.abs(card.value - run.values[run.values.length -1]) < 4 )){
-                    
-                    run.potentialKeys.push(card.index);
+            if(card.suit === run.cards[0].suit && 
+                !(run.cards.includes(card)) && 
+                (Math.abs(card.value - run.cards[0].value) < 4 || Math.abs(card.value - run.cards[run.cards.length -1].value) < 4 )){
+                    run.potentialCards.push(card);
             }
         });
-        run.score = run.score + (run.potentialKeys.length * 5);
+        run.score = run.score + (run.potentialCards.length * 5);
     });
 
     runs.sort((a, b) => {
         if (a.score > b.score) {return -1}
         if (a.score < b.score) {return 1}
-        if (a.values.reduce((a,b) => a+b) > b.values.reduce((a,b) => a+b)){return -1}
-        if (a.values.reduce((a,b) => a+b) < b.values.reduce((a,b) => a+b)){return 1}
+        if (a.cards[0].value > b.cards[0].value) {return -1}
+        if (a.cards[0].value < b.cards[0].value) {return 1}
     });
 
     let fullRunCount = 0;
@@ -297,14 +272,14 @@ const getRuns = (handArray) => {
     return runsSummarised;
 }
 
-const removeRedAces = (handArray) => {
+const removeRedAces = (hand) => { //done
     let redAces = [];
     let redAcesIndex = [];
-    let returnArray = _.cloneDeep(handArray);
+    
 
-    returnArray.forEach((card, index) => {
-        if (card.value === 1 && (card.suit === "D" || card.suit === "H")) {
-            //red ace
+    hand.forEach((card, index) => {
+        if (!card.ace) return;
+        if (card.ace.colour === "red") {
             redAces.push(card);
             redAcesIndex.push(index);
         }
@@ -312,57 +287,59 @@ const removeRedAces = (handArray) => {
 
     redAcesIndex.sort((a, b) => b - a);
     redAcesIndex.forEach((cardNum) => {
-        returnArray.splice(cardNum, 1);
+        hand.splice(cardNum, 1);
     })
     
-    return {
-        redAces,
-        handArray : returnArray
-    }
+    return redAces;
 }
 
-const getSets = (handArray) => {
-    let sortedHand = sortHand(handArray, "SETS");
+const addIndices = (hand) => { //done
+    hand.forEach((card, index) => {
+        card.index = index;
+    });
+}
+
+const getSets = (hand) => { //done
+    let sortedHand = sortHand(hand, SET);
+
     let numberCount = {};
     let sets = [];
+    let set = {
+        cards : [sortedHand[0].value]
+    }
 
-    for (let x = 1; x<14 ; x++){
-        numberCount[x] = {};
-        numberCount[x].count = 0;
-        numberCount[x].keys = [];
-        for (let i = 0; i<sortedHand.length; i++){
-            if (sortedHand[i].value === x){
-                numberCount[x].count = numberCount[x].count + 1;
-                numberCount[x].keys.push(sortedHand[i].index);
+    sortedHand.forEach((card, i) => {
+        if (i === 0) return;
+        if (card.value === sortedHand[i-1].value){
+            set.cards.push(card);
+            
+            if (i === sortedHand.length - 1) {
+                if (set.cards.length >= 2) {
+                    set.complete = (set.cards.length >= 3) ? true : false;
+                    set.score = set.cards.length * 20;
+                    set.type = SET;
+                    sets.push(set);
+                    set = {cards : [sortedHand[i]]};
+                }
+            }
+
+        } else {
+            if (set.cards.length >= 2) {
+                set.complete = (set.cards.length >= 3) ? true : false;
+                set.score = set.cards.length * 20;
+                set.type = SET;
+                sets.push(set);
+                set = {cards : [sortedHand[i]]};
             }
         }
-        
-        if (numberCount[x].count >=3){
-            //this is a set
-            sets.push({
-                type: "set",
-                complete : true,
-                value : x,
-                keys : numberCount[x].keys,
-                score : numberCount[x].count * 20
-            });
-        }else if (numberCount[x].count === 2) {
-            //this is a partial set
-            sets.push({
-                type: "set",
-                complete : false,
-                value : x,
-                keys : numberCount[x].keys,
-                score : numberCount[x].count * 20
-            });
-        }
-    }
+    });
+    
     sets.sort((a, b)=>{
         if (a.score > b.score){return -1}
         if (b.score > a.score){return 1}
         //values are the same, so sort on value
-        if (a.value > b.value){return -1}
-        if (b.value > a.value){return 1}
+        if (a.cards[0].value > b.cards[0].value){return -1}
+        if (b.cards[0].value > a.cards[0].value){return 1}
     });
     //also, add a summary to this object ie. # full sets, best score etc.
     let fullSetCount = 0;
@@ -376,10 +353,12 @@ const getSets = (handArray) => {
     return setsSummarised;
 }
 
-const sortPlayerHand = (hand, param) => {
-    //param = "SETS" or "RUNS"
-    let newHand = [];
+const sortPlayerHand = (hand, param) => { //done - deprecated
+    //param = SET or RUN
+    console.log("sortPlayerHand is deprecated - should switch to sortHand");
+    return sortHand(hand, param)
 
+    /* OLD FUNCTION
     let handArray = hand.map((card, index) => {
         let value = null;
         let suit = null;
@@ -393,9 +372,17 @@ const sortPlayerHand = (hand, param) => {
         newHand.push(card.value + card.suit);
     })
     return newHand;
+    */
 }
 
-const sortTableRun = (pSetrun) => {
+const sortTableRun = (setrun) => {
+    console.log("sortPlayerHand is deprecated - should switch to sortHand");
+    let copiedSetrun = _.cloneDeep(setrun);
+    copiedSetrun.cards = sortHand(setrun.cards, setrun.type);
+    return copiedSetrun;
+
+    /*
+    OLD FUNCTION
     console.log("triggered");
     if (pSetrun.type.toUpperCase() === "SET") return pSetrun;
     console.log("runnning");
@@ -433,8 +420,9 @@ const sortTableRun = (pSetrun) => {
             }
         })
     })
-
+    
     return setrun;
+    */
 
 }
 
@@ -549,10 +537,10 @@ const checkSetrun = (pSetrun, type, redAces, goDown) => {
 
 }
 
-const getPoints = (hand) => {
+const getPoints = (hand) => { //done
     let score = 0;
-    let handArray = createHandArray(hand);
-    handArray.forEach((card, index) => {
+    
+    hand.forEach((card, index) => { 
         if (card.value === 1) {
             score = score + 25;
         } else if (card.value > 9) {
@@ -602,7 +590,8 @@ const handFunctions = {
     sortPlayerHand,
     checkSetrun, 
     getPoints,
-    sortTableRun
+    sortTableRun,
+    insertBuildOptions
 }
 
 export {
@@ -613,7 +602,8 @@ export {
     sortPlayerHand,
     checkSetrun,
     getPoints,
-    sortTableRun
+    sortTableRun,
+    insertBuildOptions
 }
 
 export default handFunctions;

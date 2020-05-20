@@ -21,7 +21,7 @@ const createCard = (value, suit) => {
     }
     if (value === 1) {
         let colour = (suit === "C" || suit === "S") ? "black" : "red";
-        card.ace = {value, suit, color}
+        card.ace = {value, suit, colour}
     }
     return card;
 }
@@ -53,6 +53,9 @@ const deckFunctions = {
     deal,
     shuffle,
     generateDeck,
+    createCard
 }
+
+export {createCard};
 
 export default deckFunctions;

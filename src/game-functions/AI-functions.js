@@ -1,14 +1,13 @@
-import {AI_CARD_SELECT} from '../store/constants.js';
+import {AI_CARD_SELECT, SET, RUN} from '../store/constants.js';
 import handFunctions, {scoreHand, checkSetrun} from './hand-functions.js';
-import {getValue, getSuit} from '../game-functions/deck-functions.js';
 import params from './params.js';
 import _ from 'lodash';
 
 //exported functions
 const AIFunctions = {
 
-    selectDraw : (hand, requirement, discard) => {
-        //needs to be re-written - just selected the deck for now.
+    selectDraw : (hand, requirement, discard) => { //done
+        
         let handResult = scoreHand (hand, requirement);
         let adjustedHand = [...hand];
         adjustedHand.push(discard);
@@ -17,56 +16,48 @@ const AIFunctions = {
     },
 
 
-    selectDiscard : (hand, requirement, isDown) => {       
+    selectDiscard : (pHand, requirement, isDown) => {        //done   
         
-        let splitHand = hand.map((card, index) => {
-            return {
-                value : getValue (card),
-                suit : getSuit (card),
-                index
-            }
-        });
+        let hand = _.cloneDeep(pHand);
+
         if (isDown === true) {
             //if the AI is down already, just return the card with the highest value.
-            splitHand.sort((a, b)=> b.value-a.value);
-            return splitHand[0].index;
-        }
+            hand.sort((a, b)=> b.value-a.value);
+            return hand[0].index;
+        } 
 
         let handResult = scoreHand(hand, requirement);
 
         if (handResult.usefulCards.length !== hand.length) {
 
             // we have cards that aren't useful, return the highest.
-            handResult.usefulCards.sort((a,b) => b-a);    
-            handResult.usefulCards.forEach(index=> {
-                splitHand.splice(index, 1);
+            handResult.usefulCards.sort((a,b) => b.value-a.value);    
+            handResult.usefulCards.forEach((card)=> {
+                hand.splice(card.index, 1);
             });
 
-            splitHand.sort((a, b)=> b.value-a.value);
+            hand.sort((a, b)=> b.value-a.value);
         
-            return splitHand[0].index;
+            return hand[0].index;
         }
 
         // all cards are useful, throw away highest card not in best hand
         let bestCards = [];
         handResult.bestHand.forEach((setrun) => {
-            bestCards.push([...setrun.keys]);
+            bestCards.push(...setrun.cards);
         })
-        bestCards.sort((a,b) => b-a);    
-        bestCards.forEach(index=> {
-            splitHand.splice(index, 1);
+        bestCards.sort((a, b) => b.value - a.value);    
+        bestCards.forEach((card) => {
+            hand.splice(card.index, 1);
         });
         
-        splitHand.sort((a, b)=> b.value-a.value);
+        hand.sort((a, b)=> b.value - a.value);
         
-        return splitHand[0].index;
+        return hand[0].index;
     },
 
 
-    drawOOT : (hand, requirement, discard) => {
-        //takes a hand (array of 'cards') and a card and decides whether to take that card or take from the deck.
-        //needs to be re-written - never draws out of turn for now.
-        
+    drawOOT : (hand, requirement, discard) => {  //done
         let handResult = scoreHand(hand, requirement);
         let discardHand = [...hand];
         discardHand.push(discard);
@@ -74,30 +65,22 @@ const AIFunctions = {
         let discardResult = scoreHand(discardHand, requirement);
         
         return (discardResult.score > handResult.score + 5) ? true : false;
-        //TODO - need to improve such that the rather than just looking at score, we consider if it's worth exposing what's being collected
     },
 
 
-    canGoDown : (hand, requirement) => {
+    canGoDown : (hand, requirement) => { //done
  
         let score = scoreHand(hand, requirement);
         if (!score.readyToGoDown) return {result : false};
         let table = [];
         let usedCards = [];
         score.bestHand.forEach((setrun, index) => {
-            let setrunCards = [];
-            setrun.keys.forEach(cardNum => {
-                setrunCards.push(hand[cardNum]);
-                usedCards.push(cardNum);
-            });
-            let aceUsed;
-            if (setrun.aceUsed) {
-                aceUsed = setrun.aceUsed;
-                usedCards.push(aceUsed.original.index);
-            }
-            table.push({type : setrun.type, cards : setrunCards, aceUsed})
+            table.push({type : setrun.type, cards : setrun.cards, addons : setrun.addons})
+            setrun.cards.forEach(card => {
+                usedCards.push(card.index);
+            })
         })
-        usedCards.sort((a, b) => b-a);
+        usedCards.sort((a, b) => b - a);
         let newHand = [...hand];
         usedCards.forEach((cardNum) => {
             newHand.splice(cardNum, 1);
@@ -109,7 +92,7 @@ const AIFunctions = {
         }
     },
 
-    resolveOOT : (OOTRequests, AIInPlay) => {
+    resolveOOT : (OOTRequests, AIInPlay) => { //done
 
         if (OOTRequests.length === 0){
             return {winnerType : "none"};
@@ -144,6 +127,8 @@ const AIFunctions = {
     },
 
     AIHandBuild : (hand, AITables, playerTable) => {
+
+        // needs re-write with build options going into the setrun
         let result = null;
         AITables.forEach((AI, AIIndex) => {
             AI.table.forEach((setrun, setrunIndex) => {

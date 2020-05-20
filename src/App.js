@@ -89,7 +89,7 @@ class App extends Component {
 
     //HAND DRAG AND DROP HANDLERS
 
-    handDragOnDrop(pickPosition, dropPosition) {
+    handDragOnDrop(pickPosition, dropPosition) { //done
         console.log("handDragOnDrop", pickPosition, dropPosition);
         let newHand = [...this.props.state.player.hand];
 
@@ -130,7 +130,7 @@ class App extends Component {
             }, 2000);
         }
 
-        //HALT execution here if the state change a gameUpdate.
+        //HALT execution here if the state change is not a gameUpdate.
         if (this.props.state.game.gameUpdate === false) return;
 
         if (this.props.state.game.gameState === GAME_STATES.AI_DRAW) { 
@@ -231,10 +231,8 @@ class App extends Component {
         }
     }
 
-    newGameHandler = () => {
-        //generate deck with 2 shuffled packs of cards
+    newGameHandler = () => { //done
         let deck = deckFunctions.generateDeck(2);
-        //deal into numbers of hands required.
         let hands = deckFunctions.deal(deck, params.numberOfPlayers);
     
         let discard = [];
@@ -243,7 +241,7 @@ class App extends Component {
         this.props.startNewGame(deck, hands, discard);
     }
 
-    deckClickHandler = () => {
+    deckClickHandler = () => { //done
         if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD) {
             this.props.fromDeckToPlayer();
         }
@@ -273,7 +271,7 @@ class App extends Component {
 
     }
 
-    handClickHandler = (event, cardNum) => { 
+    handClickHandler = (event, cardNum) => { //done
         console.log(cardNum);
         if (this.props.state.game.gameState === GAME_STATES.PW_PLAY && this.props.state.player.isGoingDown === false) {
             //we're not in going down mode, so get the card selected ready for going onto the table or going onto the discard.
@@ -284,14 +282,14 @@ class App extends Component {
     playerHandSortRuns() {
         //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
         //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
-        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "RUNS");
+        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, RUN);
         this.props.updatePlayerHand(newHand);
     }
 
     playerHandSortSets() {
         //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
         //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
-        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, "SETS");
+        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, SET);
         this.props.updatePlayerHand(newHand);
     }
 
@@ -301,67 +299,42 @@ class App extends Component {
         this.props.showGoingDownModal();
     }
 
-    cancelPlayerGoDown = () => {
+    cancelPlayerGoDown = () => { //done
         this.props.cancelPlayerGoDown();
     }
 
-    goDownSelectCard = (event, cardNum) => {
+    goDownSelectCard = (event, cardNum) => { // done
         this.props.goDownSelectCard(cardNum);
     }
     
-    goDownSubmitSetrun = (event, requirement) => {
-        let redAces = [];
+    goDownSubmitSetrun = (event, requirement) => { // done
+        
         if (this.props.state.UI.goingDown.selectedCards.length === 0) return;
         if (requirement === "NONE") return;
-        let setrun = this.props.state.UI.goingDown.selectedCards.map((cardNum, index) => {
-            if (this.props.state.player.hand[cardNum] === "1H" || this.props.state.player.hand[cardNum] === "1D" ) {
-                let original = {
-                    value : getValue(this.props.state.player.hand[cardNum]),
-                    suit : getSuit(this.props.state.player.hand[cardNum])
-                }
-                if (requirement === "SET") {
-                    let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[0]]) : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[1]]);
-                    redAces.push({
-                        aceAs : {
-                            suit : original.suit,
-                            value : aceValue
-                        },
-                        original
-                    });
-                } else {
-                    let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) + 1 : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]) -1;
-                    let aceSuit = (index !== 0) ? getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) : getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]);
-                    redAces.push({
-                        aceAs : {
-                            suit : aceSuit,
-                            value : aceValue,
-                            position : index
-                        },
-                        original
-                    });
-                }
-                return "remove"
-            } else {
-                return this.props.state.player.hand[cardNum]; //not a red ace
-            }
-        })
-        setrun = setrun.filter (item => {
-            if (item === "remove"){
-                return false;
-            }
-            return true;
-        })
-        if (redAces.length > setrun.length) return;
-        let result = handFunctions.checkSetrun(setrun, requirement, redAces, true);
-        console.log ("check setrun result", result);
-        if (!result.valid) return;
-        //need to check that setrun is valid
-        let setrunSubmit = {
-            type : requirement.toLowerCase(),
-            cards : this.props.state.UI.goingDown.selectedCards,
-            redAces
+        let setrunCards = this.props.state.UI.goingDown.selectedCards.map((cardNum, index) => {
+           return this.props.state.player.hand[cardNum]
+        });
+        let setrun = {
+            type : requirement,
+            cards : setrunCards
         }
-        this.props.goDownSubmitSetrun(setrunSubmit);
+        setrun.cards.forEach((card, i) => {
+            if (card.ace) { 
+                if (card.ace.colour === "red") {
+                    if (requirement === SET) { 
+                        card.value = (i === 0) ? setrun.cards[i+1].value : setrun.cards[0].value;
+                    } else if (requirement === RUN) { 
+                        card.value = (i === 0) ? setrun.cards[i+1].value -1 : setrun.cards[i-1] +1;
+                    }
+                } 
+            }
+        });
+
+        
+        let result = handFunctions.checkSetrun(setrun, requirement);
+        if (!result.valid) return;
+        handFunctions.insertBuildOptions(setrun);
+        this.props.goDownSubmitSetrun(setrun);
     }
 
     goDownSubmitHand = (event, requirement) => {

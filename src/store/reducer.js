@@ -425,8 +425,7 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
-    if (action.type === actions.GO_DOWN_SUBMIT_SETRUN) {
-        let selectedCards = [...state.UI.goingDown.selectedCards];
+    if (action.type === actions.GO_DOWN_SUBMIT_SETRUN) { //NEEDS REWRITING
         let submittedSetruns = _.cloneDeep(state.UI.goingDown.submittedSetruns);
         
         submittedSetruns.push(action.payload.setrun);
