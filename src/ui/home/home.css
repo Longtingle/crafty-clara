@@ -17,7 +17,7 @@
 
 .title {
     padding-top:10vh;
-    font-size : 112px;
+    font-size : 10vw;
     font-family : "Georgia Italic";
 }
 
@@ -29,7 +29,7 @@
 
 .start-button-container{
     height:5vh;
-    width:50vw;
+    width:25vw;
     text-align:center;
     margin:auto;
     margin-top: 20vh;
@@ -37,10 +37,10 @@
 }
 .start-button { 
     border-radius:12px;
-    height:100px;
-    width:50vw;
+    height:10vh;
+    width:25vw;
     color:black;
-    font-size:24px;
+    font-size:2vw;
     font-family: "Trebuchet MS";
     background-color:rgb(185, 184, 184);
     display:table-cell;

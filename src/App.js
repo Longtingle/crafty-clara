@@ -12,6 +12,7 @@ import deckFunctions from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
 import handFunctions, { sortHand } from './game-functions/hand-functions.js';
+import _ from 'lodash';
 
 //import react components
 import Table from './containers/table/table.js';
@@ -309,7 +310,7 @@ class App extends Component {
     }
     
     goDownSubmitSetrun = (event, requirement) => {
-        let redAces;
+        let redAces = [];
         if (this.props.state.UI.goingDown.selectedCards.length === 0) return;
         if (requirement === "NONE") return;
         let setrun = this.props.state.UI.goingDown.selectedCards.map((cardNum, index) => {
@@ -320,37 +321,45 @@ class App extends Component {
                 }
                 if (requirement === "SET") {
                     let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[0]]) : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[1]]);
-                    redAces = {
+                    redAces.push({
                         aceAs : {
                             suit : original.suit,
                             value : aceValue
                         },
                         original
-                    }
+                    });
                 } else {
                     let aceValue = (index !== 0) ? getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) + 1 : getValue(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]) -1;
                     let aceSuit = (index !== 0) ? getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index - 1]]) : getSuit(this.props.state.player.hand[this.props.state.UI.goingDown.selectedCards[index + 1]]);
-                    redAces = {
+                    redAces.push({
                         aceAs : {
                             suit : aceSuit,
-                            value : aceValue
+                            value : aceValue,
+                            position : index
                         },
                         original
-                    }
+                    });
                 }
-                return;
+                return "remove"
             } else {
                 return this.props.state.player.hand[cardNum]; //not a red ace
             }
         })
-
-        let result = handFunctions.checkSetrun(setrun, requirement, redAces);
+        setrun = setrun.filter (item => {
+            if (item === "remove"){
+                return false;
+            }
+            return true;
+        })
+        if (redAces.length > setrun.length) return;
+        let result = handFunctions.checkSetrun(setrun, requirement, redAces, true);
         console.log ("check setrun result", result);
         if (!result.valid) return;
         //need to check that setrun is valid
         let setrunSubmit = {
             type : requirement.toLowerCase(),
-            cards : this.props.state.UI.goingDown.selectedCards
+            cards : this.props.state.UI.goingDown.selectedCards,
+            redAces
         }
         this.props.goDownSubmitSetrun(setrunSubmit);
     }
@@ -361,18 +370,19 @@ class App extends Component {
         let usedCards = [];
         let table = [];
         let counter = 0;
-        let cardsArray = []
-        // create new hand with used cards removed.
-        // create player's 'table' object.
+        let cardsArray = [];
+        
+   
         this.props.state.UI.goingDown.submittedSetruns.forEach((setrun, index) => {
-            
+            let redAces = setrun.redAces;
             setrun.cards.forEach((cardNum, index) => {
                 usedCards.push(cardNum);
                 cardsArray.push(this.props.state.player.hand[cardNum]);
             });
             table.push({
                 type : setrun.type,
-                cards : cardsArray
+                cards : cardsArray,
+                redAces
             });
             cardsArray = []
         })
@@ -384,25 +394,61 @@ class App extends Component {
     }
 
     playerAddCardToTable(event, playerType, setrunIndex, AIIndex) {
+    
         if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
         if (this.props.state.player.cardSelected === false) return;
         if (!this.props.state.player.isDown) return;
-        let setrun;
-        
+        let setrun, newCard, newSetrun;
+        let redAces = [];
+
         if (playerType === "player") {
-            setrun = this.props.state.player.table[setrunIndex];
+            setrun = _.cloneDeep(this.props.state.player.table[setrunIndex]);
         } else if (playerType === "AI") {
-            setrun = this.props.state.AI.players[AIIndex].table[setrunIndex];
+            setrun = _.cloneDeep(this.props.state.AI.players[AIIndex].table[setrunIndex]);
         }
         if (!setrun) return;
-        let newSetrun = [...setrun.cards];
-        newSetrun.push(this.props.state.player.hand[this.props.state.player.cardSelected]);
-        
-        if (!handFunctions.checkSetrun(newSetrun, setrun.type.toUpperCase())) return;
-        
-        newSetrun = handFunctions.sortHand(newSetrun, "RUNS");
+        console.log("setrun selected", setrun);
 
-        this.props.playerAddCardToTable(newSetrun, playerType, setrunIndex, AIIndex);   
+        let newSetrunCards = setrun.cards.filter(card => {
+            return (card === "1H" || card === "1D") ? false : true;
+        });
+        redAces.push(...setrun.redAces);
+
+        newCard = this.props.state.player.hand[this.props.state.player.cardSelected];
+        if (newCard === "1H" || newCard === "1D") { 
+            redAces.push({
+                original : {
+                    value : getValue(newCard),
+                    suit : getSuit(newCard)
+                }
+            })
+        } else {
+            newSetrunCards.push(newCard);
+        }
+
+        console.log("redAces for checkSetrun", redAces);
+        console.log("newSetrun for checkSetrun", newSetrunCards);
+        let result = handFunctions.checkSetrun(newSetrunCards, setrun.type.toUpperCase(), redAces);
+        console.log("checkSetrun result", result);
+
+        if (result.valid === false) return;
+
+        //TODO
+        //use new sorting alg.
+        //pass reducer entire setrun object, not just the cards
+        //need to handle ace going to player hand
+        
+        
+        result.redAce.forEach(ace => {
+            if (ace.aceToPlayer === true){
+                this.props.aceToPlayer(ace.original.value + ace.original.suit);
+            } else
+                newSetrunCards.push(ace.original.value + ace.original.suit);
+        });
+        setrun.cards = newSetrunCards;
+        if (setrun.type.toUpperCase() === "RUN") setrun = handFunctions.sortTableRun(setrun);
+        console.log("setrun", setrun);
+        this.props.playerAddCardToTable(setrun, playerType, setrunIndex, AIIndex);   
 
     }
     
@@ -536,7 +582,12 @@ const mapDispatchToProps = dispatch => {
         removeAIMessage : (AIIndex) => dispatch({
             type : actions.REMOVE_AI_MESSAGE,
             payload : {AIIndex}
+        }),
+        aceToPlayer : (aceString) => dispatch ({
+            type : actions.ACE_TO_PLAYER_HAND,
+            payload : {aceString}
         })
+
     }
 }
 export default connect(mapStateToProps, mapDispatchToProps)(App);
