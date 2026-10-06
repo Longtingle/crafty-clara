@@ -1,5 +1,5 @@
 import React from 'react';
-import Auxhoc from '../auxhoc/auxhoc.js';
+import Auxhoc from '../auxhoc/auxhoc.jsx';
 
 import './round-end.css';
 

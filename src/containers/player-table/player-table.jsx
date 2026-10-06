@@ -1,5 +1,5 @@
 import React from 'react'
-import PlayerTableSetrun from './player-table-setrun/player-table-setrun.js';
+import PlayerTableSetrun from './player-table-setrun/player-table-setrun.jsx';
 
 import './player-table.css';
 

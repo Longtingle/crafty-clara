@@ -1,8 +1,7 @@
 import React from 'react';
-import OpponentSetrun from '../opponent-setrun/opponent-setrun.js';
+import OpponentSetrun from '../opponent-setrun/opponent-setrun.jsx';
 
 import './opponent-header.css';
-import { findRenderedComponentWithType } from 'react-dom/test-utils';
 
 const OpponentHeader = (props) => {
     

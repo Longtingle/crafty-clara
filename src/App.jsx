@@ -15,11 +15,11 @@ import handFunctions, { sortHand } from './game-functions/hand-functions.js';
 import _ from 'lodash';
 
 //import react components
-import Table from './containers/table/table.js';
-import Home from './ui/home/home.js';
-import ModalBack from './ui/modal-back/modal-back.js';
-import GoDown from './ui/go-down/go-down';
-import RoundEnd from './ui/round-end/round-end.js';
+import Table from './containers/table/table.jsx';
+import Home from './ui/home/home.jsx';
+import ModalBack from './ui/modal-back/modal-back.jsx';
+import GoDown from './ui/go-down/go-down.jsx';
+import RoundEnd from './ui/round-end/round-end.jsx';
 
 //import CSS
 import './App.css';

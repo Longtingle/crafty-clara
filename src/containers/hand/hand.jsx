@@ -1,6 +1,6 @@
 import React from 'react';
 import './hand.css';
-import Card from '../card/card.js';
+import Card from '../card/card.jsx';
 
 var Hand = function (props) {
     let hand = null;

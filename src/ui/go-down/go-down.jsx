@@ -1,5 +1,5 @@
 import React from 'react';
-import Card from '../../containers/card/card.js';
+import Card from '../../containers/card/card.jsx';
 import {ENV_VAR} from '../../store/constants.js';
 
 import './go-down.css';

@@ -1,5 +1,5 @@
 import React from 'react';
-import OpponentHeader from './opponent-header/opponent-header.js';
+import OpponentHeader from './opponent-header/opponent-header.jsx';
 
 import './opponent-area.css';
 

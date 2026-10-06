@@ -1,8 +1,8 @@
 import React from 'react';
-import Hand from '../hand/hand.js';
-import Deck from '../deck-discard/deck-discard.js';
-import PlayerTable from '../player-table/player-table.js';
-import OpponentArea from '../opponent-area/opponent-area.js';
+import Hand from '../hand/hand.jsx';
+import Deck from '../deck-discard/deck-discard.jsx';
+import PlayerTable from '../player-table/player-table.jsx';
+import OpponentArea from '../opponent-area/opponent-area.jsx';
 import './table.css';
 
 
