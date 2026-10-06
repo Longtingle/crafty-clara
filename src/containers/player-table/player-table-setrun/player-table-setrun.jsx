@@ -7,7 +7,7 @@ const playerTableSetrun = (props) => {
     let output = props.setrun.cards.map((card, index) => {
         return (
             <Card 
-                cardName = {card} 
+                cardName = {card.displayString}
                 key = {index}
                 handClickHandler = {(event) => props.playerAddCardToTable(event, "player", props.index)}
             />

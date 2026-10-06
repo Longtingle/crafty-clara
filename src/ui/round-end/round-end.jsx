@@ -1,5 +1,6 @@
 import React from 'react';
 import Auxhoc from '../auxhoc/auxhoc.jsx';
+import {ROUND_REQUIREMENTS} from '../../store/constants.js';
 
 import './round-end.css';
 
@@ -68,12 +69,23 @@ const RoundEnd = (props) => {
 
 
     
+    // lowest total wins once every round has been played
+    let isFinalRound = props.game.round >= ROUND_REQUIREMENTS.length - 1;
+    let header = "End of Round " + (props.game.round + 1);
+    if (isFinalRound) {
+        let winner = props.AIPlayers.reduce(
+            (best, player) => (player.points.total < best.points.total) ? player : best,
+            {name : "You", points : props.player.points}
+        );
+        header = (winner.name === "You") ? "Game Over - you win!" : "Game Over - " + winner.name + " wins";
+    }
+
     let output = null;
     if (props.endOfRound === true) {
 
         output = (
             <div className = "round-end-container">
-                <div className = "round-end-header">End of Round {props.game.round + 1}</div>
+                <div className = "round-end-header">{header}</div>
                 <div className = "scoreboard-container">
                     <table>
                         <thead>
@@ -90,8 +102,11 @@ const RoundEnd = (props) => {
                     </table>
                 </div>
                 <div className = "round-end-buttons-container">
-                    <div className = "round-end-button" onClick = {props.nextRoundHandler}>
-                        Start Next Round
+                    <div
+                        className = "round-end-button"
+                        onClick = {isFinalRound ? props.newGameHandler : props.nextRoundHandler}
+                    >
+                        {isFinalRound ? "New Game" : "Start Next Round"}
                     </div>
                 </div>
             </div>

@@ -8,7 +8,7 @@ const OpponentSetrun = (props) => {
         return (
             <Card 
                 handClickHandler = {(event) => props.playerAddCardToTable(event, "AI", props.setrunIndex, props.AIIndex)}
-                cardName = {card}
+                cardName = {card.displayString}
                 key = {key} 
             />
         )

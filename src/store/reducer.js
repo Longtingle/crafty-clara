@@ -2,14 +2,8 @@ import update from 'immutability-helper';
 import actions from './actions.js';
 import GAME_STATES from './constants.js';
 import {ROUND_REQUIREMENTS} from './constants.js';
-import params from '../game-functions/params.js';
 import initialState from './initial-state.js';
 import _ from 'lodash';
-
-
-const testHand = [
-    "2C", "2H", "2D", "4C", "5C", "6C", "7C", "8C", "9C", "1H", "9D", "9S"
-]
 
 const reducer = (state = initialState, action) => {
     let newState;  
@@ -20,9 +14,8 @@ const reducer = (state = initialState, action) => {
         let playersArray = [];
         for (let i = 0; i < state.AI.AICount ; i++){
             playersArray.push({
-                name : "Opponent",
-                //hand : action.payload.hands[i+1],
-                hand : testHand,
+                name : "Opponent " + (i + 1),
+                hand : action.payload.hands[i+1],
                 isDown : false,
                 table : [],
                 points : {
@@ -36,17 +29,17 @@ const reducer = (state = initialState, action) => {
             });
         };
 
-        newState = update(state, {
+        // start from the initial state so nothing carries over from a previous game
+        newState = update(initialState, {
             timestamp : {$set : Date.now()},
             game : {
                 gameUpdate : {$set : false},
                 gameState : {$set : GAME_STATES.PW_DRAW_CARD},
                 round : {$set : 0},
-                requirement : {$set : {R : 1, S : 1}}
+                requirement : {$set : ROUND_REQUIREMENTS[0]}
             },
             player : {
-                //hand : { $set : Array.from(action.payload.hands[0])}
-                hand : { $set : testHand}
+                hand : { $set : Array.from(action.payload.hands[0])}
             },
             AI : { players : {$set : playersArray}, messageUpdate : {$set : null}}, 
             deck : {$set : action.payload.deck},
@@ -85,9 +78,9 @@ const reducer = (state = initialState, action) => {
             },
             player : {
                 hand : { $set : Array.from(action.payload.hands[0])},
+                cardSelected : {$set : null},
                 table : {$set : []},
                 isDown : {$set : false}
-                //hand : { $set : testHand}
             },
             AI : {$set : AI}, 
             deck : {$set : action.payload.deck},
@@ -480,8 +473,8 @@ const reducer = (state = initialState, action) => {
         AI.players[state.AI.AIInPlay].isDown = true;
         AI.players[state.AI.AIInPlay].table = action.payload.table;
         AI.players[state.AI.AIInPlay].message = {
-            text : {$set : "Right, I'm putting my cards down now."},
-            timestamp : {$set : Date.now()}
+            text : "Right, I'm putting my cards down now.",
+            timestamp : Date.now()
         }
         AI.messageUpdate = [state.AI.AIInPlay];
         newState = update (state, {
@@ -527,6 +520,8 @@ const reducer = (state = initialState, action) => {
     if (action.type === actions.PLAYER_ADD_CARD_TO_TABLE) {
         let hand = _.clone(state.player.hand);
         hand.splice(state.player.cardSelected, 1);
+        // a red ace replaced by its natural card comes back to the player
+        if (action.payload.returnedAce) hand.push(action.payload.returnedAce);
         let table;
         if (action.payload.playerType === "player") { 
             table = _.cloneDeep(state.player.table);
@@ -544,8 +539,8 @@ const reducer = (state = initialState, action) => {
             let AI = _.cloneDeep(state.AI);
             AI.players[action.payload.AIIndex].table[action.payload.setrunIndex] = action.payload.newSetrun;
             AI.players[action.payload.AIIndex].message = {
-                text : {$set : "Woah, steady there!"},
-                timestamp : {$set : Date.now()}
+                text : "Woah, steady there!",
+                timestamp : Date.now()
             }
             AI.messageUpdate = [action.payload.AIIndex];
             newState = update (state, {
@@ -603,15 +598,13 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
-    if (action.type === actions.ACE_TO_PLAYER_HAND) {
-        newHand = _.cloneDeep(state.player.hand);
-        newHand.push(action.payload.ace);
-        
+    if (action.type === actions.RESHUFFLE_DISCARD) {
 
         newState = update (state, {
-            game : { gameUpdate : { $set : false }},
-            AI : {messageUpdate : { $set : false }},
-            player : {hand : {$set : newHand}}
+            game : {gameUpdate : {$set : false}},
+            deck : {$set : action.payload.deck},
+            discard : {$set : action.payload.discard},
+            AI : {messageUpdate : {$set : null}}
         });
 
         return newState;

@@ -28,15 +28,16 @@ const GoDown = (props) => {
     if (requirement === "NONE"){ requirementText = "Requirement met, press go down to submit to table"};
 
     if (props.submittedSetruns.length !== 0){
-        submittedOutput = props.submittedSetruns.map((setrun) => {
-            let setrunOutput = setrun.cards.map(cardNum => {
-                return  <Card 
-                            cardName = {props.hand[cardNum]}
+        submittedOutput = props.submittedSetruns.map((setrun, setrunIndex) => {
+            let setrunOutput = setrun.cards.map((card, index) => {
+                return  <Card
+                            key = {index}
+                            cardName = {card.displayString}
                             handClickHandler = {() => false}
                         />
             })
             return (
-                <div className = "go-down-setrun-container">
+                <div className = "go-down-setrun-container" key = {setrunIndex}>
                     <div className = "go-down-selected-submit-container">
                         <div className = "go-down-tick-container" >
                             <img className = "tick-image" alt = "" src={ ENV_VAR.IMG_DIR + "/green-tick.png"}/>
@@ -50,7 +51,7 @@ const GoDown = (props) => {
         })
 
         props.submittedSetruns.forEach((setrun) => {
-            setrun.cards.forEach((cardNum) => {
+            setrun.handIndices.forEach((cardNum) => {
                 remainingHand[cardNum] = "skip";
             })
         })
@@ -58,8 +59,9 @@ const GoDown = (props) => {
 
     if (props.selectedCards.length > 0) {
         let selectedSetrun = props.selectedCards.map((cardNum) => {
-            return  <Card 
-                        cardName = {props.hand[cardNum]}
+            return  <Card
+                        key = {cardNum}
+                        cardName = {props.hand[cardNum].displayString}
                         handClickHandler = {props.selectCardHandler}
                         cardNum = {cardNum}
                     />
@@ -86,11 +88,12 @@ const GoDown = (props) => {
     let hand = remainingHand.map((card, index) => {
         let selected = false;
         //if (props.selectedCards.includes(index)) selected = true;
-        if (card === "skip") return;
-        return <Card 
+        if (card === "skip") return null;
+        return <Card
+            key = {index}
             cardSelected = {selected}
             cardNum = {index}
-            cardName = {card} 
+            cardName = {card.displayString}
             handClickHandler = {props.selectCardHandler}
         />
     });
