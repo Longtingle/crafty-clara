@@ -3,6 +3,7 @@ import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
 import {plural} from '@/game-functions/card-names.js';
 import {aiColor} from './players.js';
+import {HiddenHand} from './opponent-panel.jsx';
 
 function RequirementChip({met, children}) {
     return (
@@ -15,7 +16,9 @@ function RequirementChip({met, children}) {
     );
 }
 
-// On short screens the opponent panels don't fit, so opponents show here as chips.
+// On short screens the opponent panels don't fit, so opponents show here as
+// chips, and their cards fly to and from the avatars (opponent.hand is only
+// set then).
 function OpponentChips({opponents}) {
     return (
         <ul aria-label="Opponents" className="hidden gap-1.5 short:flex">
@@ -29,10 +32,11 @@ function OpponentChips({opponents}) {
                 >
                     <span
                         aria-hidden="true"
-                        className="grid size-6 place-items-center rounded-full text-white"
+                        className="relative grid size-6 place-items-center rounded-full text-white"
                         style={{backgroundColor : aiColor(opponent.index)}}
                     >
                         {opponent.index + 1}
+                        {opponent.hand && <HiddenHand cards={opponent.hand} className="top-0 left-1.5 w-3" />}
                     </span>
                     <span className="sr-only">{opponent.name}:</span>
                     {opponent.count} cards{opponent.isDown && " · down"}

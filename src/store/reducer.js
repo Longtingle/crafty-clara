@@ -103,7 +103,7 @@ const reducer = (state = initialState, action) => {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
             player : {
                 hand : {$set : newPlayerHand},
-                newCard : {$set : {displayString : state.deck[0].displayString, label : "New"}}
+                newCard : {$set : {id : state.deck[0].id, label : "New"}}
             },
             deck : {$set : newDeck},
             AI : { messageUpdate : {$set : null}}
@@ -120,7 +120,7 @@ const reducer = (state = initialState, action) => {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
             player : {
                 hand : {$set : newHand},
-                newCard : {$set : {displayString : state.discard[0].displayString, label : "New"}}
+                newCard : {$set : {id : state.discard[0].id, label : "New"}}
             },
             discard : {$set : newDiscard},
             discardCovered : {$set : true},
@@ -301,7 +301,7 @@ const reducer = (state = initialState, action) => {
                 discardCovered : {$set : true},
                 player : {
                     hand : {$set : newHand},
-                    newCard : {$set : {displayString : state.discard[0].displayString, label : "Claimed"}}
+                    newCard : {$set : {id : state.discard[0].id, label : "Claimed"}}
                 },
                 OOTRequests : {$set : []},
                 playerClaim : {$set : false},
@@ -502,7 +502,7 @@ const reducer = (state = initialState, action) => {
         // a red ace replaced by its natural card comes back to the player
         if (action.payload.returnedAce) hand.push(action.payload.returnedAce);
         let newCard = action.payload.returnedAce
-            ? {displayString : action.payload.returnedAce.displayString, label : "Back"}
+            ? {id : action.payload.returnedAce.id, label : "Back"}
             : state.player.newCard;
         let table;
         if (action.payload.playerType === "player") { 

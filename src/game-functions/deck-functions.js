@@ -1,24 +1,31 @@
 
+// Every generated deck gets a new number, so card ids never repeat between
+// rounds or games.
+let decksGenerated = 0;
+
 const generateDeck = (numDecks) => {
     var cards = [];
+    let deckNo = ++decksGenerated;
     for (let suitcount = 1; suitcount<=13; suitcount++) {
         for (let cardcount = 1; cardcount<=numDecks; cardcount++){
-            cards.push(createCard(suitcount, "C"));
-            cards.push(createCard(suitcount, "D"));
-            cards.push(createCard(suitcount, "H"));
-            cards.push(createCard(suitcount, "S"));
+            for (let suit of ["C", "D", "H", "S"]) {
+                cards.push(createCard(suitcount, suit, suitcount + suit + "-" + deckNo + "-" + cardcount));
+            }
         }
     }
     shuffle(cards)
     return cards;
 }
 
-const createCard = (value, suit) => {
+// id tells apart the two copies of a card in a double deck. The UI uses it to
+// follow a card as it moves between hands, piles and setruns.
+const createCard = (value, suit, id) => {
     let card = {
         value,
         suit,
         displayString : value + suit,
     }
+    if (id !== undefined) card.id = id;
     if (value === 1) {
         let colour = (suit === "C" || suit === "S") ? "black" : "red";
         card.ace = {value, suit, colour}

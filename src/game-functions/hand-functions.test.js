@@ -115,6 +115,14 @@ describe('addToSetrun', () => {
         expect(result.returnedAce).toEqual(createCard(1, "H"));
     });
 
+    it('returns the same physical ace, keeping its id', () => {
+        const wild = createCard(1, "D", "1D-1-2");
+        const withWild = checkSetrun([...cards("4C 5C 6C"), wild], RUN).setrun;
+        const standIn = withWild.cards.find(c => c.ace);
+        const result = addToSetrun(withWild, createCard(standIn.value, "C"));
+        expect(result.returnedAce).toEqual(wild);
+    });
+
     it('adds to a set', () => {
         const set = checkSetrun(cards("9C 9D 9S"), SET).setrun;
         expect(addToSetrun(set, card("9H")).valid).toBe(true);

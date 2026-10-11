@@ -1,7 +1,8 @@
 import {Check} from 'lucide-react';
+import {AnimatePresence, motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
 import {longName, shortName} from '@/game-functions/card-names.js';
-import {PlayingCard, CardBack, CardTag} from './playing-card.jsx';
+import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.jsx';
 
 // How long the human has to claim a discard out of turn: the AI's two
 // 3-second waits (AI_WAIT_ONE and AI_WAIT_TWO in App.componentDidUpdate).
@@ -41,7 +42,14 @@ function ClaimButton({card, claimed, onClaim}) {
 // The deck and the discard pile. A pile glows when clicking it does
 // something: discardAction is {chip, ariaLabel, onClick} when the discard pile
 // is live, and claim is {card, claimed, onClaim} while a claim window is open.
-function Piles({deckCount, deckActive, onDeckClick, discardTop, discardAction, claim}) {
+//
+// The deck's top card and the top two discards are MovingCards, so cards fly
+// out of and onto the piles. When a card leaves, AnimatePresence keeps it
+// long enough to cross-fade into what it becomes (a face in your hand, a back
+// in an opponent's). The second discard sits under the top one, so the pile
+// isn't empty while a card is in the air.
+function Piles({deckTop, deckCount, deckActive, onDeckClick, discard, discardAction, claim}) {
+    let discardTop = discard[0];
     return (
         <div className="flex items-start gap-8 short:gap-4">
             <div className="flex flex-col items-center gap-3 short:gap-1.5">
@@ -56,16 +64,32 @@ function Piles({deckCount, deckActive, onDeckClick, discardTop, discardAction, c
                     )}
                 >
                     <CardBack className="w-full" />
+                    <AnimatePresence initial={false}>
+                        {deckTop && (
+                            <MovingCard key={deckTop.id} id={deckTop.id} className="absolute inset-0">
+                                <CardBack className="size-full" />
+                            </MovingCard>
+                        )}
+                    </AnimatePresence>
                     {deckActive && <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">Draw</CardTag>}
                 </button>
                 <span className="text-[13px] text-muted-foreground">Deck · {deckCount} left</span>
             </div>
             <div className="relative flex flex-col items-center gap-3 short:gap-1.5">
-                {claim && (
-                    <div className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-10 ml-4 -translate-y-1/2">
-                        <ClaimButton {...claim} />
-                    </div>
-                )}
+                <AnimatePresence>
+                    {claim && (
+                        <div className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2">
+                            <motion.div
+                                initial={{opacity : 0, scale : 0.8, x : -12}}
+                                animate={{opacity : 1, scale : 1, x : 0}}
+                                exit={{opacity : 0, scale : 0.9}}
+                                transition={{type : "spring", duration : 0.35, bounce : 0.3}}
+                            >
+                                <ClaimButton {...claim} />
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
                 <button
                     type="button"
                     disabled={!discardAction}
@@ -78,9 +102,14 @@ function Piles({deckCount, deckActive, onDeckClick, discardTop, discardAction, c
                         discardAction && "pulse-gold"
                     )}
                 >
-                    {discardTop
-                        ? <PlayingCard card={discardTop} alt="" className="w-full" />
-                        : <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />}
+                    <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />
+                    <AnimatePresence initial={false}>
+                        {discard.slice(0, 2).reverse().map(card => (
+                            <MovingCard key={card.id} id={card.id} className="absolute inset-0">
+                                <PlayingCard card={card} alt="" className="w-full" />
+                            </MovingCard>
+                        ))}
+                    </AnimatePresence>
                     {discardAction && (
                         <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">{discardAction.chip}</CardTag>
                     )}

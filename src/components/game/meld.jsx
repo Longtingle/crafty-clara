@@ -1,6 +1,6 @@
 import {cn} from '@/lib/utils.js';
 import {setrunCaption, isStandIn} from '@/game-functions/card-names.js';
-import {PlayingCard} from './playing-card.jsx';
+import {PlayingCard, MovingCard} from './playing-card.jsx';
 
 // A setrun on the table. It is a button only while the selected card can be
 // added to it (target is then {label}, e.g. "Add 7♦" or "Swap for A♥").
@@ -20,8 +20,10 @@ function Meld({setrun, target, dimmed, onClick}) {
             )}
         >
             <span className="meld-fan flex">
-                {setrun.cards.map((card, index) => (
-                    <PlayingCard key={index} card={card} setrunType={setrun.type} alt="" className="w-(--meld-w)" />
+                {setrun.cards.map(card => (
+                    <MovingCard key={card.id} id={card.id} className="w-(--meld-w)">
+                        <PlayingCard card={card} setrunType={setrun.type} alt="" className="w-full" />
+                    </MovingCard>
                 ))}
             </span>
             <span className="text-xs text-muted-foreground short:hidden">{caption}</span>

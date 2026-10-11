@@ -3,7 +3,8 @@ import actions from './actions.js';
 import GAME_STATES from './constants.js';
 import {createCard} from '../game-functions/deck-functions.js';
 
-const card = (str) => createCard(parseInt(str.slice(0, -1)), str.slice(-1));
+// "10H" -> the card 10H, with "10H" as its id
+const card = (str) => createCard(parseInt(str.slice(0, -1)), str.slice(-1), str);
 const cards = (str) => str.split(" ").map(card);
 
 const startGame = () => reducer(undefined, {
@@ -22,7 +23,7 @@ describe('activity log', () => {
 
         state = reducer(state, {type : actions.FROM_DECK_TO_PLAYER});
         expect(state.log[0]).toMatchObject({actor : "player", text : "drew 10♥ from the deck"});
-        expect(state.player.newCard).toEqual({displayString : "10H", label : "New"});
+        expect(state.player.newCard).toEqual({id : "10H", label : "New"});
 
         state = reducer(state, {type : actions.SELECT_CARD_FROM_HAND, payload : {cardSelected : 0}});
         state = reducer(state, {type : actions.FROM_HAND_TO_DISCARD});
@@ -44,7 +45,7 @@ describe('activity log', () => {
 
         state = reducer(state, {type : actions.DRAW_OOT_RESOLVE, payload : {winner : {winnerType : "player"}}});
         expect(state.log[0]).toMatchObject({actor : "player", text : "claimed 7♦ out of turn"});
-        expect(state.player.newCard).toEqual({displayString : "7D", label : "Claimed"});
+        expect(state.player.newCard).toEqual({id : "7D", label : "Claimed"});
         expect(state.playerClaim).toBe(false);
     });
 

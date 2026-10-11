@@ -1,6 +1,7 @@
 //react/redux imports
 import {Component} from 'react';
 import {connect} from 'react-redux';
+import {MotionConfig} from 'motion/react';
 
 //import constants
 import actions from './store/actions.js';
@@ -36,6 +37,11 @@ class App extends Component {
     };
 
     render() {
+        // animations respect the "reduce motion" system setting
+        return <MotionConfig reducedMotion="user">{this.renderScreen()}</MotionConfig>;
+    }
+
+    renderScreen() {
         let state = this.props.state;
         if (state.game.gameState === GAME_STATES.NO_GAME) {
             return <Home onStartGame={this.newGameHandler} />;
@@ -167,37 +173,44 @@ class App extends Component {
             return;
         }
 
+        // One AI move (go down, add a card, discard) at a time, spaced out so
+        // each card lands before the next one flies.
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
+            setTimeout(() => this.AIPlayStep(), 600);
+        }
+    }
 
-            let goDownResult;
-            if (this.props.state.AI.players[this.props.state.AI.AIInPlay].isDown === false) {
-                goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
-                if (goDownResult.result === false) {
-                    let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
-                    this.props.fromAIToDiscard(discardIndex);
-                } else if (goDownResult.result === true){
-                    //we can go down, check for hand building with new hand
+    AIPlayStep() {
+        if (this.props.state.game.gameState !== GAME_STATES.AI_PLAY) return;
 
-                    this.props.AIGoDownSubmit(goDownResult.table, goDownResult.newHand);
-                }
-            } else {
-                //AI is down - check for hand building 
-                let AITables = [];
-                    this.props.state.AI.players.forEach((player, index) => {
-                        AITables.push({
-                            type : "AI",
-                            index,
-                            table : player.table
-                        });
+        let goDownResult;
+        if (this.props.state.AI.players[this.props.state.AI.AIInPlay].isDown === false) {
+            goDownResult = AIFunctions.canGoDown(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+            if (goDownResult.result === false) {
+                let discardIndex = AIFunctions.selectDiscard(this.props.state.AI.players[this.props.state.AI.AIInPlay].hand, this.props.state.game.requirement);
+                this.props.fromAIToDiscard(discardIndex);
+            } else if (goDownResult.result === true){
+                //we can go down, check for hand building with new hand
+
+                this.props.AIGoDownSubmit(goDownResult.table, goDownResult.newHand);
+            }
+        } else {
+            //AI is down - check for hand building 
+            let AITables = [];
+                this.props.state.AI.players.forEach((player, index) => {
+                    AITables.push({
+                        type : "AI",
+                        index,
+                        table : player.table
                     });
-                let AIHand = this.props.state.AI.players[this.props.state.AI.AIInPlay].hand;
-                let handBuildResult = AIFunctions.AIHandBuild(AIHand, AITables, this.props.state.player.table);
+                });
+            let AIHand = this.props.state.AI.players[this.props.state.AI.AIInPlay].hand;
+            let handBuildResult = AIFunctions.AIHandBuild(AIHand, AITables, this.props.state.player.table);
 
-                if (handBuildResult.result === false) {
-                    this.props.fromAIToDiscard(AIFunctions.selectDiscard(AIHand, this.props.state.game.requirement, true));
-                } else {
-                    this.props.AIAddCardToTable(handBuildResult.newSetrun,handBuildResult.newHand, handBuildResult.playerType, handBuildResult.setrunIndex, handBuildResult.AIIndex)
-                }
+            if (handBuildResult.result === false) {
+                this.props.fromAIToDiscard(AIFunctions.selectDiscard(AIHand, this.props.state.game.requirement, true));
+            } else {
+                this.props.AIAddCardToTable(handBuildResult.newSetrun,handBuildResult.newHand, handBuildResult.playerType, handBuildResult.setrunIndex, handBuildResult.AIIndex)
             }
         }
     }

@@ -399,7 +399,7 @@ const addToSetrun = (setrun, card) => {
     if (replaced) {
         return {
             ...result(cards.map(c => c === replaced ? card : c)),
-            returnedAce : createCard(1, replaced.ace.suit)
+            returnedAce : {...replaced, value : 1, suit : replaced.ace.suit}
         };
     }
 

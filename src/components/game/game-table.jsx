@@ -1,5 +1,7 @@
 import {useState} from 'react';
+import {motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
+import {useMediaQuery} from '@/lib/use-media-query.js';
 import {Button} from '@/components/ui/button.jsx';
 import GAME_STATES, {ROUND_REQUIREMENTS} from '@/store/constants.js';
 import {addToSetrun} from '@/game-functions/hand-functions.js';
@@ -82,6 +84,10 @@ const describeTurn = ({state, selected, targets, swap, playable, canGoDown, clai
 // the bottom. All game actions go through `actions` (handlers on App).
 function GameTable({state, actions}) {
     let [dialog, setDialog] = useState(null);
+    // The `short:` layout (see index.css) moves opponents into the top bar.
+    // Opponents' cards are rendered for one layout only, because each card
+    // must appear once for its animations to work.
+    let short = useMediaQuery("(max-height: 560px)");
     let {game, player, AI, deck, discard, log} = state;
     let drawing = game.gameState === GAME_STATES.PW_DRAW_CARD;
     let playing = game.gameState === GAME_STATES.PW_PLAY;
@@ -145,33 +151,39 @@ function GameTable({state, actions}) {
                     name : AIPlayer.name,
                     count : AIPlayer.hand.length,
                     isDown : AIPlayer.isDown,
-                    active : !myTurn && AI.AIInPlay === index
+                    active : !myTurn && AI.AIInPlay === index,
+                    hand : short ? AIPlayer.hand : null
                 }))}
                 onShowScores={() => setDialog("scores")}
                 onShowRules={() => setDialog("rules")}
             />
 
-            <section
-                aria-label="Opponents"
-                className="grid gap-5 px-6 pt-3 compact:pt-2 short:hidden"
-                style={{gridTemplateColumns : `repeat(${AI.players.length}, minmax(0, 1fr))`}}
-            >
-                {AI.players.map((AIPlayer, AIIndex) => (
-                    <OpponentPanel
-                        key={AIIndex}
-                        player={AIPlayer}
-                        index={AIIndex}
-                        active={!myTurn && AI.AIInPlay === AIIndex}
-                        lastAction={lastAction(AIIndex)}
-                    >
-                        {AIMelds(AIIndex)}
-                    </OpponentPanel>
-                ))}
-            </section>
+            {!short && (
+                <section
+                    aria-label="Opponents"
+                    className="grid gap-5 px-6 pt-3 compact:pt-2"
+                    style={{gridTemplateColumns : `repeat(${AI.players.length}, minmax(0, 1fr))`}}
+                >
+                    {AI.players.map((AIPlayer, AIIndex) => (
+                        <OpponentPanel
+                            key={AIIndex}
+                            player={AIPlayer}
+                            index={AIIndex}
+                            active={!myTurn && AI.AIInPlay === AIIndex}
+                            lastAction={lastAction(AIIndex)}
+                        >
+                            {AIMelds(AIIndex)}
+                        </OpponentPanel>
+                    ))}
+                </section>
+            )}
 
             <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 px-6 [grid-template-areas:'mine_piles_log'] short:gap-3 short:px-3 short:[grid-template-areas:'opps_piles_mine']">
-                <div className="hidden min-w-0 flex-wrap content-start gap-x-3 gap-y-2 self-stretch overflow-y-auto py-2 [scrollbar-width:thin] [--meld-w:34px] [grid-area:opps] short:flex">
-                    {AI.players.some(AIPlayer => AIPlayer.isDown)
+                <motion.div
+                    layoutScroll
+                    className="hidden min-w-0 flex-wrap content-start gap-x-3 gap-y-2 self-stretch overflow-y-auto py-2 [scrollbar-width:thin] [--meld-w:34px] [grid-area:opps] short:flex"
+                >
+                    {short && (AI.players.some(AIPlayer => AIPlayer.isDown)
                         ? AI.players.map((AIPlayer, AIIndex) => AIPlayer.isDown && (
                             <div key={AIIndex} className="flex items-start gap-1.5">
                                 <span
@@ -185,8 +197,8 @@ function GameTable({state, actions}) {
                                 <div className="flex flex-wrap gap-1.5">{AIMelds(AIIndex)}</div>
                             </div>
                         ))
-                        : <p className="my-auto text-sm text-muted-foreground">No opponent is down yet.</p>}
-                </div>
+                        : <p className="my-auto text-sm text-muted-foreground">No opponent is down yet.</p>)}
+                </motion.div>
 
                 <div className="flex min-w-0 flex-col gap-2.5 self-end pb-1 [grid-area:mine] short:items-end short:self-center">
                     <h2 className={cn(sectionLabel, "short:hidden")}>Your melds</h2>
@@ -206,10 +218,11 @@ function GameTable({state, actions}) {
 
                 <div className="[grid-area:piles]">
                     <Piles
+                        deckTop={deck[0]}
                         deckCount={deck.length}
                         deckActive={drawing}
                         onDeckClick={actions.deckClick}
-                        discardTop={discard[0]}
+                        discard={discard}
                         discardAction={discardAction}
                         claim={claimWindow ? {card : discard[0], claimed : state.playerClaim, onClaim : actions.claimDiscard} : null}
                     />
@@ -228,6 +241,7 @@ function GameTable({state, actions}) {
                 <div className="flex min-w-0 flex-col items-center gap-2.5 short:gap-1">
                     <TurnPrompt steps={turn.steps} text={turn.text} />
                     <Hand
+                        key={game.round}
                         cards={player.hand}
                         selected={playing ? player.cardSelected : null}
                         selectable={playing}

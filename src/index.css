@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Tailwind scans project files for class names, and the dev server reloads
+   the page (losing the game) when one changes. Skip the docs and source art. */
+@source not "../*.md";
+@source not "../art";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource/atkinson-hyperlegible/400.css";
@@ -131,6 +135,10 @@
 /* a gold ring that pulses on whatever the player should click next */
 @utility pulse-gold {
   animation: target-pulse 1.4s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--gold), 0 0 0 7px rgb(245 184 61 / 0.3);
+  }
 }
 
 @layer components {

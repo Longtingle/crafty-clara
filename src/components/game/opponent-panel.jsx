@@ -1,6 +1,29 @@
+import {AnimatePresence} from 'motion/react';
 import {cn} from '@/lib/utils.js';
-import {CardBack} from './playing-card.jsx';
+import {CardBack, MovingCard} from './playing-card.jsx';
 import {aiColor} from './players.js';
+
+// Where an opponent's cards fly to and from. Their hand is hidden, so each
+// card is a small back, all stacked in one spot. A card that arrives shows
+// while it flies in, then fades out over the static card backs underneath;
+// the cards dealt at the start (initial={false}) start out hidden.
+function HiddenHand({cards, className}) {
+    return (
+        <AnimatePresence initial={false}>
+            {cards.map(card => (
+                <MovingCard
+                    key={card.id}
+                    id={card.id}
+                    initial={{opacity : 1}}
+                    animate={{opacity : 0, transition : {delay : 0.45, duration : 0.2}}}
+                    className={cn("absolute", className)}
+                >
+                    <CardBack className="w-full border-[1.5px]" />
+                </MovingCard>
+            ))}
+        </AnimatePresence>
+    );
+}
 
 function Chip({gold, children}) {
     return (
@@ -49,10 +72,11 @@ function OpponentPanel({player, index, active, lastAction, children}) {
                 </div>
                 <div className="flex flex-none flex-col items-end gap-1">
                     <span className="inline-flex items-center gap-2 text-sm font-bold">
-                        <span aria-hidden="true" className="relative h-6 w-7 short:hidden">
+                        <span aria-hidden="true" className="relative h-6 w-7">
                             <CardBack className="absolute top-0.5 left-0 w-[15px] -rotate-12 border-[1.5px]" />
                             <CardBack className="absolute top-0 left-1.5 w-[15px] border-[1.5px]" />
                             <CardBack className="absolute top-0.5 left-3 w-[15px] rotate-12 border-[1.5px]" />
+                            <HiddenHand cards={player.hand} className="top-0 left-1.5 w-[15px]" />
                         </span>
                         {player.hand.length} cards
                     </span>
@@ -70,4 +94,4 @@ function OpponentPanel({player, index, active, lastAction, children}) {
     );
 }
 
-export {OpponentPanel, Chip, Avatar};
+export {OpponentPanel, HiddenHand, Chip, Avatar};

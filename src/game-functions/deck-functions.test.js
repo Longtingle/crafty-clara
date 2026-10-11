@@ -22,6 +22,11 @@ describe('generateDeck', () => {
         expect(Object.keys(counts)).toHaveLength(52);
         Object.values(counts).forEach(count => expect(count).toBe(2));
     });
+
+    it('gives every card an id that is unique across decks', () => {
+        const ids = [...deckFunctions.generateDeck(2), ...deckFunctions.generateDeck(2)].map(card => card.id);
+        expect(new Set(ids).size).toBe(208);
+    });
 });
 
 describe('deal', () => {
