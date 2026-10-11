@@ -40,13 +40,29 @@ describe('activity log', () => {
         expect(state.log[0]).toMatchObject({actor : 0, text : "drew from the deck"});
 
         state = reducer(state, {type : actions.PLAYER_DRAW_OOT});
-        expect(state.playerClaim).toBe(true);
+        expect(state.claimChoice).toBe("claim");
         expect(state.game.gameUpdate).toBe(false);
 
         state = reducer(state, {type : actions.DRAW_OOT_RESOLVE, payload : {winner : {winnerType : "player"}}});
         expect(state.log[0]).toMatchObject({actor : "player", text : "claimed 7♦ out of turn"});
         expect(state.player.newCard).toEqual({id : "7D", label : "Claimed"});
-        expect(state.playerClaim).toBe(false);
+        expect(state.claimChoice).toBe(null);
+    });
+
+    it('records a pass without logging it, and clears it when claims are settled', () => {
+        let state = startGame();
+        state = reducer(state, {type : actions.FROM_DECK_TO_PLAYER});
+        state = reducer(state, {type : actions.SELECT_CARD_FROM_HAND, payload : {cardSelected : 0}});
+        state = reducer(state, {type : actions.FROM_HAND_TO_DISCARD});
+        state = reducer(state, {type : actions.AI_PICKED_FROM_DECK});
+
+        let passed = reducer(state, {type : actions.PLAYER_PASS_OOT});
+        expect(passed.claimChoice).toBe("pass");
+        expect(passed.game.gameUpdate).toBe(false);
+        expect(passed.log).toBe(state.log);
+
+        passed = reducer(passed, {type : actions.DRAW_OOT_RESOLVE, payload : {winner : {winnerType : "none"}}});
+        expect(passed.claimChoice).toBe(null);
     });
 
     it('ignores UI-only actions', () => {

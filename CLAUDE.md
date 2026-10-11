@@ -36,7 +36,7 @@ npx vitest run -t "checkSetrun"                # tests matching a name
 - After going down, a player can add cards to any player's laid-down melds ("hand building").
 - **Out-of-turn (OOT) claims:**
   - Once the AI in play has drawn from the deck, other players can claim the top discard.
-  - AI players who are not down claim automatically. The human claims with the Claim button that appears beside the discard pile during the AI's waits (about 6 seconds).
+  - AI players who are not down claim automatically. The human gets a Claim or Pass choice beside the discard pile for up to 6 seconds; answering either way ends the wait. When the AI in play took the discard itself, there is nothing to claim and no wait.
   - When several players claim, the first in seat order after the AI in play wins (`AIFunctions.resolveOOT`).
 - When the deck runs out, the discard pile (except the top card) is shuffled into a new deck (`App.refillDeckIfEmpty`).
 - A round ends as soon as any hand is empty. Cards left in hand score points: an ace is 25, 10 through King are 10, and other cards are their face value.
@@ -60,13 +60,13 @@ npx vitest run -t "checkSetrun"                # tests matching a name
 **State machine driven from `componentDidUpdate`.** `game.gameState` (values in `GAME_STATES`, `src/store/constants.js`) drives each turn:
 - The human's turn is `PW_DRAW_CARD → PW_PLAY`, and it advances only through click handlers.
 - Each AI's turn runs automatically: `AI_DRAW → AI_WAIT_ONE → AI_DRAW_OOT → AI_WAIT_TWO → AI_OOT_RESOLVE → AI_PLAY`.
-- In `AI_PLAY`, an AI that is down keeps adding cards to melds, one action per update, until it can't. Each step (`App.AIPlayStep`) runs 600 ms after the last, so each card lands before the next one flies. Then `FROM_AI_TO_DISCARD` passes the turn to the next AI, or back to `PW_DRAW_CARD`.
-- After each state change, `App.componentDidUpdate` checks whether the round has ended, runs the AI decision for the current state and dispatches the next action. It returns early when `props.state` hasn't changed. `setTimeout` delays let the human see each move and make an OOT claim during the wait states.
+- In `AI_PLAY`, an AI that is down keeps adding cards to melds, one action per update, until it can't. Each step (`App.AIPlayStep`) runs `AI_PACE.move` after the last, so each card lands before the next one flies. Then `FROM_AI_TO_DISCARD` passes the turn to the next AI, or back to `PW_DRAW_CARD`.
+- After each state change, `App.componentDidUpdate` checks whether the round has ended, runs the AI decision for the current state and dispatches the next action. It returns early when `props.state` hasn't changed. `setTimeout` delays from `AI_PACE` (`src/store/constants.js`) let the human follow each AI move and claim discards: a pause before each AI draws, the two halves of the claim window, and a pause between AI moves.
 
 These pieces of state keep that loop working. Preserve them when you add a reducer case:
 - `game.gameUpdate`: a case sets it to `true` only when `componentDidUpdate` should advance the AI loop. Every case sets it explicitly. If a case leaves it alone, it keeps the previous value, and a UI-only action can re-trigger AI logic.
 - `AI.messageUpdate`: an array of the AI indices whose speech bubble was just set. `componentDidUpdate` dispatches `REMOVE_AI_MESSAGE` for them 2 seconds later. Set it to `null` when no new message was set.
-- `playerClaim`: set by `PLAYER_DRAW_OOT` when the human claims the top discard (a UI-only action, so `gameUpdate` is `false`). It is merged with the AI claims in `AI_OOT_RESOLVE` and cleared when claims are resolved or the turn moves on.
+- `claimChoice`: the human's answer in the claim window, `"claim"` or `"pass"` (`null` until they answer). It is set by the UI-only actions `PLAYER_DRAW_OOT` and `PLAYER_PASS_OOT`, so `gameUpdate` is `false`. An answer ends the wait at once (`App.answerClaim` cancels the timer that `App.waitForClaim` set). A claim is merged with the AI claims in `AI_OOT_RESOLVE`. It is cleared when claims are resolved or the turn moves on.
 
 **Reducer.** `src/store/reducer.js` is a single chain of `if (action.type === …)` blocks that use `immutability-helper`'s `update` together with lodash `cloneDeep`. Inside those blocks, nested state is built as plain objects; `{$set: …}` belongs only inside an `update()` spec. Action type strings are in `src/store/actions.js`, and the state shape is in `src/store/initial-state.js`. `src/index.jsx` creates the store with `legacy_createStore` and, in dev only, adds middleware that logs every action and the resulting state to the console.
 - The reducer is exported wrapped in `withLog` (`src/store/log.js`). After each action, `describeAction` turns it into an activity-log entry `{id, actor, text}` (actor is `"player"` or an AI index) and prepends it to `state.log`. The log is cleared at the start of each round. To log a new action, add a case to `describeAction`; the reducer cases don't need changing.

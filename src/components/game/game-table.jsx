@@ -71,11 +71,8 @@ const describeTurn = ({state, selected, targets, swap, playable, canGoDown, clai
     if (game.gameState === GAME_STATES.ROUND_END) return {steps : null, text : "Round over."};
 
     let name = (AI.AIInPlay !== null) ? AI.players[AI.AIInPlay].name : "Your opponents";
-    if (claimWindow && state.playerClaim) {
-        return {steps : null, text : "Claimed the " + shortName(discard[0]) + ". It's yours unless someone earlier in the order claims it too."};
-    }
     if (claimWindow) {
-        return {steps : null, text : name + " drew from the deck. Claim the " + shortName(discard[0]) + " before they play on?"};
+        return {steps : null, text : name + " drew from the deck. Claim the " + shortName(discard[0]) + ", or pass?"};
     }
     return {steps : null, text : name + " is playing."};
 }
@@ -94,7 +91,8 @@ function GameTable({state, actions}) {
     let myTurn = drawing || playing;
     let building = playing && player.isDown;
     let selected = (playing && player.cardSelected !== null) ? player.hand[player.cardSelected] : null;
-    let claimWindow = CLAIM_STATES.includes(game.gameState) && !state.discardCovered && discard.length > 0;
+    let claimWindow = CLAIM_STATES.includes(game.gameState) && !state.discardCovered && discard.length > 0 &&
+        state.claimChoice === null;
 
     // what adding the selected card to a setrun would do
     let targetFor = (setrun, owner) => {
@@ -224,7 +222,7 @@ function GameTable({state, actions}) {
                         onDeckClick={actions.deckClick}
                         discard={discard}
                         discardAction={discardAction}
-                        claim={claimWindow ? {card : discard[0], claimed : state.playerClaim, onClaim : actions.claimDiscard} : null}
+                        claim={claimWindow ? {card : discard[0], onClaim : actions.claimDiscard, onPass : actions.passDiscard} : null}
                     />
                 </div>
 

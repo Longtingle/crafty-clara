@@ -1,47 +1,46 @@
-import {Check} from 'lucide-react';
 import {AnimatePresence, motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
+import {Button} from '@/components/ui/button.jsx';
+import {AI_PACE} from '@/store/constants.js';
 import {longName, shortName} from '@/game-functions/card-names.js';
 import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.jsx';
 
-// How long the human has to claim a discard out of turn: the AI's two
-// 3-second waits (AI_WAIT_ONE and AI_WAIT_TWO in App.componentDidUpdate).
-const CLAIM_WINDOW_MS = 6000;
+// How long the human has to claim a discard out of turn: the two halves of
+// the claim window (AI_WAIT_ONE and AI_WAIT_TWO in App.componentDidUpdate).
+const CLAIM_WINDOW_MS = 2 * AI_PACE.claimWait;
 
-// The claim button counts down while the window is open. It is mounted when
-// the window opens, so the animation starts then. It sits beside the discard
-// pile so the table doesn't move when it appears.
-function ClaimButton({card, claimed, onClaim}) {
-    if (claimed) {
-        return (
-            <div role="status" className="flex items-center gap-2 rounded-xl bg-panel px-3 py-2 text-sm font-bold whitespace-nowrap">
-                <Check className="size-4 text-gold" aria-hidden="true" />
-                Claimed {shortName(card)}
-            </div>
-        );
-    }
+// Claim or pass on the top discard. The claim button counts down while the
+// window is open; it is mounted when the window opens, so the countdown
+// starts then. Answering either way closes the window. It sits beside the
+// discard pile so the table doesn't move when it appears.
+function ClaimChoice({card, onClaim, onPass}) {
     return (
-        <button
-            type="button"
-            onClick={onClaim}
-            className="flex h-11 items-center gap-2 rounded-xl bg-gold pr-4 pl-1.5 font-bold whitespace-nowrap text-gold-foreground shadow-lg hover:bg-gold/85"
-        >
-            <svg viewBox="0 0 36 36" className="size-8 -rotate-90" aria-hidden="true">
-                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
-                <circle
-                    cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
-                    pathLength="100" strokeDasharray="100"
-                    style={{animation : `claim-countdown ${CLAIM_WINDOW_MS}ms linear forwards`}}
-                />
-            </svg>
-            Claim {shortName(card)}
-        </button>
+        <div className="flex items-center gap-1 rounded-2xl bg-card p-1 shadow-lg ring-1 ring-border">
+            <button
+                type="button"
+                onClick={onClaim}
+                className="flex h-11 items-center gap-2 rounded-xl bg-gold pr-4 pl-1.5 font-bold whitespace-nowrap text-gold-foreground hover:bg-gold/85"
+            >
+                <svg viewBox="0 0 36 36" className="size-8 -rotate-90" aria-hidden="true">
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
+                    <circle
+                        cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
+                        pathLength="100" strokeDasharray="100"
+                        style={{animation : `claim-countdown ${CLAIM_WINDOW_MS}ms linear forwards`}}
+                    />
+                </svg>
+                Claim {shortName(card)}
+            </button>
+            <Button variant="ghost" onClick={onPass} aria-label={"Pass on " + longName(card)}>
+                Pass
+            </Button>
+        </div>
     );
 }
 
 // The deck and the discard pile. A pile glows when clicking it does
 // something: discardAction is {chip, ariaLabel, onClick} when the discard pile
-// is live, and claim is {card, claimed, onClaim} while a claim window is open.
+// is live, and claim is {card, onClaim, onPass} while a claim window is open.
 //
 // The deck's top card and the top two discards are MovingCards, so cards fly
 // out of and onto the piles. When a card leaves, AnimatePresence keeps it
@@ -85,7 +84,7 @@ function Piles({deckTop, deckCount, deckActive, onDeckClick, discard, discardAct
                                 exit={{opacity : 0, scale : 0.9}}
                                 transition={{type : "spring", duration : 0.35, bounce : 0.3}}
                             >
-                                <ClaimButton {...claim} />
+                                <ClaimChoice {...claim} />
                             </motion.div>
                         </div>
                     )}

@@ -6,7 +6,7 @@ import {MotionConfig} from 'motion/react';
 //import constants
 import actions from './store/actions.js';
 import GAME_STATES from './store/constants.js';
-import {AI_CARD_SELECT, SET, RUN} from './store/constants.js';
+import {AI_CARD_SELECT, AI_PACE, SET, RUN} from './store/constants.js';
 
 //import helper functions
 import deckFunctions from './game-functions/deck-functions.js';
@@ -27,7 +27,8 @@ class App extends Component {
     tableActions = {
         deckClick : () => this.deckClickHandler(),
         discardClick : () => this.discardClickHandler(),
-        claimDiscard : () => this.claimDiscard(),
+        claimDiscard : () => this.answerClaim("claim"),
+        passDiscard : () => this.answerClaim("pass"),
         selectCard : (cardNum) => this.handClickHandler(cardNum),
         reorderHand : (from, to) => this.reorderHand(from, to),
         sortBySuit : () => this.sortHand(RUN),
@@ -35,6 +36,9 @@ class App extends Component {
         openGoDown : () => this.goDownClickHandler(),
         addToMeld : (playerType, setrunIndex, AIIndex) => this.playerAddCardToTable(playerType, setrunIndex, AIIndex)
     };
+
+    // the pending half of the claim window: {timer, complete} (see waitForClaim)
+    claimWait = null;
 
     render() {
         // animations respect the "reduce motion" system setting
@@ -124,15 +128,15 @@ class App extends Component {
                 } else {
                     this.props.AIPickedFromDiscard();
                 }
-            }, 1000);
+            }, AI_PACE.turnStart);
             
 
             return;
         }
 
-        //If the state shows that the active AI needs to wait, trigger that action.
+        // The claim window, in two halves around the AI claims (AI_DRAW_OOT).
         if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_ONE) {
-            setTimeout(() => {this.props.AIWaitOneComplete()}, 3000);
+            this.waitForClaim(this.props.AIWaitOneComplete);
             return;
         }
 
@@ -157,7 +161,7 @@ class App extends Component {
         }
 
         if (this.props.state.game.gameState === GAME_STATES.AI_WAIT_TWO) {
-            setTimeout(() => {this.props.AIWaitTwoComplete()}, 3000);
+            this.waitForClaim(this.props.AIWaitTwoComplete);
             return;
         }
 
@@ -165,7 +169,7 @@ class App extends Component {
             
 
             let OOTRequests = [...this.props.state.OOTRequests];
-            if (this.props.state.playerClaim && !this.props.state.discardCovered) {
+            if (this.props.state.claimChoice === "claim" && !this.props.state.discardCovered) {
                 OOTRequests.push({type : "player", index : params.numberOfPlayers - 1});
             }
             let OOTResult = AIFunctions.resolveOOT(OOTRequests, this.props.state.AI.AIInPlay);
@@ -176,7 +180,7 @@ class App extends Component {
         // One AI move (go down, add a card, discard) at a time, spaced out so
         // each card lands before the next one flies.
         if (this.props.state.game.gameState === GAME_STATES.AI_PLAY) {
-            setTimeout(() => this.AIPlayStep(), 600);
+            setTimeout(() => this.AIPlayStep(), AI_PACE.move);
         }
     }
 
@@ -252,18 +256,43 @@ class App extends Component {
         ){
             this.props.fromHandToDiscard();
         } else {
-            this.claimDiscard();
+            this.answerClaim("claim");
         }
     }
 
-    // The human can claim the top discard out of turn once the AI in play has
-    // drawn from the deck, until the claims are resolved.
-    claimDiscard() {
+    // Once the AI in play has drawn from the deck, the human can claim the top
+    // discard out of turn until the claims are resolved.
+    claimWindowOpen() {
         let state = this.props.state;
-        let claimWindow = [GAME_STATES.AI_WAIT_ONE, GAME_STATES.AI_DRAW_OOT, GAME_STATES.AI_WAIT_TWO]
-            .includes(state.game.gameState);
-        if (claimWindow && !state.discardCovered && state.discard.length > 0 && !state.playerClaim) {
-            this.props.playerDrawOOT();
+        return [GAME_STATES.AI_WAIT_ONE, GAME_STATES.AI_DRAW_OOT, GAME_STATES.AI_WAIT_TWO].includes(state.game.gameState) &&
+            !state.discardCovered && state.discard.length > 0;
+    }
+
+    // The AI waits for the human to claim or pass, for up to AI_PACE.claimWait
+    // in each half of the window. When the AI took the discard there is nothing
+    // to claim, so it doesn't wait at all.
+    waitForClaim(complete) {
+        if (!this.claimWindowOpen() || this.props.state.claimChoice !== null) {
+            complete();
+            return;
+        }
+        this.claimWait = {complete, timer : setTimeout(() => {
+            this.claimWait = null;
+            complete();
+        }, AI_PACE.claimWait)};
+    }
+
+    // "claim" or "pass". Either way there is nothing left to wait for, so the
+    // claims are settled straight away.
+    answerClaim(choice) {
+        if (!this.claimWindowOpen() || this.props.state.claimChoice !== null) return;
+        if (choice === "claim") this.props.playerDrawOOT();
+        else this.props.playerPassOOT();
+        if (this.claimWait) {
+            clearTimeout(this.claimWait.timer);
+            let {complete} = this.claimWait;
+            this.claimWait = null;
+            complete();
         }
     }
 
@@ -392,6 +421,9 @@ const mapDispatchToProps = dispatch => {
         }),
         playerDrawOOT : () => dispatch({
             type : actions.PLAYER_DRAW_OOT
+        }),
+        playerPassOOT : () => dispatch({
+            type : actions.PLAYER_PASS_OOT
         }),
         drawOOTResolve : (winner) => dispatch({
             type : actions.DRAW_OOT_RESOLVE,

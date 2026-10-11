@@ -88,7 +88,7 @@ const reducer = (state = initialState, action) => {
             discard : {$set : action.payload.discard},
             discardCovered : {$set : false},
             OOTRequests : {$set : []},
-            playerClaim : {$set : false}
+            claimChoice : {$set : null}
         })
 
         return newState;
@@ -162,7 +162,7 @@ const reducer = (state = initialState, action) => {
             },
             discard : {$set : newDiscard},
             discardCovered : {$set : false},
-            playerClaim : {$set : false},
+            claimChoice : {$set : null},
             AI : {$set : AI}
         });
 
@@ -261,11 +261,12 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
-    if (action.type === actions.PLAYER_DRAW_OOT) {
-        // UI only: the claim is settled with the AI claims in AI_OOT_RESOLVE
+    // UI only: the human's claim or pass is settled with the AI claims in
+    // AI_OOT_RESOLVE (App ends the claim wait as soon as either arrives)
+    if (action.type === actions.PLAYER_DRAW_OOT || action.type === actions.PLAYER_PASS_OOT) {
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
-            playerClaim : {$set : true},
+            claimChoice : {$set : action.type === actions.PLAYER_DRAW_OOT ? "claim" : "pass"},
             AI : {messageUpdate : {$set : null}}
         });
 
@@ -277,7 +278,7 @@ const reducer = (state = initialState, action) => {
             newState = update (state, {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 OOTRequests : {$set : []},
-                playerClaim : {$set : false},
+                claimChoice : {$set : null},
                 AI : {messageUpdate : {$set : null}}
             });
             return newState;
@@ -304,7 +305,7 @@ const reducer = (state = initialState, action) => {
                     newCard : {$set : {id : state.discard[0].id, label : "Claimed"}}
                 },
                 OOTRequests : {$set : []},
-                playerClaim : {$set : false},
+                claimChoice : {$set : null},
                 AI : {messageUpdate : {$set : null}}
             });
 
@@ -327,7 +328,7 @@ const reducer = (state = initialState, action) => {
                 discardCovered : {$set : true},
                 AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [action.payload.winner.index]}},
                 OOTRequests : {$set : []},
-                playerClaim : {$set : false}
+                claimChoice : {$set : null}
             });
         }
         
@@ -378,7 +379,7 @@ const reducer = (state = initialState, action) => {
             },
             discard : {$set : newDiscard},
             discardCovered : {$set : false},
-            playerClaim : {$set : false}
+            claimChoice : {$set : null}
         });
 
 

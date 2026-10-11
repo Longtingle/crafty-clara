@@ -22,6 +22,18 @@ const ENV_VAR = {
     IMG_DIR : import.meta.env.BASE_URL + "img"
 }
 
+// How long the AI pauses (ms), so the human can follow its moves and claim
+// its discards.
+const AI_PACE = {
+    // before an AI draws, as the turn passes to it
+    turnStart : 1000,
+    // each half of the claim window after an AI draws from the deck; the
+    // human's claim or pass ends it early
+    claimWait : 3000,
+    // between an AI's moves: going down, each card added, the discard
+    move : 800
+}
+
 const SET = "SET";
 const RUN = "RUN";
 
@@ -37,4 +49,4 @@ const ROUND_REQUIREMENTS = [
 
 
 export default GAME_STATES;
-export {AI_CARD_SELECT, ENV_VAR, ROUND_REQUIREMENTS, SET, RUN};
+export {AI_CARD_SELECT, AI_PACE, ENV_VAR, ROUND_REQUIREMENTS, SET, RUN};

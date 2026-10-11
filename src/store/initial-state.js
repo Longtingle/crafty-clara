@@ -53,8 +53,8 @@ const initialState = {
     discardCovered : false,
 
     OOTRequests : [],
-    // the human has asked to claim the top discard out of turn
-    playerClaim : false,
+    // the human's answer in the claim window: null (undecided), "claim" or "pass"
+    claimChoice : null,
     // what has happened this round, newest first (see log.js)
     log : []
 }
