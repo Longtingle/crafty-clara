@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import {SET, RUN} from '../store/constants.js';
 import {createCard} from './deck-functions.js';
+import {SUIT_SYMBOL, rankName} from './card-names.js';
 
 const SUITS = ["C", "D", "H", "S"];
 
@@ -257,28 +258,6 @@ const getSets = (hand) => { //done
     };
 }
 
-const sortPlayerHand = (hand, param) => { //done - deprecated
-    //param = SET or RUN
-    console.log("sortPlayerHand is deprecated - should switch to sortHand");
-    return sortHand(hand, param)
-
-    /* OLD FUNCTION
-    let handArray = hand.map((card, index) => {
-        let value = null;
-        let suit = null;
-        card.length === 3 ? value = card.substring(0, 2) : value = card.substring(0, 1);
-        suit = card.substring(card.length -1);
-        return {value : parseInt(value), suit : suit, index : index}
-    });
-
-    let sortedHandArray = sortHand(handArray, param);
-    sortedHandArray.forEach((card) => {
-        newHand.push(card.value + card.suit);
-    })
-    return newHand;
-    */
-}
-
 const checkSet = (naturals, wilds) => {
     if (naturals.length < 2 || naturals.length + wilds.length < 3) return null;
     let value = naturals[0].value;
@@ -348,6 +327,55 @@ const checkSetrun = (cards, type) => {
     };
 }
 
+// The values missing from a run's natural cards, e.g. [5] for 3 4 6 7. With
+// an ace, whichever of ace-low or ace-high leaves fewer gaps is used.
+const runGaps = (naturals) => {
+    let layouts = [naturals.map(card => card.value)];
+    if (naturals.some(card => card.value === 1)) {
+        layouts.push(naturals.map(card => card.value === 1 ? 14 : card.value));
+    }
+    let gapLists = layouts.map(values => {
+        let gaps = [];
+        for (let value = Math.min(...values); value <= Math.max(...values); value++) {
+            if (!values.includes(value)) gaps.push(value);
+        }
+        return gaps;
+    });
+    return _.minBy(gapLists, gaps => gaps.length);
+}
+
+// Says why cards don't make a valid set or run yet, or returns null when
+// checkSetrun would accept them. The go-down dialog shows this to the player.
+const explainSetrun = (cards, type) => {
+    let wilds = cards.filter(isRedAce);
+    let naturals = cards.filter(card => !isRedAce(card));
+
+    if (type === SET) {
+        if (cards.length === 0) return "Pick 3 or more cards of the same value.";
+        if (naturals.some(card => card.value !== naturals[0].value)) return "Every card in a set must have the same value.";
+        if (wilds.length > naturals.length) return "Wild aces can't outnumber natural cards.";
+        if (cards.length < 3) return "A set needs at least 3 cards. Add " + (3 - cards.length) + " more.";
+        return null;
+    }
+
+    if (cards.length === 0) return "Pick 4 or more cards in a row, all the same suit.";
+    if (naturals.some(card => card.suit !== naturals[0].suit)) return "Every card in a run must be the same suit.";
+    if (wilds.length > naturals.length) return "Wild aces can't outnumber natural cards.";
+    if (new Set(naturals.map(card => card.value)).size !== naturals.length) return "A run can't have two cards of the same value.";
+
+    let gaps = (naturals.length > 1) ? runGaps(naturals) : [];
+    if (gaps.length > wilds.length) {
+        let missing = gaps.map(value => rankName(value) + SUIT_SYMBOL[naturals[0].suit]);
+        return (missing.length === 1)
+            ? "There's a gap. Add the " + missing[0] + " or a wild ace."
+            : "There are gaps. Add the " + missing.join(" and ") + ", or wild aces in their place.";
+    }
+    if (cards.length < 4) return "A run needs at least 4 cards. Add " + (4 - cards.length) + " more.";
+    if (naturals.length < 3) return "A run needs at least 3 natural cards.";
+    if (checkRun(naturals, wilds)) return null;
+    return "These cards don't make a run.";
+}
+
 // Tries to add one card to a setrun already on the table. A natural card
 // matching a red ace's stand-in value replaces it and the ace is returned to
 // the hand; otherwise the card has to extend the setrun.
@@ -408,8 +436,8 @@ const handFunctions = {
     getSets,
     scoreHand,
     sortHand,
-    sortPlayerHand,
     checkSetrun,
+    explainSetrun,
     addToSetrun,
     getPoints,
     insertBuildOptions
@@ -420,8 +448,8 @@ export {
     getSets,
     scoreHand,
     sortHand,
-    sortPlayerHand,
     checkSetrun,
+    explainSetrun,
     addToSetrun,
     getPoints,
     insertBuildOptions

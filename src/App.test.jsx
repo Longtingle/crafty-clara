@@ -10,6 +10,6 @@ it('shows the home screen before a game starts', () => {
             <App />
         </Provider>
     );
-    expect(screen.getByText('Crafty Clara')).toBeInTheDocument();
-    expect(screen.getByText('Start Game')).toBeInTheDocument();
+    expect(screen.getByRole('heading', {name : 'Crafty Clara'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name : 'Start game'})).toBeInTheDocument();
 });

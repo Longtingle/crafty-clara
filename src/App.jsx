@@ -1,5 +1,5 @@
 //react/redux imports
-import React, {Component} from 'react';
+import {Component} from 'react';
 import {connect} from 'react-redux';
 
 //import constants
@@ -14,97 +14,65 @@ import AIFunctions from './game-functions/AI-functions.js';
 import handFunctions from './game-functions/hand-functions.js';
 
 //import react components
-import Table from './containers/table/table.jsx';
-import Home from './ui/home/home.jsx';
-import ModalBack from './ui/modal-back/modal-back.jsx';
-import GoDown from './ui/go-down/go-down.jsx';
-import RoundEnd from './ui/round-end/round-end.jsx';
-
-//import CSS
-import './App.css';
+import Home from './components/game/home.jsx';
+import GameTable from './components/game/game-table.jsx';
+import GoDownDialog from './components/game/go-down-dialog.jsx';
+import RoundEndDialog from './components/game/round-end-dialog.jsx';
 
 
 class App extends Component {
-    
-    playerOOTRequest = null;
 
-    constructor (props) {
-        super(props);
-        this.playerHandSortRuns = this.playerHandSortRuns.bind(this);
-        this.playerHandSortSets = this.playerHandSortSets.bind(this);
-        this.playerAddCardToTable = this.playerAddCardToTable.bind(this);
-        this.startNextRound = this.startNextRound.bind(this);
-        this.handDragOnDrop = this.handDragOnDrop.bind(this);
-    }
-    
+    // handlers the table calls; created once so the table's props stay stable
+    tableActions = {
+        deckClick : () => this.deckClickHandler(),
+        discardClick : () => this.discardClickHandler(),
+        claimDiscard : () => this.claimDiscard(),
+        selectCard : (cardNum) => this.handClickHandler(cardNum),
+        reorderHand : (from, to) => this.reorderHand(from, to),
+        sortBySuit : () => this.sortHand(RUN),
+        sortByValue : () => this.sortHand(SET),
+        openGoDown : () => this.goDownClickHandler(),
+        addToMeld : (playerType, setrunIndex, AIIndex) => this.playerAddCardToTable(playerType, setrunIndex, AIIndex)
+    };
+
     render() {
-        
-        let output;
-        if (this.props.state.game.gameState === GAME_STATES.NO_GAME) {
-            output = (
-                <Home startGameHandler = {this.newGameHandler} />
-            );
-        } else { 
-            output = (
-                <div className = "App">
-                    <ModalBack showModalBack = {this.props.state.UI.showModalBack}/>
-                    <RoundEnd 
-                        endOfRound = {this.props.state.UI.endOfRound}
-                        AIPlayers = {this.props.state.AI.players}
-                        player = {this.props.state.player}
-                        game = {this.props.state.game}
-                        nextRoundHandler = {this.startNextRound}
-                        newGameHandler = {this.newGameHandler}
-                    />
-                    <GoDown 
-                        isGoingDown = {this.props.state.player.isGoingDown}
-                        cancelClickHandler = {this.props.cancelPlayerGoDown}
-                        hand = {this.props.state.player.hand}
-                        requirement = {this.props.state.game.requirement}
-                        selectedCards = {this.props.state.UI.goingDown.selectedCards}
-                        submittedSetruns = {this.props.state.UI.goingDown.submittedSetruns}
-                        selectCardHandler = {this.goDownSelectCard}
-                        submitSetrunHandler = {this.goDownSubmitSetrun}
-                        submitHandHandler = {this.goDownSubmitHand}
-                    />
-                    <Table
-                        playerAddCardToTable = {this.playerAddCardToTable}
-                        playerHandSortSets = {this.playerHandSortSets}
-                        playerHandSortRuns = {this.playerHandSortRuns}
-                        goDownClickHandler = {this.goDownClickHandler}
-                        deckClickHandler = {this.deckClickHandler}
-                        handClickHandler = {this.handClickHandler}
-                        discardClickHandler = {this.discardClickHandler}
-                        state = {this.props.state}
-                        handDragOnDrop = {this.handDragOnDrop}
-                    />
-                </div>
-            )
+        let state = this.props.state;
+        if (state.game.gameState === GAME_STATES.NO_GAME) {
+            return <Home onStartGame={this.newGameHandler} />;
         }
-            
-        return(
-            output
+        return (
+            <>
+                <GameTable state={state} actions={this.tableActions} />
+                <GoDownDialog
+                    open={state.player.isGoingDown}
+                    hand={state.player.hand}
+                    requirement={state.game.requirement}
+                    onCancel={this.props.cancelPlayerGoDown}
+                    onSubmit={this.goDownSubmit}
+                />
+                <RoundEndDialog
+                    open={state.UI.endOfRound}
+                    round={state.game.round}
+                    player={state.player}
+                    AIPlayers={state.AI.players}
+                    onNextRound={this.startNextRound}
+                    onNewGame={this.newGameHandler}
+                />
+            </>
         );
     }
 
-    //HAND DRAG AND DROP HANDLERS
-
-    handDragOnDrop(pickPosition, dropPosition) { //done
-        console.log("handDragOnDrop", pickPosition, dropPosition);
+    // Moves a card in the hand onto another card's position.
+    reorderHand(from, to) {
+        if (from === to || Number.isNaN(from)) return;
         let newHand = [...this.props.state.player.hand];
-
-        if (pickPosition <  dropPosition){
-            newHand.splice(dropPosition + 1, 0, newHand[pickPosition]);
-            newHand.splice(pickPosition, 1);
-        } else if (dropPosition < pickPosition) {
-            let movedCard = newHand.splice(pickPosition, 1);
-            newHand.splice(dropPosition + 1, 0, movedCard[0]);
-        }
-        this.props.sortPlayerHand(newHand);
+        newHand.splice(to, 0, newHand.splice(from, 1)[0]);
+        this.props.updatePlayerHand(newHand);
     }
 
-    componentDidUpdate() {
-        console.log("Component did update: ", Date.now());
+    componentDidUpdate(prevProps) {
+        // only state changes move the game on
+        if (prevProps.state === this.props.state) return;
 
         //check if anyone is out
         if (this.props.state.player.hand.length === 0) {
@@ -191,13 +159,11 @@ class App extends Component {
             
 
             let OOTRequests = [...this.props.state.OOTRequests];
-            //console.log(OOTRequests);
-            if (this.playerOOTRequest) OOTRequests.push(this.playerOOTRequest);
-            //console.log(OOTRequests);
+            if (this.props.state.playerClaim && !this.props.state.discardCovered) {
+                OOTRequests.push({type : "player", index : params.numberOfPlayers - 1});
+            }
             let OOTResult = AIFunctions.resolveOOT(OOTRequests, this.props.state.AI.AIInPlay);
-            //console.log(OOTResult);
             this.props.drawOOTResolve(OOTResult);
-            this.playerOOTRequest = null;
             return;
         }
 
@@ -263,7 +229,6 @@ class App extends Component {
     }
 
     discardClickHandler = () => {
-        console.log("discardClickHandler triggered.");
         if (this.props.state.game.gameState === GAME_STATES.PW_DRAW_CARD && 
             this.props.state.discard.length > 0) {
             this.props.fromDiscardToPlayer();
@@ -272,40 +237,32 @@ class App extends Component {
             this.props.state.player.cardSelected !== null && 
             !this.props.state.player.isGoingDown
         ){
-            let OOTResult = AIFunctions.resolveOOT(this.props.state.OOTRequests, this.props.state.AI.AIInPlay);
-            console.log(OOTResult);
-            if (OOTResult.winnerType !== "none") {
-                this.props.drawOOTResolve(OOTResult);
-            }
             this.props.fromHandToDiscard();
-        } else if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
-            this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD &&
-            this.props.state.discardCovered !== true){
-            this.playerOOTRequest = {type : "player", index : params.numberOfPlayers - 1}
+        } else {
+            this.claimDiscard();
         }
-
     }
 
-    handClickHandler = (event, cardNum) => { //done
-        console.log(cardNum);
+    // The human can claim the top discard out of turn once the AI in play has
+    // drawn from the deck, until the claims are resolved.
+    claimDiscard() {
+        let state = this.props.state;
+        let claimWindow = [GAME_STATES.AI_WAIT_ONE, GAME_STATES.AI_DRAW_OOT, GAME_STATES.AI_WAIT_TWO]
+            .includes(state.game.gameState);
+        if (claimWindow && !state.discardCovered && state.discard.length > 0 && !state.playerClaim) {
+            this.props.playerDrawOOT();
+        }
+    }
+
+    handClickHandler = (cardNum) => {
         if (this.props.state.game.gameState === GAME_STATES.PW_PLAY && this.props.state.player.isGoingDown === false) {
             //we're not in going down mode, so get the card selected ready for going onto the table or going onto the discard.
             this.props.selectCardFromHand(cardNum);
         }
     }
 
-    playerHandSortRuns() {
-        //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY &&
-        //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
-        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, RUN);
-        this.props.updatePlayerHand(newHand);
-    }
-
-    playerHandSortSets() {
-        //if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY && 
-        //    this.props.state.game.gameState !== GAME_STATES.PW_DRAW_CARD) return;
-        let newHand = handFunctions.sortPlayerHand(this.props.state.player.hand, SET);
-        this.props.updatePlayerHand(newHand);
+    sortHand(type) {
+        this.props.updatePlayerHand(handFunctions.sortHand(this.props.state.player.hand, type));
     }
 
     goDownClickHandler = () => {
@@ -314,41 +271,22 @@ class App extends Component {
         this.props.showGoingDownModal();
     }
 
-    cancelPlayerGoDown = () => { //done
-        this.props.cancelPlayerGoDown();
-    }
-
-    goDownSelectCard = (event, cardNum) => { // done
-        this.props.goDownSelectCard(cardNum);
-    }
-    
-    goDownSubmitSetrun = (event, requirement) => { // done
-        let selectedCards = this.props.state.UI.goingDown.selectedCards;
-        if (selectedCards.length === 0) return;
-        if (requirement === "NONE") return;
-        let cards = selectedCards.map(cardNum => this.props.state.player.hand[cardNum]);
-
-        let result = handFunctions.checkSetrun(cards, requirement);
-        if (!result.valid) return;
-        handFunctions.insertBuildOptions(result.setrun);
-        // remember which hand cards were used so they can be taken out on going down
-        this.props.goDownSubmitSetrun({...result.setrun, handIndices : [...selectedCards]});
-    }
-
-    goDownSubmitHand = (event, requirement) => {
-        if (requirement !== "NONE") return;
-        let submittedSetruns = this.props.state.UI.goingDown.submittedSetruns;
-        let usedCards = submittedSetruns.flatMap(setrun => setrun.handIndices);
-        let table = submittedSetruns.map(setrun => ({
-            type : setrun.type,
-            cards : setrun.cards,
-            addons : setrun.addons
-        }));
-        let newHand = this.props.state.player.hand.filter((card, index) => !usedCards.includes(index));
+    // slots: [{type, indices}] from the go-down dialog, one per setrun the round needs
+    goDownSubmit = (slots) => {
+        let hand = this.props.state.player.hand;
+        let table = [];
+        for (let slot of slots) {
+            let result = handFunctions.checkSetrun(slot.indices.map(index => hand[index]), slot.type);
+            if (!result.valid) return;
+            handFunctions.insertBuildOptions(result.setrun);
+            table.push(result.setrun);
+        }
+        let usedCards = slots.flatMap(slot => slot.indices);
+        let newHand = hand.filter((card, index) => !usedCards.includes(index));
         this.props.goDownSubmitHand(table, newHand);
     }
 
-    playerAddCardToTable(event, playerType, setrunIndex, AIIndex) {
+    playerAddCardToTable(playerType, setrunIndex, AIIndex) {
 
         if (this.props.state.game.gameState !== GAME_STATES.PW_PLAY) return;
         if (this.props.state.player.cardSelected === null) return;
@@ -380,8 +318,7 @@ class App extends Component {
         this.props.endRound(points);
     }   
 
-    startNextRound () {
-        
+    startNextRound = () => {
        let deck = deckFunctions.generateDeck(2);
        let hands = deckFunctions.deal(deck, params.numberOfPlayers);
        let discard = [];
@@ -460,14 +397,6 @@ const mapDispatchToProps = dispatch => {
         }),
         cancelPlayerGoDown : () => dispatch({
             type : actions.CANCEL_PLAYER_GO_DOWN
-        }),
-        goDownSelectCard : (cardNum) => dispatch({
-            type : actions.GO_DOWN_SELECT_CARD,
-            payload : {cardNum}
-        }),
-        goDownSubmitSetrun : (setrun) => dispatch({
-            type : actions.GO_DOWN_SUBMIT_SETRUN,
-            payload : {setrun}
         }),
         goDownSubmitHand : (table, hand) => dispatch({
             type : actions.GO_DOWN_SUBMIT_HAND,

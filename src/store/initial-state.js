@@ -10,16 +10,13 @@ const initialState = {
         gameUpdate : false,
     },
     UI : {
-        showModalBack : false,
-        goingDown : {
-            selectedCards : [],
-            submittedSetruns : []
-        },
         endOfRound : false
     },
     player : {
         hand : [],
         cardSelected : null,
+        // the card just drawn, claimed or given back, tagged in the hand: {displayString, label}
+        newCard : null,
         table : [],
         isDown : false,
         canGoDown : false,
@@ -55,7 +52,11 @@ const initialState = {
     discard : [],
     discardCovered : false,
 
-    OOTRequests : []
+    OOTRequests : [],
+    // the human has asked to claim the top discard out of turn
+    playerClaim : false,
+    // what has happened this round, newest first (see log.js)
+    log : []
 }
 
 export default initialState;

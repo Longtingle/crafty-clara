@@ -3,6 +3,7 @@ import actions from './actions.js';
 import GAME_STATES from './constants.js';
 import {ROUND_REQUIREMENTS} from './constants.js';
 import initialState from './initial-state.js';
+import {withLog} from './log.js';
 import _ from 'lodash';
 
 const reducer = (state = initialState, action) => {
@@ -73,19 +74,21 @@ const reducer = (state = initialState, action) => {
         newState = update(state, {
             game : {$set : game},
             UI : {
-                endOfRound : {$set : false},
-                showModalBack : {$set : false}
+                endOfRound : {$set : false}
             },
             player : {
                 hand : { $set : Array.from(action.payload.hands[0])},
                 cardSelected : {$set : null},
+                newCard : {$set : null},
                 table : {$set : []},
                 isDown : {$set : false}
             },
-            AI : {$set : AI}, 
+            AI : {$set : AI},
             deck : {$set : action.payload.deck},
             discard : {$set : action.payload.discard},
-            discardCovered : {$set : false}
+            discardCovered : {$set : false},
+            OOTRequests : {$set : []},
+            playerClaim : {$set : false}
         })
 
         return newState;
@@ -98,7 +101,10 @@ const reducer = (state = initialState, action) => {
         newDeck.shift();
         newState = update(state, {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
-            player : { hand : {$set : newPlayerHand}},
+            player : {
+                hand : {$set : newPlayerHand},
+                newCard : {$set : {displayString : state.deck[0].displayString, label : "New"}}
+            },
             deck : {$set : newDeck},
             AI : { messageUpdate : {$set : null}}
         });
@@ -112,7 +118,10 @@ const reducer = (state = initialState, action) => {
         newHand.push(newDiscard.shift());
         newState = update(state, {
             game : {gameState : {$set : GAME_STATES.PW_PLAY}, gameUpdate : {$set : false}},
-            player : {hand : {$set : newHand}},
+            player : {
+                hand : {$set : newHand},
+                newCard : {$set : {displayString : state.discard[0].displayString, label : "New"}}
+            },
             discard : {$set : newDiscard},
             discardCovered : {$set : true},
             AI : { messageUpdate : {$set : null}}
@@ -149,9 +158,11 @@ const reducer = (state = initialState, action) => {
             player : {
                 hand : {$set : newHand},
                 cardSelected : {$set : null},
+                newCard : {$set : null}
             },
             discard : {$set : newDiscard},
             discardCovered : {$set : false},
+            playerClaim : {$set : false},
             AI : {$set : AI}
         });
 
@@ -250,11 +261,23 @@ const reducer = (state = initialState, action) => {
         return newState;
     }
 
+    if (action.type === actions.PLAYER_DRAW_OOT) {
+        // UI only: the claim is settled with the AI claims in AI_OOT_RESOLVE
+        newState = update (state, {
+            game : {gameUpdate : {$set : false}},
+            playerClaim : {$set : true},
+            AI : {messageUpdate : {$set : null}}
+        });
+
+        return newState;
+    }
+
     if (action.type === actions.DRAW_OOT_RESOLVE) {
         if (action.payload.winner.winnerType === "none") {
             newState = update (state, {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 OOTRequests : {$set : []},
+                playerClaim : {$set : false},
                 AI : {messageUpdate : {$set : null}}
             });
             return newState;
@@ -276,8 +299,12 @@ const reducer = (state = initialState, action) => {
                 game : {gameState : {$set : GAME_STATES.AI_PLAY}, gameUpdate : {$set : true}},
                 discard : {$set : newDiscard},
                 discardCovered : {$set : true},
-                player : {hand : {$set : newHand}},
+                player : {
+                    hand : {$set : newHand},
+                    newCard : {$set : {displayString : state.discard[0].displayString, label : "Claimed"}}
+                },
                 OOTRequests : {$set : []},
+                playerClaim : {$set : false},
                 AI : {messageUpdate : {$set : null}}
             });
 
@@ -299,7 +326,8 @@ const reducer = (state = initialState, action) => {
                 discard : {$set : newDiscard},
                 discardCovered : {$set : true},
                 AI : {players : {$set : newAIPlayers}, messageUpdate : {$set : [action.payload.winner.index]}},
-                OOTRequests : {$set : []}
+                OOTRequests : {$set : []},
+                playerClaim : {$set : false}
             });
         }
         
@@ -349,7 +377,8 @@ const reducer = (state = initialState, action) => {
                 messageUpdate : {$set : messageUpdate}
             },
             discard : {$set : newDiscard},
-            discardCovered : {$set : false}
+            discardCovered : {$set : false},
+            playerClaim : {$set : false}
         });
 
 
@@ -360,7 +389,7 @@ const reducer = (state = initialState, action) => {
         
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
-            player : {hand : {$set : action.payload.newHand}},
+            player : {hand : {$set : action.payload.newHand}, cardSelected : {$set : null}},
             AI : {messageUpdate : {$set : null}}
         });
 
@@ -372,8 +401,7 @@ const reducer = (state = initialState, action) => {
         
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
-            UI : {showModalBack : {$set : true}},
-            player : {isGoingDown : {$set : true}},
+            player : {isGoingDown : {$set : true}, cardSelected : {$set : null}},
             AI : {messageUpdate : {$set : null}}
         });
 
@@ -385,52 +413,7 @@ const reducer = (state = initialState, action) => {
         
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
-            UI : {
-                showModalBack : {$set : false},
-                goingDown : {
-                    selectedCards : {$set : []},
-                    submittedSetruns : {$set : []}
-                }
-            },
             player : {isGoingDown : {$set : false}},
-            AI : {messageUpdate : {$set : null}}
-        });
-
-
-        return newState;
-    }
-
-    if (action.type === actions.GO_DOWN_SELECT_CARD) {
-        let selectedCards = [...state.UI.goingDown.selectedCards];
-        if (selectedCards.includes(action.payload.cardNum)) {
-            let index = selectedCards.indexOf(action.payload.cardNum);
-            if (index !== -1) selectedCards.splice(index, 1);
-        }else {
-            selectedCards.push(action.payload.cardNum);
-        }
-        newState = update (state, {
-            game : {gameUpdate : {$set : false}},
-            UI : {goingDown : {selectedCards : {$set : selectedCards}}},
-            AI : {messageUpdate : {$set : null}}
-        });
-
-
-        return newState;
-    }
-
-    if (action.type === actions.GO_DOWN_SUBMIT_SETRUN) { //NEEDS REWRITING
-        let submittedSetruns = _.cloneDeep(state.UI.goingDown.submittedSetruns);
-        
-        submittedSetruns.push(action.payload.setrun);
-
-        newState = update (state, {
-            game : {gameUpdate : {$set : false}},
-            UI : { 
-                goingDown : { 
-                    selectedCards : {$set : []},
-                    submittedSetruns : {$set : submittedSetruns}
-                }
-            },
             AI : {messageUpdate : {$set : null}}
         });
 
@@ -442,16 +425,12 @@ const reducer = (state = initialState, action) => {
         let player = _.cloneDeep(state.player);
         player.isGoingDown = false;
         player.hand = action.payload.hand;
+        player.cardSelected = null;
         player.isDown = true;
         player.table = action.payload.table;
-        let UI = _.cloneDeep(state.UI);
-        UI.goingDown.selectedCards = [];
-        UI.goingDown.submittedSetruns = [];
-        UI.showModalBack = false;
 
         newState = update (state, {
             game : {gameUpdate : {$set : false}},
-            UI : {$set : UI},
             player : {$set : player},
             AI : {messageUpdate : {$set : null}}
         });
@@ -522,6 +501,9 @@ const reducer = (state = initialState, action) => {
         hand.splice(state.player.cardSelected, 1);
         // a red ace replaced by its natural card comes back to the player
         if (action.payload.returnedAce) hand.push(action.payload.returnedAce);
+        let newCard = action.payload.returnedAce
+            ? {displayString : action.payload.returnedAce.displayString, label : "Back"}
+            : state.player.newCard;
         let table;
         if (action.payload.playerType === "player") { 
             table = _.cloneDeep(state.player.table);
@@ -531,6 +513,7 @@ const reducer = (state = initialState, action) => {
                 player : {
                     hand : {$set : hand},
                     cardSelected : {$set : null},
+                    newCard : {$set : newCard},
                     table : {$set : table}
                 },
                 AI : {messageUpdate : {$set : null}}
@@ -547,8 +530,9 @@ const reducer = (state = initialState, action) => {
                 game : {gameUpdate : {$set : false}},
                 player : {
                     hand : {$set : hand},
-                    cardSelected : {$set : null}
-                }, 
+                    cardSelected : {$set : null},
+                    newCard : {$set : newCard}
+                },
                 AI : {$set : AI}
             });
         }
@@ -567,15 +551,11 @@ const reducer = (state = initialState, action) => {
             AI.points.total = AI.points.total + action.payload.points.AI[index];
         });
         AI.messageUpdate = null;
-        let UI = _.cloneDeep(state.UI);
-        UI.showModalBack = true;
-        UI.endOfRound = true;
-        
         newState = update (state, {
             game : {gameState : {$set : GAME_STATES.ROUND_END}, gameUpdate : {$set : false}},
             player : {$set : player},
             AI : {$set : AI},
-            UI : {$set : UI}
+            UI : {endOfRound : {$set : true}}
         });
 
 
@@ -611,19 +591,6 @@ const reducer = (state = initialState, action) => {
     }
 
     return state;
-
-    if (action.type === actions.TEMPLATE) {
-        
-        newState = update (state, {
-            game : {gameUpdate : {$set : false}},
-            AI : {messageUpdate : {$set : null}} //or an array of AI indices
-        });
-
-
-        return newState;
-    }
-
-    return state;
 }
 
-export default reducer;
+export default withLog(reducer);

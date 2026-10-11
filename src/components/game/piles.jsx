@@ -1,0 +1,94 @@
+import {Check} from 'lucide-react';
+import {cn} from '@/lib/utils.js';
+import {longName, shortName} from '@/game-functions/card-names.js';
+import {PlayingCard, CardBack, CardTag} from './playing-card.jsx';
+
+// How long the human has to claim a discard out of turn: the AI's two
+// 3-second waits (AI_WAIT_ONE and AI_WAIT_TWO in App.componentDidUpdate).
+const CLAIM_WINDOW_MS = 6000;
+
+// The claim button counts down while the window is open. It is mounted when
+// the window opens, so the animation starts then. It sits beside the discard
+// pile so the table doesn't move when it appears.
+function ClaimButton({card, claimed, onClaim}) {
+    if (claimed) {
+        return (
+            <div role="status" className="flex items-center gap-2 rounded-xl bg-panel px-3 py-2 text-sm font-bold whitespace-nowrap">
+                <Check className="size-4 text-gold" aria-hidden="true" />
+                Claimed {shortName(card)}
+            </div>
+        );
+    }
+    return (
+        <button
+            type="button"
+            onClick={onClaim}
+            className="flex h-11 items-center gap-2 rounded-xl bg-gold pr-4 pl-1.5 font-bold whitespace-nowrap text-gold-foreground shadow-lg hover:bg-gold/85"
+        >
+            <svg viewBox="0 0 36 36" className="size-8 -rotate-90" aria-hidden="true">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
+                <circle
+                    cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
+                    pathLength="100" strokeDasharray="100"
+                    style={{animation : `claim-countdown ${CLAIM_WINDOW_MS}ms linear forwards`}}
+                />
+            </svg>
+            Claim {shortName(card)}
+        </button>
+    );
+}
+
+// The deck and the discard pile. A pile glows when clicking it does
+// something: discardAction is {chip, ariaLabel, onClick} when the discard pile
+// is live, and claim is {card, claimed, onClaim} while a claim window is open.
+function Piles({deckCount, deckActive, onDeckClick, discardTop, discardAction, claim}) {
+    return (
+        <div className="flex items-start gap-8 short:gap-4">
+            <div className="flex flex-col items-center gap-3 short:gap-1.5">
+                <button
+                    type="button"
+                    disabled={!deckActive}
+                    onClick={onDeckClick}
+                    aria-label={"Deck, " + deckCount + " cards" + (deckActive ? ". Draw a card" : "")}
+                    className={cn(
+                        "relative w-(--pile-w) rounded-[7%/4.6%] shadow-[3px_3px_0_#e4dcc9,6px_6px_0_#cbbf9f,0_12px_24px_rgb(0_0_0/0.4)]",
+                        deckActive && "pulse-gold"
+                    )}
+                >
+                    <CardBack className="w-full" />
+                    {deckActive && <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">Draw</CardTag>}
+                </button>
+                <span className="text-[13px] text-muted-foreground">Deck · {deckCount} left</span>
+            </div>
+            <div className="relative flex flex-col items-center gap-3 short:gap-1.5">
+                {claim && (
+                    <div className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-10 ml-4 -translate-y-1/2">
+                        <ClaimButton {...claim} />
+                    </div>
+                )}
+                <button
+                    type="button"
+                    disabled={!discardAction}
+                    onClick={discardAction?.onClick}
+                    aria-label={discardAction
+                        ? discardAction.ariaLabel
+                        : "Discard pile" + (discardTop ? ", " + longName(discardTop) + " on top" : ", empty")}
+                    className={cn(
+                        "relative w-(--pile-w) rounded-[5%/3.3%] shadow-[0_12px_24px_rgb(0_0_0/0.4)]",
+                        discardAction && "pulse-gold"
+                    )}
+                >
+                    {discardTop
+                        ? <PlayingCard card={discardTop} alt="" className="w-full" />
+                        : <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />}
+                    {discardAction && (
+                        <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">{discardAction.chip}</CardTag>
+                    )}
+                </button>
+                <span className="text-[13px] text-muted-foreground">Discard pile</span>
+            </div>
+        </div>
+    );
+}
+
+export default Piles;

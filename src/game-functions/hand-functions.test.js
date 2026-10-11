@@ -1,5 +1,5 @@
 import {createCard} from './deck-functions.js';
-import {getRuns, getSets, scoreHand, checkSetrun, addToSetrun, getPoints} from './hand-functions.js';
+import {getRuns, getSets, scoreHand, checkSetrun, explainSetrun, addToSetrun, getPoints} from './hand-functions.js';
 import {SET, RUN} from '../store/constants.js';
 
 // "10H" -> createCard(10, "H")
@@ -67,6 +67,35 @@ describe('checkSetrun', () => {
     it('uses a red ace in a set but not more wilds than naturals', () => {
         expect(checkSetrun(cards("7C 7H 1D"), SET).valid).toBe(true);
         expect(checkSetrun(cards("7C 1H 1D"), SET).valid).toBe(false);
+    });
+});
+
+describe('explainSetrun', () => {
+    it('returns null exactly when checkSetrun accepts the cards', () => {
+        const examples = [
+            ["7C 7H 7D", SET], ["7C 7H 1D", SET], ["7C 1H 1D", SET], ["7C 7H", SET], ["7C 7H 8D", SET],
+            ["4S 5S 6S 7S", RUN], ["4S 1H 6S 7S", RUN], ["12C 13C 1C 11C", RUN], ["4S 5S 6S", RUN],
+            ["4S 5S 6H 7S", RUN], ["4S 5S 5S 6S", RUN], ["3D 4D 6D 7D", RUN], ["3D 1H 1D 6D", RUN]
+        ];
+        examples.forEach(([str, type]) => {
+            const hand = cards(str);
+            expect(explainSetrun(hand, type) === null).toBe(checkSetrun(hand, type).valid);
+        });
+    });
+
+    it('says what is wrong with a set', () => {
+        expect(explainSetrun([], SET)).toBe("Pick 3 or more cards of the same value.");
+        expect(explainSetrun(cards("7C 8C 7D"), SET)).toBe("Every card in a set must have the same value.");
+        expect(explainSetrun(cards("7C 7H"), SET)).toBe("A set needs at least 3 cards. Add 1 more.");
+        expect(explainSetrun(cards("7C 1H 1D"), SET)).toBe("Wild aces can't outnumber natural cards.");
+    });
+
+    it('names the cards missing from a run', () => {
+        expect(explainSetrun(cards("3D 4D 6D 7D"), RUN)).toBe("There's a gap. Add the 5♦ or a wild ace.");
+        expect(explainSetrun(cards("3D 4D 7D 8D"), RUN)).toBe("There are gaps. Add the 5♦ and 6♦, or wild aces in their place.");
+        expect(explainSetrun(cards("4S 5S 6H 7S"), RUN)).toBe("Every card in a run must be the same suit.");
+        expect(explainSetrun(cards("4S 5S 6S"), RUN)).toBe("A run needs at least 4 cards. Add 1 more.");
+        expect(explainSetrun(cards("3D 4D 6D"), RUN)).toBe("There's a gap. Add the 5♦ or a wild ace.");
     });
 });
 

@@ -1,6 +1,6 @@
 # Crafty Clara
 
-A single-player rummy card game against AI opponents, built with React, Redux and Vite.
+A single-player rummy card game against AI opponents, built with React, Redux, Vite, Tailwind CSS and shadcn/ui.
 
 ## Getting started
 
