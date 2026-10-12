@@ -87,7 +87,12 @@
     /* card widths; heights follow the 691x1056 card images (x1.528) */
     --hand-w: clamp(56px, min(8vw, 13vh), 116px);
     --pile-w: clamp(52px, min(7.5vw, 10vh), 110px);
-    --meld-w: clamp(38px, min(4.8vw, 7.5vh), 72px);
+    /* setrun cards at full size; a MeldRow shrinks them to fit its width */
+    --meld-w-full: clamp(38px, min(4.8vw, 7.5vh), 72px);
+    --meld-w: var(--meld-w-full);
+    /* a setrun's side padding, and the gap between setruns in a row */
+    --meld-pad-x: 10px;
+    --meld-gap: 14px;
     /* height of a setrun block: card, padding and caption */
     --meld-row: calc(var(--meld-w) * 1.528 + 44px);
 }
@@ -97,7 +102,9 @@
     :root {
         --hand-w: clamp(48px, min(8vw, 17vh), 90px);
         --pile-w: clamp(44px, min(7.5vw, 16vh), 80px);
-        --meld-w: clamp(30px, min(4.8vw, 10.5vh), 52px);
+        --meld-w-full: clamp(30px, min(4.8vw, 10.5vh), 52px);
+        --meld-pad-x: 6px;
+        --meld-gap: 8px;
         --meld-row: calc(var(--meld-w) * 1.528 + 24px);
     }
 }

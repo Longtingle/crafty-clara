@@ -1,6 +1,7 @@
 import {AnimatePresence} from 'motion/react';
 import {cn} from '@/lib/utils.js';
 import {CardBack, MovingCard} from './playing-card.jsx';
+import {MeldRow} from './meld.jsx';
 import {aiColor} from './players.js';
 
 // Where an opponent's cards fly to and from. Their hand is hidden, so each
@@ -83,13 +84,13 @@ function OpponentPanel({player, index, active, lastAction, children}) {
                     <span className="text-[13px] text-muted-foreground">{player.points.total} pts</span>
                 </div>
             </div>
-            <div className="flex min-h-(--meld-row) flex-wrap items-start gap-3.5 short:gap-2">
+            <MeldRow setruns={player.isDown ? player.table : []} className="min-h-(--meld-row) items-start">
                 {player.isDown ? children : (
                     <div className="grid h-(--meld-row) flex-1 place-items-center rounded-xl border-2 border-dashed border-white/18 text-sm text-muted-foreground">
                         Not down yet
                     </div>
                 )}
-            </div>
+            </MeldRow>
         </div>
     );
 }

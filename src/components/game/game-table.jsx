@@ -9,7 +9,7 @@ import AIFunctions from '@/game-functions/AI-functions.js';
 import {shortName, longName, requirementText} from '@/game-functions/card-names.js';
 import TopBar from './top-bar.jsx';
 import {OpponentPanel} from './opponent-panel.jsx';
-import Meld from './meld.jsx';
+import Meld, {MeldRow} from './meld.jsx';
 import Piles from './piles.jsx';
 import ActivityLog from './activity-log.jsx';
 import PlayerPanel from './player-panel.jsx';
@@ -202,10 +202,10 @@ function GameTable({state, actions}) {
                     <h2 className={cn(sectionLabel, "short:hidden")}>Your melds</h2>
                     {player.isDown
                         ? (
-                            <div className="flex flex-wrap gap-3.5 short:justify-end short:gap-2">
+                            <MeldRow setruns={player.table} className="short:justify-end">
                                 {player.table.map((setrun, setrunIndex) =>
                                     meld(setrun, myTargets[setrunIndex], setrunIndex, () => actions.addToMeld("player", setrunIndex)))}
-                            </div>
+                            </MeldRow>
                         )
                         : (
                             <div className="grid h-(--meld-row) w-full max-w-80 place-items-center rounded-xl border-2 border-dashed border-white/18 px-4 text-center text-sm text-muted-foreground">
