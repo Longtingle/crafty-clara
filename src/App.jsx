@@ -12,7 +12,8 @@ import {AI_CARD_SELECT, AI_PACE, SET, RUN} from './store/constants.js';
 import deckFunctions from './game-functions/deck-functions.js';
 import params from './game-functions/params.js';
 import AIFunctions from './game-functions/AI-functions.js';
-import handFunctions from './game-functions/hand-functions.js';
+import {getPoints} from './engine/cards.ts';
+import {sortHand, checkSetrun, addToSetrun} from './engine/setruns.ts';
 
 //import react components
 import Home from './components/game/home.jsx';
@@ -304,7 +305,7 @@ class App extends Component {
     }
 
     sortHand(type) {
-        this.props.updatePlayerHand(handFunctions.sortHand(this.props.state.player.hand, type));
+        this.props.updatePlayerHand(sortHand(this.props.state.player.hand, type));
     }
 
     goDownClickHandler = () => {
@@ -318,9 +319,8 @@ class App extends Component {
         let hand = this.props.state.player.hand;
         let table = [];
         for (let slot of slots) {
-            let result = handFunctions.checkSetrun(slot.indices.map(index => hand[index]), slot.type);
+            let result = checkSetrun(slot.indices.map(index => hand[index]), slot.type);
             if (!result.valid) return;
-            handFunctions.insertBuildOptions(result.setrun);
             table.push(result.setrun);
         }
         let usedCards = slots.flatMap(slot => slot.indices);
@@ -340,7 +340,7 @@ class App extends Component {
         if (!setrun) return;
 
         let newCard = this.props.state.player.hand[this.props.state.player.cardSelected];
-        let result = handFunctions.addToSetrun(setrun, newCard);
+        let result = addToSetrun(setrun, newCard);
         if (!result.valid) return;
 
         this.props.playerAddCardToTable(result.setrun, playerType, setrunIndex, AIIndex, result.returnedAce);
@@ -352,9 +352,9 @@ class App extends Component {
             player : null,
             AI : []
         };
-        points.player = (this.props.state.player.hand.length !== 0) ? handFunctions.getPoints(this.props.state.player.hand) : 0;
+        points.player = (this.props.state.player.hand.length !== 0) ? getPoints(this.props.state.player.hand) : 0;
         this.props.state.AI.players.forEach((player, index) => {
-            points.AI[index] = (player.hand.length !== 0) ? handFunctions.getPoints(player.hand) : 0;
+            points.AI[index] = (player.hand.length !== 0) ? getPoints(player.hand) : 0;
         });
         
         this.props.endRound(points);

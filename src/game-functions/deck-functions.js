@@ -1,3 +1,4 @@
+import {createCard} from '../engine/cards.ts';
 
 // Every generated deck gets a new number, so card ids never repeat between
 // rounds or games.
@@ -15,22 +16,6 @@ const generateDeck = (numDecks) => {
     }
     shuffle(cards)
     return cards;
-}
-
-// id tells apart the two copies of a card in a double deck. The UI uses it to
-// follow a card as it moves between hands, piles and setruns.
-const createCard = (value, suit, id) => {
-    let card = {
-        value,
-        suit,
-        displayString : value + suit,
-    }
-    if (id !== undefined) card.id = id;
-    if (value === 1) {
-        let colour = (suit === "C" || suit === "S") ? "black" : "red";
-        card.ace = {value, suit, colour}
-    }
-    return card;
 }
 
 function shuffle(array) {

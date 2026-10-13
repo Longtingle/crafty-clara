@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils.js';
-import {setrunCaption, isStandIn} from '@/game-functions/card-names.js';
+import {setrunCaption, isStandIn} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard} from './playing-card.jsx';
 
 // A setrun on the table. It is a button only while the selected card can be

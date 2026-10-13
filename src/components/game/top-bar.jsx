@@ -1,7 +1,7 @@
 import {Check, CircleHelp, Trophy} from 'lucide-react';
 import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
-import {plural} from '@/game-functions/card-names.js';
+import {plural} from '@/engine/card-names.ts';
 import {aiColor} from './players.js';
 import {HiddenHand} from './opponent-panel.jsx';
 

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "oxc"],
+  "plugins": ["react", "oxc", "typescript"],
   "env": {
     "browser": true,
     "es2024": true
@@ -13,7 +13,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.{js,jsx}"],
+      "files": ["**/*.test.{js,jsx,ts}"],
       "env": { "vitest": true }
     }
   ]

@@ -3,7 +3,7 @@ import {DndContext, PointerSensor, closestCenter, useSensor, useSensors} from '@
 import {SortableContext, horizontalListSortingStrategy, useSortable} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 import {cn} from '@/lib/utils.js';
-import {longName} from '@/game-functions/card-names.js';
+import {longName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardTag} from './playing-card.jsx';
 import {FLIGHT} from './cards.js';
 

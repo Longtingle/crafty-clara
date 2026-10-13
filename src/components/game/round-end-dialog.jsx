@@ -1,7 +1,7 @@
 import {Button} from '@/components/ui/button.jsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
 import {ROUND_REQUIREMENTS} from '@/store/constants.js';
-import {requirementText} from '@/game-functions/card-names.js';
+import {requirementText} from '@/engine/card-names.ts';
 import Scoreboard from './scoreboard.jsx';
 import {scoreRows} from './scores.js';
 

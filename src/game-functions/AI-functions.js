@@ -1,79 +1,23 @@
 import {AI_CARD_SELECT} from '../store/constants.js';
-import {scoreHand, checkSetrun, addToSetrun, insertBuildOptions} from './hand-functions.js';
+import {wantsCard, chooseDiscard, planGoDown, findAddition} from '../engine/bot.ts';
+import {addToSetrun} from '../engine/setruns.ts';
 import params from './params.js';
-import _ from 'lodash';
 
-const isRedAce = (card) => card.ace !== undefined && card.ace.colour === "red";
-
-//exported functions
+// The App loop's interface to the bot's decisions in engine/bot.ts. It goes
+// once the App plays through the engine.
 const AIFunctions = {
 
-    selectDraw : (hand, requirement, discard) => { //done
+    selectDraw : (hand, requirement, discard) =>
+        wantsCard(hand, requirement, discard) ? AI_CARD_SELECT.SELECT_DISCARD : AI_CARD_SELECT.SELECT_DECK,
 
-        let handResult = scoreHand (hand, requirement);
-        let adjustedHand = [...hand];
-        adjustedHand.push(discard);
-        let discardResult = scoreHand(adjustedHand, requirement)
-        return (discardResult.score > handResult.score + 5) ? AI_CARD_SELECT.SELECT_DISCARD : AI_CARD_SELECT.SELECT_DECK;
-    },
+    // Returns the index of the card to discard.
+    selectDiscard : (hand, requirement, isDown) => chooseDiscard(hand, requirement, isDown === true),
 
+    drawOOT : (hand, requirement, discard) => wantsCard(hand, requirement, discard),
 
-    // Returns the index of the card to discard: the highest card that isn't
-    // useful, then the highest not in the best hand. Red aces are kept if possible.
-    selectDiscard : (pHand, requirement, isDown) => {        //done
-
-        let hand = pHand.map((card, index) => ({...card, index}));
-        let candidates = hand;
-
-        if (isDown !== true) {
-            let handResult = scoreHand(pHand, requirement);
-            let useful = new Set(handResult.usefulCards.map(card => card.index));
-            let best = new Set(handResult.bestHand.flatMap(setrun => setrun.cards.map(card => card.index)));
-            candidates = hand.filter(card => !useful.has(card.index));
-            if (candidates.length === 0) candidates = hand.filter(card => !best.has(card.index));
-            if (candidates.length === 0) candidates = hand;
-        }
-
-        let notWild = candidates.filter(card => !isRedAce(card));
-        if (notWild.length > 0) candidates = notWild;
-
-        return _.maxBy(candidates, card => card.value).index;
-    },
-
-
-    drawOOT : (hand, requirement, discard) => {  //done
-        let handResult = scoreHand(hand, requirement);
-        let discardHand = [...hand];
-        discardHand.push(discard);
-
-        let discardResult = scoreHand(discardHand, requirement);
-
-        return (discardResult.score > handResult.score + 5) ? true : false;
-    },
-
-
-    canGoDown : (hand, requirement) => { //done
-
-        let score = scoreHand(hand, requirement);
-        if (!score.readyToGoDown) return {result : false};
-        let table = [];
-        let usedCards = [];
-        for (let setrun of score.bestHand) {
-            // scoreHand only estimates, so make sure each setrun really is valid
-            let check = checkSetrun(setrun.cards.map(card => _.omit(card, 'index')), setrun.type);
-            if (!check.valid) return {result : false};
-            insertBuildOptions(check.setrun);
-            table.push(check.setrun);
-            usedCards.push(...setrun.cards.map(card => card.index));
-        }
-        if (new Set(usedCards).size !== usedCards.length) return {result : false};
-
-        let newHand = hand.filter((card, index) => !usedCards.includes(index));
-        return {
-            result : true,
-            table,
-            newHand
-        }
+    canGoDown : (hand, requirement) => {
+        let plan = planGoDown(hand, requirement);
+        return plan ? {result : true, table : plan.table, newHand : plan.rest} : {result : false};
     },
 
     resolveOOT : (OOTRequests, AIInPlay) => { //done
@@ -112,32 +56,24 @@ const AIFunctions = {
 
     // Looks for a card in hand that can be added to any setrun on the table.
     AIHandBuild : (hand, AITables, playerTable) => {
-        let tables = [
-            ...AITables.map(AI => ({playerType : "AI", AIIndex : AI.index, table : AI.table})),
-            {playerType : "player", AIIndex : null, table : playerTable}
-        ];
-
-        for (let {playerType, AIIndex, table} of tables) {
-            for (let setrunIndex = 0; setrunIndex < table.length; setrunIndex++) {
-                for (let cardIndex = 0; cardIndex < hand.length; cardIndex++) {
-                    let added = addToSetrun(table[setrunIndex], hand[cardIndex]);
-                    if (!added.valid) continue;
-                    let newHand = [...hand];
-                    newHand.splice(cardIndex, 1);
-                    if (added.returnedAce) newHand.push(added.returnedAce);
-                    return {
-                        result : true,
-                        newSetrun : added.setrun,
-                        newHand,
-                        cardIndex,
-                        playerType,
-                        setrunIndex,
-                        AIIndex
-                    };
-                }
-            }
-        }
-        return {result : false};
+        let tables = [...AITables.map(AI => AI.table), playerTable];
+        let found = findAddition(hand, tables);
+        if (!found) return {result : false};
+        let {seat, index} = found.target;
+        let added = addToSetrun(tables[seat][index], found.card);
+        let cardIndex = hand.indexOf(found.card);
+        let newHand = hand.filter((card, i) => i !== cardIndex);
+        if (added.returnedAce) newHand.push(added.returnedAce);
+        let isPlayer = seat === AITables.length;
+        return {
+            result : true,
+            newSetrun : added.setrun,
+            newHand,
+            cardIndex,
+            playerType : isPlayer ? "player" : "AI",
+            setrunIndex : index,
+            AIIndex : isPlayer ? null : AITables[seat].index
+        };
     }
 }
 

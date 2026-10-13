@@ -34,19 +34,6 @@ const AI_PACE = {
     move : 800
 }
 
-const SET = "SET";
-const RUN = "RUN";
-
-const ROUND_REQUIREMENTS = [
-    {S : 2, R: 0},
-    {S : 1, R: 1},
-    {S : 0, R: 2},
-    {S : 3, R: 0},
-    {S : 2, R: 1},
-    {S : 1, R: 2},
-    {S : 0, R: 3}
-]
-
-
 export default GAME_STATES;
-export {AI_CARD_SELECT, AI_PACE, ENV_VAR, ROUND_REQUIREMENTS, SET, RUN};
+export {SET, RUN, ROUND_REQUIREMENTS} from '../engine/cards.ts';
+export {AI_CARD_SELECT, AI_PACE, ENV_VAR};

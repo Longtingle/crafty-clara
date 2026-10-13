@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
-import {longName, isStandIn, standInName} from '@/game-functions/card-names.js';
+import {longName, isStandIn, standInName} from '@/engine/card-names.ts';
 import {cardImage, FLIGHT} from './cards.js';
 
 // A card face. Size it with a width class; the height follows the image.

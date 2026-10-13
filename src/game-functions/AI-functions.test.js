@@ -1,5 +1,5 @@
 import {createCard} from './deck-functions.js';
-import {checkSetrun} from './hand-functions.js';
+import {checkSetrun} from '../engine/setruns.ts';
 import AIFunctions from './AI-functions.js';
 import {RUN} from '../store/constants.js';
 

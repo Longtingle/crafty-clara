@@ -4,8 +4,8 @@ import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
 import {SET, RUN} from '@/store/constants.js';
-import {checkSetrun, explainSetrun} from '@/game-functions/hand-functions.js';
-import {longName, setrunCaption, requirementText} from '@/game-functions/card-names.js';
+import {checkSetrun, explainSetrun} from '@/engine/setruns.ts';
+import {longName, setrunCaption, requirementText} from '@/engine/card-names.ts';
 import {PlayingCard, CardTag} from './playing-card.jsx';
 
 // One slot per meld the round needs: sets first, then runs.

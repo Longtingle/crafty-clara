@@ -2,7 +2,7 @@ import {AnimatePresence, motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
 import {AI_PACE} from '@/store/constants.js';
-import {longName, shortName} from '@/game-functions/card-names.js';
+import {longName, shortName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.jsx';
 
 // How long the human has to claim a discard out of turn: the two halves of

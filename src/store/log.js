@@ -1,6 +1,6 @@
 import actions from './actions.js';
 import {SET} from './constants.js';
-import {shortName} from '../game-functions/card-names.js';
+import {shortName} from '../engine/card-names.ts';
 
 const MAX_ENTRIES = 30;
 
