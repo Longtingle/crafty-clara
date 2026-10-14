@@ -1,7 +1,6 @@
-import {ENV_VAR} from '@/store/constants.js';
-
-// Card faces are half-size WebP versions of the PNGs in art/card-faces.
-const cardImage = (displayString) => ENV_VAR.IMG_DIR + "/cards/" + displayString + ".webp";
+// Card faces are half-size WebP versions of the PNGs in art/card-faces. They
+// live in public/, which is served from the base URL.
+const cardImage = (displayString) => import.meta.env.BASE_URL + "img/cards/" + displayString + ".webp";
 
 // Fetch every face up front, so a card never arrives blank mid-flight.
 let preloaded = false;

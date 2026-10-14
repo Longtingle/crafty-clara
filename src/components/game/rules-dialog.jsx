@@ -1,5 +1,5 @@
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
-import {ROUND_REQUIREMENTS} from '@/store/constants.js';
+import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
 
 function Section({title, children}) {
@@ -43,11 +43,13 @@ function RulesDialog({open, onOpenChange}) {
 
                 <Section title="Your turn">
                     <p>Draw from the deck or take the top card of the discard pile. Go down if you can. Once you're down you can add cards to anyone's melds. Then discard a card to end your turn.</p>
-                    <p>The round ends as soon as someone has no cards left.</p>
+                    <p>Each round, the next player along starts. The round ends as soon as someone has no cards left.</p>
+                    <p>When the deck runs out, the discard pile is shuffled into a new one. If it runs out a third time, the round ends there and everyone counts what's in their hand.</p>
                 </Section>
 
                 <Section title="Claiming out of turn">
-                    <p>When an opponent draws from the deck instead of taking the discard, you have a few seconds to <strong>claim</strong> it. If several players claim, the first one after the current player gets it.</p>
+                    <p>When a player draws from the deck instead of taking the discard, everyone else (except whoever discarded it) has a few seconds to <strong>claim</strong> it. If several players claim, the first one after the current player gets it.</p>
+                    <p>When you're the one who drew, you can play your melds meanwhile, but you discard once the others have decided.</p>
                 </Section>
 
                 <Section title="Scoring">

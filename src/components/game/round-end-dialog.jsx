@@ -1,24 +1,28 @@
 import {Button} from '@/components/ui/button.jsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
-import {ROUND_REQUIREMENTS} from '@/store/constants.js';
+import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
 import Scoreboard from './scoreboard.jsx';
 import {scoreRows} from './scores.js';
+import {opponentSeats} from './players.js';
 
 const keepOpen = (event) => event.preventDefault();
 
 // Shown when a round ends. After the last round it names the winner (lowest
-// total) and offers a new game.
-function RoundEndDialog({open, round, player, AIPlayers, onNextRound, onNewGame}) {
-    if (!open) return null;
+// total) and offers a new game. The next round is dealt once everyone is
+// ready, so once you are, it says who it's waiting for.
+function RoundEndDialog({view, onReady, onNewGame}) {
+    if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
-    let rows = scoreRows(player, AIPlayers, round);
-    let roundCount = ROUND_REQUIREMENTS.length;
-    let isFinalRound = round >= roundCount - 1;
+    let {round, rounds : roundCount} = view;
+    let rows = scoreRows(view, true);
+    let isFinalRound = view.phase === "gameEnd";
     let ranked = [...rows].sort((a, b) => a.total - b.total);
     let leader = ranked[0];
     let you = rows[0];
     let wentOut = rows.find(row => row.wentOut);
+    let ready = view.seats[view.seat].ready;
+    let waitingFor = opponentSeats(view).filter(seat => !view.seats[seat].ready).map(seat => view.seats[seat].name);
 
     let eyebrow = isFinalRound ? "Game over" : "Round " + (round + 1) + " of " + roundCount + " complete";
     let title;
@@ -27,7 +31,7 @@ function RoundEndDialog({open, round, player, AIPlayers, onNextRound, onNewGame}
     } else if (wentOut) {
         title = wentOut.isYou ? "You went out!" : wentOut.name + " went out";
     } else {
-        title = "Round over";
+        title = "The deck ran out";
     }
     let standing = (you.total === leader.total)
         ? (isFinalRound ? "Lowest total wins." : "You're in the lead.")
@@ -46,6 +50,7 @@ function RoundEndDialog({open, round, player, AIPlayers, onNextRound, onNewGame}
                         <span className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">{eyebrow}</span>
                         <DialogTitle className="text-3xl">{title}</DialogTitle>
                         <DialogDescription>
+                            {view.wentOut === null && "Nobody went out before the deck ran out for the third time. "}
                             Cards left in hand count against you. Lowest total after round {roundCount} wins.
                         </DialogDescription>
                     </DialogHeader>
@@ -59,9 +64,9 @@ function RoundEndDialog({open, round, player, AIPlayers, onNextRound, onNewGame}
                 <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} />
                 <DialogFooter>
                     <span className="text-sm text-muted-foreground sm:mr-auto">{standing}</span>
-                    {isFinalRound
-                        ? <Button size="lg" onClick={onNewGame}>New game</Button>
-                        : <Button size="lg" onClick={onNextRound}>Start round {round + 2}</Button>}
+                    {isFinalRound && <Button size="lg" onClick={onNewGame}>New game</Button>}
+                    {!isFinalRound && !ready && <Button size="lg" onClick={onReady}>Start round {round + 2}</Button>}
+                    {!isFinalRound && ready && <Button size="lg" disabled>Waiting for {waitingFor.join(", ")}</Button>}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

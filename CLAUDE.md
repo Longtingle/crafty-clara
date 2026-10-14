@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Crafty Clara is a browser card game, a contract-rummy variant played against bot opponents. It is built with Vite and React 19, styled with Tailwind CSS v4 and shadcn/ui, and animated with Motion. There is no backend: all game logic runs in the browser.
+Crafty Clara is a browser card game, a contract-rummy variant played against bot opponents. It is built with Vite and React 19, styled with Tailwind CSS v4 and shadcn/ui, and animated with Motion. There is no backend yet: all game logic runs in the browser, and the site is static.
 
-The game is partway through a move to a new architecture, so it can later be played online:
-- **Done:** `src/engine/`, a TypeScript rules engine with a seat-by-seat view of the game and bots that play from those views.
-- **Next:** a host that runs the engine in the page, with bots as seats.
-- **Then:** the UI switches over, with function components and a `useGame()` hook.
+It is built so it can later be played online. Three layers talk only through messages:
+- **`src/engine/`:** a TypeScript rules engine, with a seat-by-seat view of the game and bots that play from those views.
+- **`src/host/`:** a host that runs the engine (in the page, for now), with bots as seats. Everything talks through a transport that behaves like a network.
+- **`src/client/`** and the UI: your seat's view of the game, read through `useGame()`. Moves go to the host as commands.
 
-Until then, the UI still runs the old Redux loop in `App.jsx`. It uses the engine's rule and bot functions but not its game state.
+A real server (with WebSockets, a lobby and reconnects) is the next big step; the host and the messages are meant to move onto it as they are.
 
 ## Commands
 
@@ -30,14 +30,14 @@ npx vitest run src/engine/game.test.ts         # one file
 npx vitest run -t "checkSetrun"                # tests matching a name
 ```
 
-- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.js`. Engine tests start with `// @vitest-environment node`, which shows the engine needs no browser.
+- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.js`. Engine, host and client tests start with `// @vitest-environment node`, which shows they need no browser.
 - `.oxlintrc.json` turns on `no-undef`. Undefined identifiers were the main source of runtime crashes in this codebase, so treat lint errors as real bugs. `src/classes/` is excluded from lint (see below).
 - `tsconfig.json`:
-  - It is strict, and it checks `.ts` files only (`checkJs` is off).
+  - It is strict, and it checks `.ts` files only (`checkJs` is off). The UI is plain `.jsx`, and there are no React type definitions, so code that imports React (such as `use-game.js`) stays in `.js`.
   - `erasableSyntaxOnly` rules out enums, namespaces and constructor parameter properties, so Node can run the engine just by stripping its types.
   - Type-only imports need `import type` (`verbatimModuleSyntax`).
 - Files containing JSX must use the `.jsx` extension. Imports include explicit extensions (`./hand.jsx`, `./game.ts`). `@/` is an alias for `src/` (`vite.config.js`, `tsconfig.json`); the UI components use it.
-- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded through `ENV_VAR.IMG_DIR` (`src/store/constants.js`) by `src/components/game/cards.js`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`). The rest of `art/` is unused source card art; it is outside `public/` so it isn't copied into builds.
+- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded from Vite's base URL by `src/components/game/cards.js`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`). The rest of `art/` is unused source card art; it is outside `public/` so it isn't copied into builds.
 
 ## Game rules
 
@@ -71,18 +71,15 @@ These are the engine's rules (`src/engine/game.ts`).
 **End of a round**
 - A round ends as soon as a player's hand is empty.
 - Cards left in hand score points: an ace is 25, 10 through King are 10, and other cards are their face value.
+- The next round is dealt once every player has said they're ready. Bots are ready at once.
 
-**How the old loop still in the UI differs**
-- You always play first, as the last of the four seats.
-- Only AI turns open a claim window, so nobody can claim on your turn.
-- A player may claim back their own discard.
-- There's no limit on how many times the deck is reshuffled.
+In the game on the page, you are seat 0 of four, against "Opponent 1" to "Opponent 3".
 
 ## Architecture
 
 ### The engine (`src/engine/`)
 
-TypeScript with no React, DOM or Redux, so it can also run on a server. Every function is pure:
+TypeScript with no React or DOM, so it can also run on a server. Every function is pure:
 - Time comes in as `now`.
 - Randomness comes from a seeded generator whose state is in the game state (`random.ts`).
 - A game replays exactly from its seed and its commands.
@@ -91,9 +88,8 @@ TypeScript with no React, DOM or Redux, so it can also run on a server. Every fu
 - `createGame({names, seed})` deals round 1.
 - `apply(state, seat, command, now)` returns `{ok, state}` or `{ok: false, error}` with a message fit to show a player.
 - `expireClaims(state, now)` closes a claim window whose deadline has passed; the host calls it when the deadline comes.
-- `startNextRound(state)` deals the next round.
 - Every seat is the same. Whether a seat is a person or a bot is the host's business.
-- Commands name cards by id: `draw`, `claim`, `pass`, `goDown`, `addToSetrun`, `discard`.
+- Commands name cards by id: `draw`, `claim`, `pass`, `goDown`, `addToSetrun`, `discard`, and `ready` (for the next round).
 - `apply` copies the state with `structuredClone` and changes the copy, so a state object is never changed once made.
 
 **`view.ts`**
@@ -102,7 +98,7 @@ TypeScript with no React, DOM or Redux, so it can also run on a server. Every fu
 
 **`bot.ts`**
 - `botMove(view)` returns a bot's next command, or null while it waits. A bot sees only its own view.
-- It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards.
+- It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run).
 - `planGoDown` re-checks each setrun with `checkSetrun`, because `scoreHand` only estimates.
 - `worthTaking` stops the two take-and-throw-back loops the simulations found.
@@ -122,43 +118,50 @@ TypeScript with no React, DOM or Redux, so it can also run on a server. Every fu
 
 **`testing.ts`** has test shorthands: `card("10H")` and `cards("7C 7H 1D")`.
 
+### The host (`src/host/`)
+
+TypeScript with no React or DOM. It is the "server" for a game, run in the page for now. A seat is whatever is at the other end of a port, and the host treats every seat the same.
+
+- **`transport.ts`:** a `Port` is one end of a connection (`send`, `listen`, `close`). `createLocalPair` connects two ends in the page. Each message arrives a moment after it is sent, never during `send`, and as a copy made through JSON, as over a socket. A WebSocket can later be wrapped as a `Port`.
+- **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
+- **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
+- **`bot-player.ts`:** `startBot(port)` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
+- **`local-game.ts`:** `startLocalGame({name})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `App.jsx` starts one per game.
+- **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
+
+### The client (`src/client/`)
+
+- **`game-client.ts`:** `createGameClient(port)` listens to your seat's port and keeps a snapshot, `{view, refusal}`: the latest view, and the last command the host refused (`{command, error, seq}`). Each message replaces the snapshot whole. `send(command)` sends a command.
+- **`use-game.js`:** `useGame(client)` reads the snapshot with `useSyncExternalStore` and returns `{view, refusal, send}`.
+
 ### The UI
 
-- `src/components/game/` holds the presentational components. `game-table.jsx` lays out the table and works out what the human can do right now: valid setrun targets for the selected card (via `addToSetrun`), the gold "fits a meld" dots, the turn prompt, and whether the claim window is open. `go-down-dialog.jsx` keeps its slot picks in local state and only hands App the finished setruns.
+Function components only; there is no global store.
+- **`App.jsx`** shows the home screen, or a game. Starting a game calls `startLocalGame` and `createGameClient`. An effect stops the game's host and bots when the game is replaced or App unmounts.
+- **`game-screen.jsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
+  - the order of your hand: card ids, so arranged cards keep their places and new ones join on the right (`arrange`)
+  - the selected card, by id
+  - whether the go-down dialog is open
+  - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
+  - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
+  
+  It turns clicks into commands, and renders `GameTable` and the go-down and round-end dialogs.
+- **`game-table.jsx`** lays out the table from the view and works out what you can do right now: valid setrun targets for the selected card (via `addToSetrun`), the gold "fits a meld" dots, whether you can go down (`planGoDown`), and the turn prompt. While a claim window is open on your turn, you can't discard.
+- **`log-text.js`** turns `view.log` into words: the activity panel, each opponent's last move, and the "New" / "Claimed" / "Back" tag on the card you just got. **`players.js`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
+- `go-down-dialog.jsx` keeps its slot picks in local state and only hands back the finished setruns, as indices into your hand.
+- The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people.
 - `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`). They are copied into the repo to be edited: `button.jsx` sizes were raised so every button is at least 44px.
 - **Animation** uses Motion (`motion/react`):
   - Every element that shows a card on the table is a `MovingCard` (`playing-card.jsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.
   - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the opponents' setruns and hands are rendered for the current layout only (`useMediaQuery` in `game-table.jsx`), and the go-down dialog uses plain `PlayingCard`s.
-  - Opponents' hands are hidden. `HiddenHand` (`opponent-panel.jsx`) renders each of their cards as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
-  - The deck's top card and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
+  - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.jsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
+  - The deck's top card (by the id in `view.deck.top`) and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
   - In the hand, dnd-kit (`@dnd-kit/sortable`) does drag-to-reorder for mouse and touch, and Motion animates the lift, the sliding and the deal. `Hand` is keyed by round so each deal remounts it.
   - App wraps everything in `MotionConfig reducedMotion="user"`.
 - Styling is Tailwind utility classes. The theme lives in `src/index.css`: colour tokens (felt green, gold for "you can act here", violet for wild-ace badges), the fonts, and card sizes as CSS variables (`--hand-w`, `--pile-w`, `--meld-w`) that scale with the viewport.
   - Rows of setruns never wrap: `MeldRow` (`meld.jsx`) lowers `--meld-w` until a player's setruns fit on one line, the way the hand's overlap grows with its size.
   - Two custom variants trim the layout for small windows: `compact:` (height 780px or less) and `short:` (height 560px or less, i.e. a phone in landscape).
   - A phone held upright gets a "turn your phone sideways" screen.
-
-### The old loop (until the UI switches to the engine)
-
-**One connected component.** `src/App.jsx` is the only component connected to Redux 5 (react-redux `connect`), and `mapStateToProps` passes the whole store in as `props.state`. App holds every event handler and defines every dispatcher inline in `mapDispatchToProps`. It renders the home screen, or the table plus the go-down and round-end dialogs, and passes its handlers to the table as one `tableActions` object. The human is `state.player` and the AIs are `state.AI.players`.
-
-**State machine driven from `componentDidUpdate`.** `game.gameState` (values in `GAME_STATES`, `src/store/constants.js`) drives each turn:
-- The human's turn is `PW_DRAW_CARD → PW_PLAY`, and it advances only through click handlers.
-- Each AI's turn runs automatically: `AI_DRAW → AI_WAIT_ONE → AI_DRAW_OOT → AI_WAIT_TWO → AI_OOT_RESOLVE → AI_PLAY`.
-- In `AI_PLAY`, an AI that is down keeps adding cards to setruns, one action per update, until it can't. Each step (`App.AIPlayStep`) runs `AI_PACE.move` after the last. Then `FROM_AI_TO_DISCARD` passes the turn to the next AI, or back to `PW_DRAW_CARD`.
-- After each state change, `App.componentDidUpdate` checks whether the round has ended, runs the AI decision for the current state and dispatches the next action. It returns early when `props.state` hasn't changed. `setTimeout` delays from `AI_PACE` (`src/store/constants.js`) set the pace.
-
-These pieces of state keep that loop working. Preserve them when you add a reducer case:
-- `game.gameUpdate`: a case sets it to `true` only when `componentDidUpdate` should advance the AI loop. Every case sets it explicitly.
-- `AI.messageUpdate`: an array of the AI indices whose speech bubble was just set; `componentDidUpdate` clears those bubbles 2 seconds later. `null` when no new message was set.
-- `claimChoice`: the human's answer in the claim window, `"claim"` or `"pass"` (`null` until they answer), set by the UI-only actions `PLAYER_DRAW_OOT` and `PLAYER_PASS_OOT`. An answer ends the wait at once (`App.answerClaim` cancels the timer that `App.waitForClaim` set).
-
-**Reducer.** `src/store/reducer.js` is a chain of `if (action.type === …)` blocks using `immutability-helper`'s `update` and lodash `cloneDeep`; `{$set: …}` belongs only inside an `update()` spec. Action types are in `src/store/actions.js`, and the state shape is in `src/store/initial-state.js`. The reducer is wrapped in `withLog` (`src/store/log.js`), whose `describeAction` turns actions into activity-log entries. `player.newCard` (`{id, label}`) marks the card the human just drew, claimed or got back.
-
-**`src/game-functions/`** serves only this loop:
-- `deck-functions.js` builds and deals decks with ids like `"10H-3-1"`.
-- `AI-functions.js` adapts `engine/bot.ts` to the loop's state shape.
-- `params.js` sets the number of players.
 
 ## Card model
 
@@ -168,7 +171,7 @@ A card is the object `createCard` (`src/engine/cards.ts`) returns:
 {value: 1–13, suit: "C"|"D"|"H"|"S", displayString: "10H", id: "k3f9-17", ace?: {value: 1, suit, colour}}
 ```
 
-- In the engine, `id` is the game's prefix and a number given in shuffled order, so it says nothing about the card. Cards are renumbered whenever they are shuffled, so nobody can follow a card through a shuffle. Otherwise an id stays with the physical card wherever it goes, including wild-ace copies and an ace returned from a setrun. The UI uses ids for React keys, Motion `layoutId`s and dnd-kit.
+- `id` is the game's prefix and a number given in shuffled order, so it says nothing about the card. Cards are renumbered whenever they are shuffled, so nobody can follow a card through a shuffle. Otherwise an id stays with the physical card wherever it goes, including wild-ace copies and an ace returned from a setrun. The UI uses ids for React keys, Motion `layoutId`s and dnd-kit.
 - `displayString` is also the image filename. Aces are `1`, and J/Q/K are `11`/`12`/`13`.
 - Inside a setrun, a red ace is a copy whose `value` and `suit` are set to the card it stands in for. `card.ace` and `displayString` still identify it as the real ace.
 - A high ace in a run is a copy with `value: 14`.
@@ -180,8 +183,7 @@ A card is the object `createCard` (`src/engine/cards.ts`) returns:
 - *table*: the setruns a player has laid down.
 - *requirement*: the round's `{S, R}` pair.
 - *seat*: a player's place at the table, 0-based, in turn order.
-- *OOT*: out of turn (old loop).
-- *PW*: the human player's turn (old loop).
+- *view*: what one seat may see of the game (`viewFor`).
 
 ## Leftovers
 

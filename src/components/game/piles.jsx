@@ -1,19 +1,15 @@
+import {useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
 import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
-import {AI_PACE} from '@/store/constants.js';
 import {longName, shortName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.jsx';
 
-// How long the human has to claim a discard out of turn: the two halves of
-// the claim window (AI_WAIT_ONE and AI_WAIT_TWO in App.componentDidUpdate).
-const CLAIM_WINDOW_MS = 2 * AI_PACE.claimWait;
-
-// Claim or pass on the top discard. The claim button counts down while the
-// window is open; it is mounted when the window opens, so the countdown
-// starts then. Answering either way closes the window. It sits beside the
-// discard pile so the table doesn't move when it appears.
-function ClaimChoice({card, onClaim, onPass}) {
+// Claim or pass on the top discard. The claim button counts down the time
+// left (closesIn, ms) from when it mounts; later views don't restart it. It
+// sits beside the discard pile so the table doesn't move when it appears.
+function ClaimChoice({card, closesIn, onClaim, onPass}) {
+    let [duration] = useState(closesIn);
     return (
         <div className="flex items-center gap-1 rounded-2xl bg-card p-1 shadow-lg ring-1 ring-border">
             <button
@@ -26,7 +22,7 @@ function ClaimChoice({card, onClaim, onPass}) {
                     <circle
                         cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
                         pathLength="100" strokeDasharray="100"
-                        style={{animation : `claim-countdown ${CLAIM_WINDOW_MS}ms linear forwards`}}
+                        style={{animation : `claim-countdown ${duration}ms linear forwards`}}
                     />
                 </svg>
                 Claim {shortName(card)}
@@ -40,14 +36,15 @@ function ClaimChoice({card, onClaim, onPass}) {
 
 // The deck and the discard pile. A pile glows when clicking it does
 // something: discardAction is {chip, ariaLabel, onClick} when the discard pile
-// is live, and claim is {card, onClaim, onPass} while a claim window is open.
+// is live, and claim is {card, closesIn, onClaim, onPass} while you can claim.
 //
-// The deck's top card and the top two discards are MovingCards, so cards fly
-// out of and onto the piles. When a card leaves, AnimatePresence keeps it
-// long enough to cross-fade into what it becomes (a face in your hand, a back
-// in an opponent's). The second discard sits under the top one, so the pile
-// isn't empty while a card is in the air.
-function Piles({deckTop, deckCount, deckActive, onDeckClick, discard, discardAction, claim}) {
+// The deck's top card (deckTopId, as the view gives only its id) and the top
+// two discards are MovingCards, so cards fly out of and onto the piles. When
+// a card leaves, AnimatePresence keeps it long enough to cross-fade into what
+// it becomes (a face in your hand, a back in an opponent's). The second
+// discard sits under the top one, so the pile isn't empty while a card is in
+// the air.
+function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim}) {
     let discardTop = discard[0];
     return (
         <div className="flex items-start gap-8 short:gap-4">
@@ -64,8 +61,8 @@ function Piles({deckTop, deckCount, deckActive, onDeckClick, discard, discardAct
                 >
                     <CardBack className="w-full" />
                     <AnimatePresence initial={false}>
-                        {deckTop && (
-                            <MovingCard key={deckTop.id} id={deckTop.id} className="absolute inset-0">
+                        {deckTopId && (
+                            <MovingCard key={deckTopId} id={deckTopId} className="absolute inset-0">
                                 <CardBack className="size-full" />
                             </MovingCard>
                         )}
@@ -77,7 +74,7 @@ function Piles({deckTop, deckCount, deckActive, onDeckClick, discard, discardAct
             <div className="relative flex flex-col items-center gap-3 short:gap-1.5">
                 <AnimatePresence>
                     {claim && (
-                        <div className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2">
+                        <div key={claim.card.id} className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2">
                             <motion.div
                                 initial={{opacity : 0, scale : 0.8, x : -12}}
                                 animate={{opacity : 1, scale : 1, x : 0}}

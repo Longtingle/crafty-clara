@@ -1,21 +1,21 @@
 import {motion} from 'motion/react';
-import {actorName, actorColor} from './players.js';
 
 const SHOWN = 5;
 
-// The latest moves, newest first, so nothing the AI does goes unseen.
-function ActivityLog({log, AIPlayers}) {
+// The latest moves, newest first, so nothing an opponent does goes unseen.
+// entries: [{id, name, color, text}] (activityEntries in log-text.js).
+function ActivityLog({entries}) {
     return (
         <aside aria-label="Activity" className="w-[300px] max-w-full rounded-2xl bg-panel px-4 pt-3 pb-3.5">
             <div className="mb-2.5 flex items-baseline justify-between">
                 <h2 className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">Activity</h2>
                 <span className="text-xs text-muted-foreground">Newest first</span>
             </div>
-            {log.length === 0
+            {entries.length === 0
                 ? <p className="text-sm text-muted-foreground">Nothing yet this round.</p>
                 : (
                     <ol aria-live="polite" className="flex flex-col gap-2">
-                        {log.slice(0, SHOWN).map(entry => (
+                        {entries.slice(0, SHOWN).map(entry => (
                             <motion.li
                                 key={entry.id}
                                 layout="position"
@@ -27,9 +27,9 @@ function ActivityLog({log, AIPlayers}) {
                                 <span
                                     aria-hidden="true"
                                     className="mt-1 size-2.5 flex-none rounded-full ring-[1.5px] ring-white/50"
-                                    style={{backgroundColor : actorColor(entry.actor)}}
+                                    style={{backgroundColor : entry.color}}
                                 />
-                                <span><strong>{actorName(entry.actor, AIPlayers)}</strong> {entry.text}</span>
+                                <span><strong>{entry.name}</strong> {entry.text}</span>
                             </motion.li>
                         ))}
                     </ol>

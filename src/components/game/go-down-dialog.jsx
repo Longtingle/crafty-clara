@@ -3,7 +3,7 @@ import {Check, CircleAlert} from 'lucide-react';
 import {cn} from '@/lib/utils.js';
 import {Button} from '@/components/ui/button.jsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
-import {SET, RUN} from '@/store/constants.js';
+import {SET, RUN} from '@/engine/cards.ts';
 import {checkSetrun, explainSetrun} from '@/engine/setruns.ts';
 import {longName, setrunCaption, requirementText} from '@/engine/card-names.ts';
 import {PlayingCard, CardTag} from './playing-card.jsx';

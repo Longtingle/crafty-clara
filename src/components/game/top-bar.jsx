@@ -17,8 +17,8 @@ function RequirementChip({met, children}) {
 }
 
 // On short screens the opponent panels don't fit, so opponents show here as
-// chips, and their cards fly to and from the avatars (opponent.hand is only
-// set then).
+// chips, and their cards fly to and from the avatars (opponent.cards, their
+// card ids, is only set then).
 function OpponentChips({opponents}) {
     return (
         <ul aria-label="Opponents" className="hidden gap-1.5 short:flex">
@@ -36,7 +36,7 @@ function OpponentChips({opponents}) {
                         style={{backgroundColor : aiColor(opponent.index)}}
                     >
                         {opponent.index + 1}
-                        {opponent.hand && <HiddenHand cards={opponent.hand} className="top-0 left-1.5 w-3" />}
+                        {opponent.cards && <HiddenHand ids={opponent.cards} className="top-0 left-1.5 w-3" />}
                     </span>
                     <span className="sr-only">{opponent.name}:</span>
                     {opponent.count} cards{opponent.isDown && " · down"}

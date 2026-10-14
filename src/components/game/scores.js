@@ -1,27 +1,20 @@
-import {YOU_COLOR, aiColor} from './players.js';
+import {opponentSeats, opponentIndex, seatColor} from './players.js';
 
-// Rows for the Scoreboard. Whoever scored 0 in `round` went out that round.
-const scoreRows = (player, AIPlayers, round) => [
-    {
-        key : "you",
-        name : "You",
-        color : YOU_COLOR,
-        label : "You",
-        isYou : true,
-        points : player.points.points,
-        total : player.points.total,
-        wentOut : round !== undefined && player.points.points[round] === 0
-    },
-    ...AIPlayers.map((AIPlayer, index) => ({
-        key : "ai-" + index,
-        name : AIPlayer.name,
-        color : aiColor(index),
-        label : index + 1,
-        isYou : false,
-        points : AIPlayer.points.points,
-        total : AIPlayer.points.total,
-        wentOut : round !== undefined && AIPlayer.points.points[round] === 0
-    }))
-];
+// Rows for the Scoreboard, you first. With markWentOut, whoever went out this
+// round is marked (nobody, if the deck ran out).
+const scoreRows = (view, markWentOut = false) => [view.seat, ...opponentSeats(view)].map(seat => {
+    let player = view.seats[seat];
+    let isYou = seat === view.seat;
+    return {
+        key : seat,
+        name : isYou ? "You" : player.name,
+        color : seatColor(view, seat),
+        label : isYou ? "You" : opponentIndex(view, seat) + 1,
+        isYou,
+        points : player.scores,
+        total : player.total,
+        wentOut : markWentOut && view.wentOut === seat
+    };
+});
 
 export {scoreRows};

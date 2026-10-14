@@ -4,17 +4,18 @@ import {CardBack, MovingCard} from './playing-card.jsx';
 import {MeldRow} from './meld.jsx';
 import {aiColor} from './players.js';
 
-// Where an opponent's cards fly to and from. Their hand is hidden, so each
-// card is a small back, all stacked in one spot. A card that arrives shows
-// while it flies in, then fades out over the static card backs underneath;
-// the cards dealt at the start (initial={false}) start out hidden.
-function HiddenHand({cards, className}) {
+// Where an opponent's cards fly to and from. Their hand is hidden (the view
+// gives only the cards' ids), so each card is a small back, all stacked in one
+// spot. A card that arrives shows while it flies in, then fades out over the
+// static card backs underneath; the cards dealt at the start (initial={false})
+// start out hidden.
+function HiddenHand({ids, className}) {
     return (
         <AnimatePresence initial={false}>
-            {cards.map(card => (
+            {ids.map(id => (
                 <MovingCard
-                    key={card.id}
-                    id={card.id}
+                    key={id}
+                    id={id}
                     initial={{opacity : 1}}
                     animate={{opacity : 0, transition : {delay : 0.45, duration : 0.2}}}
                     className={cn("absolute", className)}
@@ -50,9 +51,9 @@ function Avatar({color, label, className}) {
 }
 
 // An opponent's name, status and score, with their setruns (children) below.
-// The line under the name shows what they are saying, or else their last move.
-function OpponentPanel({player, index, active, lastAction, children}) {
-    let speech = player.message.text;
+// player is their seat in the view. The line under the name shows what they
+// are saying, or else their last move.
+function OpponentPanel({player, index, active, speech, lastAction, children}) {
     let status = speech ? "“" + speech + "”" : (lastAction ?? "Waiting for their turn");
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
@@ -77,11 +78,11 @@ function OpponentPanel({player, index, active, lastAction, children}) {
                             <CardBack className="absolute top-0.5 left-0 w-[15px] -rotate-12 border-[1.5px]" />
                             <CardBack className="absolute top-0 left-1.5 w-[15px] border-[1.5px]" />
                             <CardBack className="absolute top-0.5 left-3 w-[15px] rotate-12 border-[1.5px]" />
-                            <HiddenHand cards={player.hand} className="top-0 left-1.5 w-[15px]" />
+                            <HiddenHand ids={player.cards} className="top-0 left-1.5 w-[15px]" />
                         </span>
-                        {player.hand.length} cards
+                        {player.cards.length} cards
                     </span>
-                    <span className="text-[13px] text-muted-foreground">{player.points.total} pts</span>
+                    <span className="text-[13px] text-muted-foreground">{player.total} pts</span>
                 </div>
             </div>
             <MeldRow setruns={player.isDown ? player.table : []} className="min-h-(--meld-row) items-start">

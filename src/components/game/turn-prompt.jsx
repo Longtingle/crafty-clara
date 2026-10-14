@@ -1,8 +1,9 @@
-import {Check} from 'lucide-react';
+import {Check, CircleAlert} from 'lucide-react';
 import {cn} from '@/lib/utils.js';
 
 // steps: [{label, state : "done" | "current" | "todo"}], or null when it's not your turn.
-function TurnPrompt({steps, text}) {
+// notice, when set, says why a move didn't work, in place of text.
+function TurnPrompt({steps, text, notice}) {
     return (
         <div
             role="status"
@@ -27,7 +28,14 @@ function TurnPrompt({steps, text}) {
                     ))}
                 </ol>
             )}
-            <p className="leading-snug short:text-sm">{text}</p>
+            {notice
+                ? (
+                    <p className="flex items-center gap-2 leading-snug text-warn short:text-sm">
+                        <CircleAlert className="size-4.5 flex-none" aria-hidden="true" />
+                        {notice}
+                    </p>
+                )
+                : <p className="leading-snug short:text-sm">{text}</p>}
         </div>
     );
 }
