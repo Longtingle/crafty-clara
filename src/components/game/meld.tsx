@@ -1,11 +1,16 @@
 import type {CSSProperties, ReactNode} from 'react';
+import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
 import {isWild, type Setrun} from '@/engine/cards.ts';
 import {setrunCaption} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard} from './playing-card.tsx';
 import type {MeldTarget} from './your-turn.ts';
+import {meldTarget} from './drop-targets.ts';
 
 interface MeldProps {
+    /** whose setrun it is, and which of theirs */
+    seat: number;
+    index: number;
     setrun: Setrun;
     /** what the selected card would do here, if it can go here */
     target: MeldTarget | null;
@@ -14,12 +19,14 @@ interface MeldProps {
 }
 
 // A setrun on the table. It is a button only while the selected card can be
-// added to it.
-function Meld({setrun, target, dimmed, onClick}: MeldProps) {
+// added to it, and a card dragged from your hand can be dropped on it then.
+function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
     let caption = setrunCaption(setrun);
     let hasWild = setrun.cards.some(isWild);
+    let {setNodeRef, isOver} = useDroppable({id : meldTarget(seat, index)});
     return (
         <button
+            ref={setNodeRef}
             type="button"
             disabled={!target}
             onClick={onClick}
@@ -27,6 +34,7 @@ function Meld({setrun, target, dimmed, onClick}: MeldProps) {
             className={cn(
                 "relative flex flex-none flex-col items-start gap-1.5 rounded-xl border-2 border-transparent bg-black/18 px-(--meld-pad-x) pt-3 pb-1.5 transition short:pt-2.5 short:pb-1",
                 target && "border-gold shadow-[0_0_0_5px_rgb(245_184_61/0.22)] hover:brightness-110",
+                target && isOver && "shadow-[0_0_0_7px_rgb(245_184_61/0.45)] brightness-110",
                 dimmed && "opacity-50"
             )}
         >

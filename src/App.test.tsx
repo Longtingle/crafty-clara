@@ -1,4 +1,4 @@
-import {render, screen, fireEvent, within, cleanup} from '@testing-library/react';
+import {render, screen, fireEvent, within, cleanup, waitFor} from '@testing-library/react';
 import App from './App.tsx';
 
 beforeEach(() => localStorage.clear());
@@ -49,4 +49,15 @@ it('goes back to the home screen from the choice of opponents', () => {
     fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
     fireEvent.click(screen.getByRole('button', {name : 'Back'}));
     expect(screen.getByRole('heading', {name : 'Crafty Clara'})).toBeInTheDocument();
+});
+
+it('pauses the game until you resume it', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    fireEvent.click(screen.getByRole('button', {name : 'Deal the cards'}));
+    await screen.findByRole('group', {name : 'Your hand'});
+    fireEvent.click(screen.getByRole('button', {name : 'Pause'}));
+    expect(await screen.findByRole('dialog', {name : 'Paused'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name : 'Resume'}));
+    await waitFor(() => expect(screen.queryByRole('dialog', {name : 'Paused'})).not.toBeInTheDocument());
 });

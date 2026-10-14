@@ -75,7 +75,7 @@ function App() {
 
     let screen;
     if (session) {
-        screen = <GameScreen client={session.client} levels={session.levels} onNewGame={newGame} />;
+        screen = <GameScreen client={session.client} levels={session.levels} pausing={session.game} onNewGame={newGame} />;
     } else if (choosing) {
         screen = <NewGame levels={levels} onLevelsChange={changeLevels} onDeal={deal} onBack={() => setChoosing(false)} />;
     } else {

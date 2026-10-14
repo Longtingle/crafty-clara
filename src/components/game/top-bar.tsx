@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import {Check, CircleHelp, Trophy} from 'lucide-react';
+import {Check, CircleHelp, Pause, Trophy} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Requirement} from '@/engine/cards.ts';
@@ -33,8 +33,9 @@ function RequirementChip({met, children}: {met: boolean; children: ReactNode}) {
 }
 
 // On short screens the opponent panels don't fit, so opponents show here as
-// chips, and their cards fly to and from the avatars. On narrower phones the
-// chips leave out the word "cards", so the buttons still fit.
+// chips, and their cards fly to and from the avatars. To leave room for the
+// buttons, an opponent who is down gets a tick on their avatar, and on
+// narrower phones the chips leave out the word "cards".
 function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
     return (
         <ul aria-label="Opponents" className="hidden gap-1.5 short:flex">
@@ -52,10 +53,16 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                         style={{backgroundColor : aiColor(opponent.index)}}
                     >
                         {opponent.index + 1}
+                        {opponent.isDown && (
+                            <span className="absolute -right-1 -bottom-1 grid size-3.5 place-items-center rounded-full bg-cream text-[#12402a]">
+                                <Check className="size-2.5" strokeWidth={4} />
+                            </span>
+                        )}
                         {opponent.cards && <HiddenHand ids={opponent.cards} className="top-0 left-1.5 w-3" />}
                     </span>
                     <span className="sr-only">{opponent.name}:</span>
-                    {opponent.count}<span className="max-[820px]:sr-only"> cards</span>{opponent.isDown && " · down"}
+                    {opponent.count}<span className="max-[820px]:sr-only"> cards</span>
+                    {opponent.isDown && <span className="sr-only">, down</span>}
                     {opponent.hard && (
                         <span className="rounded-full bg-cream px-1.5 text-[10px] tracking-wider text-[#12402a] uppercase">Hard</span>
                     )}
@@ -72,12 +79,13 @@ interface TopBarProps {
     requirement: Requirement;
     requirementMet: boolean;
     opponents: OpponentChip[];
+    onPause: () => void;
     onShowScores: () => void;
     onShowRules: () => void;
 }
 
-// Round, what this round needs, and the scores and rules.
-function TopBar({round, roundCount, requirement, requirementMet, opponents, onShowScores, onShowRules}: TopBarProps) {
+// Round, what this round needs, and pausing, the scores and the rules.
+function TopBar({round, roundCount, requirement, requirementMet, opponents, onPause, onShowScores, onShowRules}: TopBarProps) {
     return (
         <header className="grid h-15 min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-white/8 bg-black/34 px-6 short:flex short:h-11 short:gap-2 short:px-3">
             <div className="truncate font-heading text-2xl font-extrabold tracking-tight short:hidden">Crafty Clara</div>
@@ -91,6 +99,9 @@ function TopBar({round, roundCount, requirement, requirementMet, opponents, onSh
             <span className="hidden flex-1 short:block" />
             <OpponentChips opponents={opponents} />
             <nav aria-label="Game" className="flex justify-end gap-2 short:gap-1">
+                <Button variant="outline" onClick={onPause} className="short:size-11 short:px-0">
+                    <Pause aria-hidden="true" /><span className="short:sr-only">Pause</span>
+                </Button>
                 <Button variant="outline" onClick={onShowScores} className="short:size-11 short:px-0">
                     <Trophy aria-hidden="true" /><span className="short:sr-only">Scores</span>
                 </Button>

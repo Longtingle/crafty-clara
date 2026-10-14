@@ -71,6 +71,23 @@ describe('a local game', () => {
         expect(finish(3)).toEqual(finish(3));
     });
 
+    it('stands still while paused, and carries on when resumed', () => {
+        const clock = createTestClock();
+        const game = startLocalGame({name : "You", seed : 7, clock});
+        playAsYou(game.port, clock);
+        clock.advance(5000);
+        game.pause();
+        const paused = game.host.state();
+        clock.advance(60_000);
+        expect(game.host.state()).toBe(paused);
+
+        game.resume();
+        clock.advance(5000);
+        expect(game.host.state()).not.toBe(paused);
+        clock.runAll();
+        expect(game.host.state().phase).toBe("gameEnd");
+    });
+
     it('stops where it stands', () => {
         const clock = createTestClock();
         const game = startLocalGame({name : "You", seed : 7, clock});

@@ -3,7 +3,7 @@
 
 import type {BotLevel} from '../engine/bot.ts';
 import {random} from '../engine/random.ts';
-import {systemClock, type Clock} from './clock.ts';
+import {createPausableClock, systemClock, type Clock} from './clock.ts';
 import {createHost, type Host} from './host.ts';
 import {startBot, type BotPace} from './bot-player.ts';
 import {createLocalPair} from './transport.ts';
@@ -27,6 +27,13 @@ export interface LocalGame {
     /** your end of the connection: send commands on it, and listen for your views */
     port: SeatPort;
     host: Host;
+    /**
+     * Pauses the whole game: the host, the bots and the messages between you
+     * all wait on one clock, which stops. Claim windows keep the time they
+     * had left. In a game with other people, pausing will need their say.
+     */
+    pause(): void;
+    resume(): void;
     /** Ends the game: stops the bots and the host. */
     stop(): void;
 }
@@ -37,9 +44,10 @@ export const startLocalGame = ({
     levels = [],
     seed,
     claimWindowMs,
-    clock = systemClock,
+    clock : baseClock = systemClock,
     pace
 }: LocalGameOptions): LocalGame => {
+    let clock = createPausableClock(baseClock);
     let host = createHost({names : [name, ...opponents], seed, claimWindowMs, clock});
     const seat = (index: number): SeatPort => {
         let [seatEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
@@ -57,6 +65,8 @@ export const startLocalGame = ({
     return {
         port,
         host,
+        pause : () => clock.pause(),
+        resume : () => clock.resume(),
         stop() {
             bots.forEach(stop => stop());
             host.close();

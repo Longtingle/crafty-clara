@@ -1,10 +1,12 @@
 import {useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
+import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Card} from '@/engine/cards.ts';
 import {longName, shortName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.tsx';
+import {DECK_PILE, DISCARD_PILE} from './drop-targets.ts';
 
 /** What clicking the discard pile does, while it does something. */
 export interface PileAction {
@@ -25,9 +27,10 @@ export interface ClaimOffer {
 }
 
 // Claim or pass on the top discard. The claim button counts down the time
-// left from when it mounts; later views don't restart it. It sits beside the
-// discard pile so the table doesn't move when it appears.
-function ClaimChoice({card, closesIn, onClaim, onPass}: ClaimOffer) {
+// left from when it mounts; later views don't restart it, and it stops while
+// the game is paused. It sits beside the discard pile so the table doesn't
+// move when it appears.
+function ClaimChoice({card, closesIn, paused, onClaim, onPass}: ClaimOffer & {paused: boolean}) {
     let [duration] = useState(closesIn);
     return (
         <div className="flex items-center gap-1 rounded-2xl bg-card p-1 shadow-lg ring-1 ring-border">
@@ -41,7 +44,7 @@ function ClaimChoice({card, closesIn, onClaim, onPass}: ClaimOffer) {
                     <circle
                         cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
                         pathLength="100" strokeDasharray="100"
-                        style={{animation : `claim-countdown ${duration}ms linear forwards`}}
+                        style={{animation : `claim-countdown ${duration}ms linear forwards`, animationPlayState : paused ? "paused" : "running"}}
                     />
                 </svg>
                 Claim {shortName(card)}
@@ -63,6 +66,8 @@ interface PilesProps {
     discard: Card[];
     discardAction: PileAction | null;
     claim: ClaimOffer | null;
+    /** whether the game is paused, which stops the claim countdown */
+    paused: boolean;
 }
 
 // The deck and the discard pile. A pile glows when clicking it does
@@ -73,12 +78,17 @@ interface PilesProps {
 // long enough to cross-fade into what it becomes (a face in your hand, a back
 // in an opponent's). The second discard sits under the top one, so the pile
 // isn't empty while a card is in the air.
-function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim}: PilesProps) {
+function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim, paused}: PilesProps) {
     let discardTop = discard[0];
+    // a card dragged from your hand can be dropped on the discard pile, and is
+    // turned away from the deck
+    let {setNodeRef : deckRef} = useDroppable({id : DECK_PILE});
+    let {setNodeRef : pileRef, isOver : overPile} = useDroppable({id : DISCARD_PILE});
     return (
         <div className="flex items-start gap-8 short:gap-4">
             <div className="flex flex-col items-center gap-3 short:gap-1.5">
                 <button
+                    ref={deckRef}
                     type="button"
                     disabled={!deckActive}
                     onClick={onDeckClick}
@@ -110,12 +120,13 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                                 exit={{opacity : 0, scale : 0.9}}
                                 transition={{type : "spring", duration : 0.35, bounce : 0.3}}
                             >
-                                <ClaimChoice {...claim} />
+                                <ClaimChoice {...claim} paused={paused} />
                             </motion.div>
                         </div>
                     )}
                 </AnimatePresence>
                 <button
+                    ref={pileRef}
                     type="button"
                     disabled={!discardAction}
                     onClick={discardAction?.onClick}
@@ -123,8 +134,9 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                         ? discardAction.label
                         : "Discard pile" + (discardTop ? ", " + longName(discardTop) + " on top" : ", empty")}
                     className={cn(
-                        "relative w-(--pile-w) rounded-[5%/3.3%] shadow-[0_12px_24px_rgb(0_0_0/0.4)]",
-                        discardAction && "pulse-gold"
+                        "relative w-(--pile-w) rounded-[5%/3.3%] shadow-[0_12px_24px_rgb(0_0_0/0.4)] transition-transform",
+                        discardAction && "pulse-gold",
+                        discardAction && overPile && "scale-105"
                     )}
                 >
                     <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />

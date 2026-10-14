@@ -174,8 +174,10 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
 - **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
 - **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game. In development, `?seed=N` in the URL fixes the deal.
-- **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
+- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game. In development, `?seed=N` in the URL fixes the deal.
+- **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default.
+  - A local game wraps its clock in `createPausableClock`, so pausing stops everything at once. Timers wait, and time spent paused doesn't count, so a claim window keeps the time it had left.
+  - Pausing a game with other people will need a host command and their say. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
 
 ### The client (`src/client/`)
 
@@ -196,6 +198,8 @@ Function components only; there is no global store.
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
+  - whether the game is paused: the top bar's Pause button calls `pause()` on the game, and the Paused dialog (`pause-dialog.tsx`) resumes it. The claim countdown stops meanwhile.
+  - the card being dragged, which counts as the selected card while it's dragged
   
   It works out what you can do (`yourTurn`), turns clicks into commands (`TableActions`), and renders `GameTable` and the go-down and round-end dialogs.
 - **`your-turn.ts`** (`yourTurn(view, hand, selectedIndex)`) works out what you can do right now, with no React, so it is tested on its own:
@@ -213,7 +217,12 @@ Function components only; there is no global store.
   - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the opponents' setruns and hands are rendered for the current layout only (`useMediaQuery` in `game-table.tsx`; on short screens their setruns are `CompactMelds`), and the go-down dialog uses plain `PlayingCard`s.
   - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.tsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
   - The deck's top card (by the id in `view.deck.top`) and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
-  - In the hand, dnd-kit (`@dnd-kit/sortable`) does drag-to-reorder for mouse and touch, and Motion animates the lift, the sliding and the deal. `Hand` is keyed by round so each deal remounts it.
+  - dnd-kit does the dragging, for mouse and touch. `TableDnd` (`table-dnd.tsx`) wraps the whole table:
+    - **Targets:** a card from the hand can be dropped back in the hand to reorder it (`@dnd-kit/sortable`), on the discard pile to discard it, or on a meld it fits to add it. The drop targets' ids are in `drop-targets.ts`.
+    - **Highlights:** while dragged, the card counts as the selected one, so the table lights up where it can go. A drop anywhere else puts it back.
+    - **Following the pointer:** dnd-kit's sortable only moves the dragged card while it's over the hand, so `HandCard` follows the pointer itself (`useDndMonitor`).
+    - **After a drop:** a card played by a drop stays where it was dropped (`PlayedCard`) and is measured there, so Motion flies it on from that spot without a jump back into the hand.
+  - Motion animates the lift, the sliding and the deal. `Hand` is keyed by round so each deal remounts it.
   - App wraps everything in `MotionConfig reducedMotion="user"`.
 - Styling is Tailwind utility classes. The theme lives in `src/index.css`: colour tokens (felt green, gold for "you can act here", violet for wild-ace badges), the fonts, and card sizes as CSS variables (`--hand-w`, `--pile-w`, `--meld-w`) that scale with the viewport.
   - Rows of setruns never wrap: `MeldRow` (`meld.tsx`) lowers `--meld-w` until a player's setruns fit on one line, the way the hand's overlap grows with its size.
