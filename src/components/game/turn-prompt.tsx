@@ -15,7 +15,7 @@ function TurnPrompt({steps, text, notice}: TurnPromptProps) {
         <div
             role="status"
             aria-live="polite"
-            className="flex min-h-17 max-w-[720px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-black/30 px-5 py-2.5 text-center compact:min-h-0 compact:py-2 short:px-3 short:py-1"
+            className="flex min-h-17 max-w-[720px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-black/30 px-5 py-2.5 text-center compact:min-h-0 compact:py-2"
         >
             {steps && (
                 <ol aria-label="Turn steps" className="flex items-center gap-2.5 text-[13px] compact:hidden">
@@ -37,12 +37,12 @@ function TurnPrompt({steps, text, notice}: TurnPromptProps) {
             )}
             {notice
                 ? (
-                    <p className="flex items-center gap-2 leading-snug text-warn short:text-sm">
+                    <p className="flex items-center gap-2 leading-snug text-warn">
                         <CircleAlert className="size-4.5 flex-none" aria-hidden="true" />
                         {notice}
                     </p>
                 )
-                : <p className="leading-snug short:text-sm">{text}</p>}
+                : <p className="leading-snug">{text}</p>}
         </div>
     );
 }

@@ -1,3 +1,4 @@
+import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
@@ -17,8 +18,10 @@ interface RoundEndDialogProps {
 
 // Shown when a round ends. After the last round it names the winner (lowest
 // total) and offers a new game. The next round is dealt once everyone is
-// ready, so once you are, it says who it's waiting for.
+// ready, so once you are, it says who it's waiting for. On a phone it fills
+// the screen: the result on the left, the scores on the right.
 function RoundEndDialog({view, onReady, onNewGame}: RoundEndDialogProps) {
+    let short = useMediaQuery("(max-height: 560px)");
     if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
     let {round, rounds : roundCount} = view;
@@ -44,6 +47,47 @@ function RoundEndDialog({view, onReady, onNewGame}: RoundEndDialogProps) {
         ? (isFinalRound ? "Lowest total wins." : "You're in the lead.")
         : "You're " + (you.total - leader.total) + " points behind " + leader.name + ".";
 
+    let button;
+    if (isFinalRound) button = <Button size="lg" onClick={onNewGame}>New game</Button>;
+    else if (!ready) button = <Button size="lg" onClick={onReady}>Start round {round + 2}</Button>;
+    else button = <Button size="lg" disabled>Waiting for {waitingFor.join(", ")}</Button>;
+    let nextUp = !isFinalRound && (
+        <div className="flex flex-col items-end gap-1 rounded-xl bg-white/6 px-3.5 py-2.5 short:items-start short:gap-0.5 short:px-3 short:py-2">
+            <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase short:text-[10.5px]">Next up</span>
+            <span className="font-bold short:text-sm">Round {round + 2} · {requirementText(ROUND_REQUIREMENTS[round + 1])}</span>
+        </div>
+    );
+
+    if (short) {
+        let points = you.points[round] ?? 0;
+        return (
+            <Dialog open>
+                <DialogContent
+                    showCloseButton={false}
+                    onEscapeKeyDown={keepOpen}
+                    onPointerDownOutside={keepOpen}
+                    className="top-0 left-0 grid h-dvh max-w-none translate-x-0 translate-y-0 grid-cols-[min(15rem,32vw)_minmax(0,1fr)] gap-5 rounded-none bg-card px-5 py-4 ring-0 sm:max-w-none"
+                >
+                    <div className="flex min-h-0 flex-col gap-2">
+                        <span className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{eyebrow}</span>
+                        <DialogTitle className="text-[28px] leading-none">{title}</DialogTitle>
+                        <DialogDescription className="text-[13px] leading-snug">
+                            {view.wentOut === null && "Nobody went out before the deck ran out for the third time. "}
+                            {(points === 0) ? "You scored nothing this round. " : "You were left holding " + points + " points. "}
+                            {standing}
+                        </DialogDescription>
+                        {nextUp}
+                        <span className="flex-1" />
+                        {button}
+                    </div>
+                    <div className="min-h-0 self-center overflow-y-auto">
+                        <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} compact />
+                    </div>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
         <Dialog open>
             <DialogContent
@@ -61,19 +105,12 @@ function RoundEndDialog({view, onReady, onNewGame}: RoundEndDialogProps) {
                             Cards left in hand count against you. Lowest total after round {roundCount} wins.
                         </DialogDescription>
                     </DialogHeader>
-                    {!isFinalRound && (
-                        <div className="flex flex-col items-end gap-1 rounded-xl bg-white/6 px-3.5 py-2.5">
-                            <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Next up</span>
-                            <span className="font-bold">Round {round + 2} · {requirementText(ROUND_REQUIREMENTS[round + 1])}</span>
-                        </div>
-                    )}
+                    {nextUp}
                 </div>
                 <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} />
                 <DialogFooter>
                     <span className="text-sm text-muted-foreground sm:mr-auto">{standing}</span>
-                    {isFinalRound && <Button size="lg" onClick={onNewGame}>New game</Button>}
-                    {!isFinalRound && !ready && <Button size="lg" onClick={onReady}>Start round {round + 2}</Button>}
-                    {!isFinalRound && ready && <Button size="lg" disabled>Waiting for {waitingFor.join(", ")}</Button>}
+                    {button}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

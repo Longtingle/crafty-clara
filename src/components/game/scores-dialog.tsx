@@ -1,3 +1,4 @@
+import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import type {GameView} from '@/engine/view.ts';
 import Scoreboard from './scoreboard.tsx';
@@ -11,9 +12,11 @@ interface ScoresDialogProps {
 
 function ScoresDialog({open, onOpenChange, view}: ScoresDialogProps) {
     let roundsPlayed = view.seats[view.seat].scores.length;
+    // a phone gets the tighter table, so it fits without scrolling
+    let short = useMediaQuery("(max-height: 560px)");
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[880px]">
+            <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[880px] short:max-h-[calc(100dvh-1rem)] short:gap-3 short:p-4">
                 <DialogHeader>
                     <DialogTitle>Scores</DialogTitle>
                     <DialogDescription>
@@ -22,7 +25,7 @@ function ScoresDialog({open, onOpenChange, view}: ScoresDialogProps) {
                             : "Lowest total after round " + view.rounds + " wins."}
                     </DialogDescription>
                 </DialogHeader>
-                {roundsPlayed > 0 && <Scoreboard rows={scoreRows(view)} roundCount={view.rounds} />}
+                {roundsPlayed > 0 && <Scoreboard rows={scoreRows(view)} roundCount={view.rounds} compact={short} />}
             </DialogContent>
         </Dialog>
     );

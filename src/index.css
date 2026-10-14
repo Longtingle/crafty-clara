@@ -93,19 +93,24 @@
     /* a setrun's side padding, and the gap between setruns in a row */
     --meld-pad-x: 10px;
     --meld-gap: 14px;
+    /* how much of each card in a setrun shows from under the next, as a share of its width */
+    --meld-strip: 0.38;
     /* height of a setrun block: card, padding and caption */
     --meld-row: calc(var(--meld-w) * 1.528 + 44px);
 }
 
-/* Phones in landscape: opponents move into the top bar, so cards can be taller. */
+/* Phones in landscape (phone-table.tsx): the hand is an arch along the bottom
+   edge with only the top of each card showing, so its cards can be big, and
+   the piles overhang the right edge. */
 @media (max-height: 560px) {
     :root {
-        --hand-w: clamp(48px, min(8vw, 17vh), 90px);
-        --pile-w: clamp(44px, min(7.5vw, 16vh), 80px);
-        --meld-w-full: clamp(30px, min(4.8vw, 10.5vh), 52px);
-        --meld-pad-x: 6px;
-        --meld-gap: 8px;
-        --meld-row: calc(var(--meld-w) * 1.528 + 24px);
+        --hand-w: clamp(56px, min(11vw, 26vh), 96px);
+        /* how much of the hand shows: enough for the corners of the end cards (arch.ts) */
+        --hand-show: calc(var(--hand-w) * 0.84);
+        --pile-w: clamp(44px, min(9vw, 20vh), 80px);
+        --meld-pad-x: 2px;
+        --meld-gap: 6px;
+        --meld-strip: 0.3;
     }
 }
 
@@ -157,7 +162,7 @@
     margin-left: calc(min(var(--hand-w) * 0.6, (100cqi - var(--hand-w)) / max(var(--n) - 1, 1)) - var(--hand-w));
   }
   .meld-fan > * + * {
-    margin-left: calc(var(--meld-w) * -0.62);
+    margin-left: calc(var(--meld-w) * (var(--meld-strip) - 1));
   }
 }
 

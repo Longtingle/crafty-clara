@@ -32,9 +32,11 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
             onClick={onClick}
             aria-label={caption + (hasWild ? ", with a wild ace" : "") + (target ? ". " + target.label : "")}
             className={cn(
-                "relative flex flex-none flex-col items-start gap-1.5 rounded-xl border-2 border-transparent bg-black/18 px-(--meld-pad-x) pt-3 pb-1.5 transition short:pt-2.5 short:pb-1",
-                target && "border-gold shadow-[0_0_0_5px_rgb(245_184_61/0.22)] hover:brightness-110",
-                target && isOver && "shadow-[0_0_0_7px_rgb(245_184_61/0.45)] brightness-110",
+                "relative flex flex-none flex-col items-start gap-1.5 rounded-xl border-2 border-transparent bg-black/18 px-(--meld-pad-x) pt-3 pb-1.5 transition",
+                // on a phone, just the cards, in their player's quarter of the table
+                "short:rounded-md short:border-0 short:bg-transparent short:py-(--meld-pad-x)",
+                target && "border-gold shadow-[0_0_0_5px_rgb(245_184_61/0.22)] hover:brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_7px_rgb(245_184_61/0.25)]",
+                target && isOver && "shadow-[0_0_0_7px_rgb(245_184_61/0.45)] brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_9px_rgb(245_184_61/0.45)]",
                 dimmed && "opacity-50"
             )}
         >
@@ -48,7 +50,7 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
             {/* as wide as the cards, never wider, so MeldRow's sums hold */}
             <span className="w-0 min-w-full truncate text-xs text-muted-foreground short:hidden">{caption}</span>
             {target && (
-                <span className="absolute -top-3 right-2 rounded-full bg-gold px-2 py-0.5 text-xs font-bold whitespace-nowrap text-gold-foreground">
+                <span className="absolute -top-3 right-2 z-10 rounded-full bg-gold px-2 py-0.5 text-xs font-bold whitespace-nowrap text-gold-foreground short:-top-2.5 short:-right-2 short:py-px short:text-[11px]">
                     {target.label}
                 </span>
             )}
@@ -59,14 +61,15 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
 // Setruns side by side. Their cards shrink so the row fits its width, the way
 // the hand's overlap does, so a row of setruns never wraps and pushes the
 // table down. A setrun is as wide as its fan of cards (each card after the
-// first adds 38% of a card width, see .meld-fan) plus a 2px border and
-// --meld-pad-x on each side; --meld-gap separates them. Wrapping is left on
-// only for when the cards hit their smallest size.
+// first adds --meld-strip of a card width, see .meld-fan) plus a 2px border
+// and --meld-pad-x on each side; --meld-gap separates them. Wrapping is left
+// on only for when the cards hit their smallest size.
 function MeldRow({setruns, className, children}: {setruns: Setrun[]; className?: string; children: ReactNode}) {
-    let cardWidths = setruns.reduce((sum, setrun) => sum + 1 + 0.38 * (setrun.cards.length - 1), 0);
+    let overlapped = setruns.reduce((sum, setrun) => sum + setrun.cards.length - 1, 0);
+    let cardWidths = setruns.length + " + var(--meld-strip) * " + overlapped;
     let fixed = setruns.length + " * (2 * var(--meld-pad-x) + 4px) + " + Math.max(setruns.length - 1, 0) + " * var(--meld-gap) + 2px";
     let fit = setruns.length
-        ? {"--meld-w" : "max(26px, min(var(--meld-w-full), (100cqi - (" + fixed + ")) / " + cardWidths + "))"} as CSSProperties
+        ? {"--meld-w" : "max(26px, min(var(--meld-w-full), (100cqi - (" + fixed + ")) / (" + cardWidths + ")))"} as CSSProperties
         : undefined;
     return (
         <div className={cn("@container flex w-full flex-wrap gap-(--meld-gap)", className)} style={fit}>

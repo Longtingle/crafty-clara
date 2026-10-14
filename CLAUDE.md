@@ -206,15 +206,21 @@ Function components only; there is no global store.
   - where the selected card can go (via `addToSetrun`), and the gold "fits a meld" dots
   - what the deck and the discard pile do if clicked. While a claim window is open on your turn, you can't discard.
   - whether the go-down dialog can open. Nothing says whether your hand is ready to go down: spotting that is part of the game.
-  - the turn prompt and its steps
-- **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic.
+  - the turn prompt and its steps, and a brief prompt for the status line on a phone
+- **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic. Short screens (560px high or less: a phone held sideways) get **`phone-table.tsx`** instead:
+  - The top bar holds everyone as chips, with your points in a "You" chip. Pause, Scores, Rules and Full screen go in a ☰ menu.
+  - A status line under it says what an opponent last did or said, and what you can do (`brief`).
+  - Every player's melds have a fixed place in a grid two rows high (`seatPlaces` in `players.ts`): you at the bottom left, the others round clockwise in turn order. A player who isn't down has a dashed "Not down yet" place, where your own shows a Go down button while you can go down. Melds stay on one line, their cards sized to the place's height (`--meld-w-full`, with `cqh` units).
+  - The deck and the discard pile are stacked, overhanging the right edge.
+  - Your hand is an arch along the bottom edge, showing only the top of each card (`arch.ts`, `--hand-show`). However many cards you hold, each card's corner (value and suit) stays on the screen.
+  - Its root is `overflow: clip`, not `hidden`: the browser can scroll a `hidden` box to show a card you tap, and the hand and piles hang off the edges.
 - **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
-- `go-down-dialog.tsx` keeps its slot picks in local state and only hands back the finished setruns, as indices into your hand.
-- The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people.
+- `go-down-dialog.tsx` keeps its slot picks in local state (`useSlots`) and only hands back the finished setruns, as indices into your hand. On a phone it's a sheet that fills the screen: the slots across the top, your hand in the arch along the bottom.
+- The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people. On a phone it fills the screen, with the result on the left and a compact `Scoreboard` on the right.
 - `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`, which writes `.tsx`). They are copied into the repo to be edited: `button.tsx` sizes were raised so every button is at least 44px.
 - **Animation** uses Motion (`motion/react`):
   - Every element that shows a card on the table is a `MovingCard` (`playing-card.tsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.
-  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the opponents' setruns and hands are rendered for the current layout only (`useMediaQuery` in `game-table.tsx`; on short screens their setruns are `CompactMelds`), and the go-down dialog uses plain `PlayingCard`s.
+  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the table is rendered for the current layout only (`useMediaQuery` in `game-table.tsx` picks the wide layout or `PhoneTable`), and the go-down dialog uses plain `PlayingCard`s.
   - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.tsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
   - The deck's top card (by the id in `view.deck.top`) and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
   - dnd-kit does the dragging, for mouse and touch. `TableDnd` (`table-dnd.tsx`) wraps the whole table:
@@ -226,7 +232,7 @@ Function components only; there is no global store.
   - App wraps everything in `MotionConfig reducedMotion="user"`.
 - Styling is Tailwind utility classes. The theme lives in `src/index.css`: colour tokens (felt green, gold for "you can act here", violet for wild-ace badges), the fonts, and card sizes as CSS variables (`--hand-w`, `--pile-w`, `--meld-w`) that scale with the viewport.
   - Rows of setruns never wrap: `MeldRow` (`meld.tsx`) lowers `--meld-w` until a player's setruns fit on one line, the way the hand's overlap grows with its size.
-  - Two custom variants trim the layout for small windows: `compact:` (height 780px or less) and `short:` (height 560px or less, i.e. a phone in landscape).
+  - Two custom variants trim the layout for small windows: `compact:` (height 780px or less) and `short:` (height 560px or less, i.e. a phone in landscape). `short:` styles the pieces `PhoneTable` shares with the wide table (the top bar, the piles, the melds).
   - A phone held upright gets a "turn your phone sideways" screen.
 
 ## Card model

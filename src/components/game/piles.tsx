@@ -10,6 +10,7 @@ import {DECK_PILE, DISCARD_PILE} from './drop-targets.ts';
 
 /** What clicking the discard pile does, while it does something. */
 export interface PileAction {
+    move: "take" | "discard";
     /** the tag on the pile */
     chip: string;
     /** for screen readers */
@@ -73,11 +74,20 @@ interface PilesProps {
 // The deck and the discard pile. A pile glows when clicking it does
 // something.
 //
+// On a phone they're stacked, overhanging the right edge of the screen, so
+// their tags sit inside the part that shows, or beside the pile.
+//
 // The deck's top card and the top two discards are MovingCards, so cards fly
 // out of and onto the piles. When a card leaves, AnimatePresence keeps it
 // long enough to cross-fade into what it becomes (a face in your hand, a back
 // in an opponent's). The second discard sits under the top one, so the pile
 // isn't empty while a card is in the air.
+// A pile's tag sits centred on its top edge, or on a phone, at the bottom of
+// the part of the pile that shows (a short tag), or beside the pile (a long one).
+const tagCentred = "left-1/2 -translate-x-1/2 short:translate-x-0";
+const tagInside = "short:top-auto short:bottom-2 short:left-1 short:px-1.5 short:text-[10px] short:tracking-wide";
+const tagBeside = "short:top-auto short:bottom-[18%] short:right-[calc(100%+6px)] short:left-auto";
+
 function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim, paused}: PilesProps) {
     let discardTop = discard[0];
     // a card dragged from your hand can be dropped on the discard pile, and is
@@ -85,8 +95,8 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
     let {setNodeRef : deckRef} = useDroppable({id : DECK_PILE});
     let {setNodeRef : pileRef, isOver : overPile} = useDroppable({id : DISCARD_PILE});
     return (
-        <div className="flex items-start gap-8 short:gap-4">
-            <div className="flex flex-col items-center gap-3 short:gap-1.5">
+        <div className="flex items-start gap-8 short:flex-col short:gap-2">
+            <div className="flex flex-col items-center gap-3">
                 <button
                     ref={deckRef}
                     type="button"
@@ -106,14 +116,20 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                             </MovingCard>
                         )}
                     </AnimatePresence>
-                    {deckActive && <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">Draw</CardTag>}
+                    <span className="absolute top-1 left-1 z-10 hidden rounded-full bg-black/55 px-1.5 text-[11px] font-bold text-cream short:block">
+                        {deckCount}
+                    </span>
+                    {deckActive && <CardTag className={cn(tagCentred, tagInside, "bg-gold text-gold-foreground")}>Draw</CardTag>}
                 </button>
-                <span className="text-[13px] text-muted-foreground">Deck · {deckCount} left</span>
+                <span className="text-[13px] text-muted-foreground short:hidden">Deck · {deckCount} left</span>
             </div>
-            <div className="relative flex flex-col items-center gap-3 short:gap-1.5">
+            <div className="relative flex flex-col items-center gap-3">
                 <AnimatePresence>
                     {claim && (
-                        <div key={claim.card.id} className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2">
+                        <div
+                            key={claim.card.id}
+                            className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2 short:right-full short:left-auto short:mr-3 short:ml-0"
+                        >
                             <motion.div
                                 initial={{opacity : 0, scale : 0.8, x : -12}}
                                 animate={{opacity : 1, scale : 1, x : 0}}
@@ -148,10 +164,12 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                         ))}
                     </AnimatePresence>
                     {discardAction && (
-                        <CardTag className="left-1/2 -translate-x-1/2 bg-gold text-gold-foreground">{discardAction.chip}</CardTag>
+                        <CardTag className={cn(tagCentred, (discardAction.move === "take") ? tagInside : tagBeside, "bg-gold text-gold-foreground")}>
+                            {discardAction.chip}
+                        </CardTag>
                     )}
                 </button>
-                <span className="text-[13px] text-muted-foreground">Discard pile</span>
+                <span className="text-[13px] text-muted-foreground short:hidden">Discard pile</span>
             </div>
         </div>
     );

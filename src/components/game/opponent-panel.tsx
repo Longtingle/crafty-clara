@@ -1,10 +1,10 @@
 import type {ReactNode} from 'react';
 import {AnimatePresence} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
-import type {GameView, SeatView} from '@/engine/view.ts';
+import type {SeatView} from '@/engine/view.ts';
 import {CardBack, MovingCard} from './playing-card.tsx';
 import {MeldRow} from './meld.tsx';
-import {aiColor, opponentIndex} from './players.ts';
+import {aiColor} from './players.ts';
 
 // Where an opponent's cards fly to and from. Their hand is hidden (the view
 // gives only the cards' ids), so each card is a small back, all stacked in one
@@ -46,7 +46,7 @@ function Avatar({color, label, className}: {color: string; label: ReactNode; cla
     return (
         <span
             aria-hidden="true"
-            className={cn("grid size-11 flex-none place-items-center rounded-full font-bold text-white short:size-8", className)}
+            className={cn("grid size-11 flex-none place-items-center rounded-full font-bold text-white", className)}
             style={{backgroundColor : color}}
         >
             {label}
@@ -75,10 +75,10 @@ function OpponentPanel({player, index, hard, active, speech, lastAction, childre
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
             <div className={cn(
-                "flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-2.5 compact:py-1.5 short:px-2.5",
+                "flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-2.5 compact:py-1.5",
                 active ? "border-gold" : "border-border"
             )}>
-                <Avatar color={aiColor(index)} label={index + 1} className="text-lg short:text-sm" />
+                <Avatar color={aiColor(index)} label={index + 1} className="text-lg" />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                         <span className="truncate font-bold">{player.name}</span>
@@ -86,7 +86,7 @@ function OpponentPanel({player, index, hard, active, speech, lastAction, childre
                         {active && <Chip tone="gold">Playing</Chip>}
                         {player.isDown && <Chip>Down</Chip>}
                     </div>
-                    <span className={cn("truncate text-[13px] text-muted-foreground short:hidden", speech && "italic")}>
+                    <span className={cn("truncate text-[13px] text-muted-foreground", speech && "italic")}>
                         {status}
                     </span>
                 </div>
@@ -114,25 +114,4 @@ function OpponentPanel({player, index, hard, active, speech, lastAction, childre
     );
 }
 
-// On short screens there's no room for the opponent panels, so the setruns
-// of the opponents who are down sit beside the piles, each player's marked
-// with their number. melds renders a seat's setruns.
-function CompactMelds({view, seats, melds}: {view: GameView; seats: number[]; melds: (seat: number) => ReactNode}) {
-    let down = seats.filter(seat => view.seats[seat].isDown);
-    if (down.length === 0) return <p className="my-auto text-sm text-muted-foreground">No opponent is down yet.</p>;
-    return down.map(seat => (
-        <div key={seat} className="flex items-start gap-1.5">
-            <span
-                aria-hidden="true"
-                className="mt-2.5 grid size-5 flex-none place-items-center rounded-full text-[11px] font-bold text-white"
-                style={{backgroundColor : aiColor(opponentIndex(view, seat))}}
-            >
-                {opponentIndex(view, seat) + 1}
-            </span>
-            <span className="sr-only">{view.seats[seat].name}</span>
-            <div className="flex flex-wrap gap-1.5">{melds(seat)}</div>
-        </div>
-    ));
-}
-
-export {OpponentPanel, CompactMelds, HiddenHand, Chip, Avatar};
+export {OpponentPanel, HiddenHand, Chip, Avatar};

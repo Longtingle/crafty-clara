@@ -40,6 +40,7 @@ describe('yourTurn', () => {
         expect(turn.discardPile).toMatchObject({move : "take", chip : "Take"});
         expect(turn.steps?.map(step => step.state)).toEqual(["current", "todo", "todo"]);
         expect(turn.prompt).toBe("You start this round. Draw from the deck or take the " + shortName(view.discard[0]) + ".");
+        expect(turn.brief).toBe("You start: draw, or take the " + shortName(view.discard[0]));
         expect(turn.goDown).toMatchObject({enabled : false, hint : "Draw a card first"});
     });
 
@@ -72,8 +73,11 @@ describe('yourTurn', () => {
         const add = yourTurn(view, hand, 1);
         expect(add.targets[1][0]).toMatchObject({label : "Add 8♠", returnedAce : null});
         expect(add.prompt).toBe("Add 8♠ to a highlighted meld, or discard it to end your turn.");
+        expect(add.brief).toBe("Add 8♠ to a gold meld, or discard it");
+        expect(swap.brief).toBe("Swap 5♠ for the wild A♥, or discard it");
 
         expect(yourTurn(view, hand, 3).prompt).toBe("2♣ doesn't fit any meld. Discard it to end your turn.");
+        expect(yourTurn(view, hand, 3).brief).toBe("2♣ fits no meld: discard it");
         expect(yourTurn(view, hand, null).prompt).toBe("Select a card to add to a meld or discard. Gold dots mark cards that fit.");
     });
 
@@ -103,6 +107,7 @@ describe('yourTurn', () => {
         const turn = yourTurn(view, view.hand, 0);
         expect(turn).toMatchObject({drawing : false, playing : false, selected : null, discardPile : null, steps : null});
         expect(turn.prompt).toBe("Opponent 2 drew from the deck. Claim the " + shortName(view.claim!.card) + ", or pass?");
+        expect(turn.brief).toBe("Claim the " + shortName(view.claim!.card) + ", or pass?");
         expect(turn.goDown.hint).toBe("You can go down on your turn");
     });
 });

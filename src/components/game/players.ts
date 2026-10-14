@@ -22,4 +22,27 @@ const seatName = (view: GameView, seat: number): string => (seat === view.seat) 
 
 const seatColor = (view: GameView, seat: number): string => (seat === view.seat) ? YOU_COLOR : aiColor(opponentIndex(view, seat));
 
-export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor};
+/** A place in a grid, from 0. */
+export interface GridPlace {
+    row: number;
+    column: number;
+}
+
+// Where each player's melds go on a phone: in a grid two rows high, you at the
+// bottom left, nearest your hand, and the others going round clockwise in turn
+// order, the way they'd sit at a table. With four players, opponent 1 is at
+// the top left, 2 at the top right and 3 at the bottom right. Every player
+// keeps their place all game, down or not. Places are for you first, then
+// your opponents in turn order (opponentSeats).
+const seatPlaces = (count: number): {columns: number; places: GridPlace[]} => {
+    let columns = Math.max(1, Math.ceil(count / 2));
+    // up the left side, along the top, then back along the bottom
+    let round: GridPlace[] = [
+        {row : 1, column : 0},
+        ...Array.from({length : columns}, (_, column) => ({row : 0, column})),
+        ...Array.from({length : columns - 1}, (_, i) => ({row : 1, column : columns - 1 - i}))
+    ];
+    return {columns, places : round.slice(0, count)};
+}
+
+export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor, seatPlaces};

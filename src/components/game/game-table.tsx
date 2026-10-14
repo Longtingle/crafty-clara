@@ -1,5 +1,4 @@
 import {useState} from 'react';
-import {motion} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
 import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
@@ -7,7 +6,7 @@ import type {Card} from '@/engine/cards.ts';
 import type {BotLevel} from '@/engine/bot.ts';
 import type {GameView} from '@/engine/view.ts';
 import TopBar from './top-bar.tsx';
-import {OpponentPanel, CompactMelds} from './opponent-panel.tsx';
+import {OpponentPanel} from './opponent-panel.tsx';
 import Meld, {MeldRow} from './meld.tsx';
 import Piles from './piles.tsx';
 import ActivityLog from './activity-log.tsx';
@@ -18,6 +17,7 @@ import TableDnd, {type DragActions} from './table-dnd.tsx';
 import ScoresDialog from './scores-dialog.tsx';
 import RulesDialog from './rules-dialog.tsx';
 import RotatePrompt from './rotate-prompt.tsx';
+import PhoneTable from './phone-table.tsx';
 import {opponentSeats, opponentIndex} from './players.ts';
 import {activityEntries, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
@@ -56,11 +56,11 @@ interface GameTableProps {
 
 const sectionLabel = "text-[13px] font-bold tracking-widest text-muted-foreground uppercase";
 
-// The choices for laying out your hand, with shorter labels for short screens.
-const SORTS: {sort: HandSort; label: string; short: string}[] = [
-    {sort : "value", label : "By value", short : "Value"},
-    {sort : "suit", label : "By suit", short : "Suit"},
-    {sort : "own", label : "Your order", short : "Your order"}
+// The choices for laying out your hand.
+const SORTS: {sort: HandSort; label: string}[] = [
+    {sort : "value", label : "By value"},
+    {sort : "suit", label : "By suit"},
+    {sort : "own", label : "Your order"}
 ];
 
 // How your hand is laid out. A sort keeps the hand sorted as cards come and
@@ -68,7 +68,7 @@ const SORTS: {sort: HandSort; label: string; short: string}[] = [
 function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort) => void}) {
     return (
         <div role="group" aria-labelledby="sort-hand" className="flex flex-col gap-1.5">
-            <span id="sort-hand" className={cn(sectionLabel, "short:hidden")}>Sort hand</span>
+            <span id="sort-hand" className={sectionLabel}>Sort hand</span>
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1">
                 {SORTS.map(option => (
                     <Button
@@ -77,16 +77,11 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
                         aria-pressed={sort === option.sort}
                         onClick={() => onChange(option.sort)}
                         className={cn(
-                            "aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a] short:h-9 short:px-2 short:text-sm",
+                            "aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a]",
                             option.sort === "own" && "col-span-2"
                         )}
                     >
-                        {(option.label === option.short) ? option.label : (
-                            <>
-                                <span className="short:hidden">{option.label}</span>
-                                <span className="hidden short:inline">{option.short}</span>
-                            </>
-                        )}
+                        {option.label}
                     </Button>
                 ))}
             </div>
@@ -95,12 +90,12 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 }
 
 // The whole table: opponents along the top, piles in the middle, your hand at
-// the bottom.
+// the bottom. Short screens (phones held sideways) get their own layout
+// (PhoneTable), with the opponents in the top bar.
 function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, notice, actions}: GameTableProps) {
     let [dialog, setDialog] = useState<"scores" | "rules" | null>(null);
-    // The `short:` layout (see index.css) moves opponents into the top bar.
-    // Opponents' cards are rendered for one layout only, because each card
-    // must appear once for its animations to work.
+    // Each card is rendered for one layout only, because each card must
+    // appear once for its animations to work.
     let short = useMediaQuery("(max-height: 560px)");
     let me = view.seats[view.seat];
     let opponents = opponentSeats(view);
@@ -119,6 +114,7 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
 
     let pile = turn.discardPile;
     let discardAction = pile && {
+        move : pile.move,
         chip : pile.chip,
         label : pile.label,
         onClick : (pile.move === "take") ? actions.takeDiscard : actions.discard
@@ -127,62 +123,98 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
         ? {card : view.claim.card, closesIn : view.claim.closesIn, onClaim : actions.claim, onPass : actions.pass}
         : null;
 
+    let topBar = (
+        <TopBar
+            round={view.round}
+            roundCount={view.rounds}
+            requirement={view.requirement}
+            requirementMet={me.isDown}
+            opponents={opponents.map(seat => ({
+                index : opponentIndex(view, seat),
+                name : view.seats[seat].name,
+                count : view.seats[seat].cards.length,
+                isDown : view.seats[seat].isDown,
+                hard : levels[seat] === "hard",
+                active : isInTurn(view, seat),
+                cards : short ? view.seats[seat].cards : null
+            }))}
+            you={{points : me.total, active : isInTurn(view, view.seat)}}
+            onPause={actions.pause}
+            onShowScores={() => setDialog("scores")}
+            onShowRules={() => setDialog("rules")}
+        />
+    );
+    let piles = (
+        <Piles
+            deckTopId={view.deck.top}
+            deckCount={view.deck.count}
+            deckActive={turn.deckLive}
+            onDeckClick={actions.drawFromDeck}
+            discard={view.discard}
+            discardAction={discardAction}
+            claim={claim}
+            paused={paused}
+        />
+    );
+    let dialogs = (
+        <>
+            <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => setDialog(open ? "scores" : null)} view={view} />
+            <RulesDialog open={dialog === "rules"} onOpenChange={(open) => setDialog(open ? "rules" : null)} />
+            <RotatePrompt />
+        </>
+    );
+
+    if (short) {
+        return (
+            <TableDnd view={view} hand={hand} turn={turn} actions={actions}>
+                <PhoneTable
+                    view={view}
+                    hand={hand}
+                    sort={sort}
+                    turn={turn}
+                    newCard={newCard}
+                    speech={speech}
+                    notice={notice}
+                    actions={actions}
+                    topBar={topBar}
+                    piles={piles}
+                    melds={melds}
+                />
+                {dialogs}
+            </TableDnd>
+        );
+    }
+
     return (
         <TableDnd view={view} hand={hand} turn={turn} actions={actions}>
-            <div className="relative grid h-dvh grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden bg-felt shadow-[inset_0_0_180px_rgb(0_0_0/0.4)] short:grid-rows-[auto_minmax(0,1fr)_auto]">
-                <TopBar
-                    round={view.round}
-                    roundCount={view.rounds}
-                    requirement={view.requirement}
-                    requirementMet={me.isDown}
-                    opponents={opponents.map(seat => ({
-                        index : opponentIndex(view, seat),
-                        name : view.seats[seat].name,
-                        count : view.seats[seat].cards.length,
-                        isDown : view.seats[seat].isDown,
-                        hard : levels[seat] === "hard",
-                        active : isInTurn(view, seat),
-                        cards : short ? view.seats[seat].cards : null
-                    }))}
-                    onPause={actions.pause}
-                    onShowScores={() => setDialog("scores")}
-                    onShowRules={() => setDialog("rules")}
-                />
+            <div className="relative grid h-dvh grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden bg-felt shadow-[inset_0_0_180px_rgb(0_0_0/0.4)]">
+                {topBar}
 
-                {!short && (
-                    <section
+                <section
                         aria-label="Opponents"
                         className="grid gap-5 px-6 pt-3 compact:pt-2"
                         style={{gridTemplateColumns : `repeat(${opponents.length}, minmax(0, 1fr))`}}
                     >
-                        {opponents.map(seat => (
-                            <OpponentPanel
-                                key={seat}
-                                player={view.seats[seat]}
-                                index={opponentIndex(view, seat)}
-                                hard={levels[seat] === "hard"}
-                                active={isInTurn(view, seat)}
-                                speech={speech[seat]}
-                                lastAction={lastAction(view, seat)}
-                            >
-                                {melds(seat)}
-                            </OpponentPanel>
-                        ))}
-                    </section>
-                )}
+                    {opponents.map(seat => (
+                        <OpponentPanel
+                            key={seat}
+                            player={view.seats[seat]}
+                            index={opponentIndex(view, seat)}
+                            hard={levels[seat] === "hard"}
+                            active={isInTurn(view, seat)}
+                            speech={speech[seat]}
+                            lastAction={lastAction(view, seat)}
+                        >
+                            {melds(seat)}
+                        </OpponentPanel>
+                    ))}
+                </section>
 
-                <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 px-6 [grid-template-areas:'mine_piles_log'] short:gap-3 short:px-3 short:[grid-template-areas:'opps_piles_mine']">
-                    <motion.div
-                        layoutScroll
-                        className="hidden min-w-0 flex-wrap content-start gap-x-3 gap-y-2 self-stretch overflow-y-auto py-2 [scrollbar-width:thin] [--meld-w:34px] [grid-area:opps] short:flex"
-                    >
-                        {short && <CompactMelds view={view} seats={opponents} melds={melds} />}
-                    </motion.div>
-
-                    <div className="flex min-w-0 flex-col gap-2.5 self-end pb-1 [grid-area:mine] short:items-end short:self-center">
-                        <h2 className={cn(sectionLabel, "short:hidden")}>Your melds</h2>
+                <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 px-6 [grid-template-areas:'mine_piles_log']">
+                    <div className="flex min-w-0 flex-col gap-2.5 self-end pb-1 [grid-area:mine]">
+                        <h2 className={sectionLabel}>Your melds</h2>
                         {me.isDown
-                            ? <MeldRow setruns={me.table} className="short:justify-end">{melds(view.seat)}</MeldRow>
+                            ? <MeldRow setruns={me.table}>{melds(view.seat)}</MeldRow>
                             : (
                                 <div className="grid h-(--meld-row) w-full max-w-80 place-items-center rounded-xl border-2 border-dashed border-white/18 px-4 text-center text-sm text-muted-foreground">
                                     Your melds go here once you go down
@@ -190,30 +222,19 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
                             )}
                     </div>
 
-                    <div className="[grid-area:piles]">
-                        <Piles
-                            deckTopId={view.deck.top}
-                            deckCount={view.deck.count}
-                            deckActive={turn.deckLive}
-                            onDeckClick={actions.drawFromDeck}
-                            discard={view.discard}
-                            discardAction={discardAction}
-                            claim={claim}
-                            paused={paused}
-                        />
-                    </div>
+                    <div className="[grid-area:piles]">{piles}</div>
 
-                    <div className="flex justify-end [grid-area:log] short:hidden">
+                    <div className="flex justify-end [grid-area:log]">
                         <ActivityLog entries={activityEntries(view)} />
                     </div>
                 </section>
 
-                <section className="grid grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,15rem)] items-end gap-6 px-6 pb-4 short:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_minmax(0,8rem)] short:gap-3 short:px-3 short:pb-2">
-                    <div className="mb-4 short:mb-2">
+                <section className="grid grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,15rem)] items-end gap-6 px-6 pb-4">
+                    <div className="mb-4">
                         <PlayerPanel active={isInTurn(view, view.seat)} isDown={me.isDown} score={me.total} cardCount={hand.length} />
                     </div>
 
-                    <div className="flex min-w-0 flex-col items-center gap-2.5 short:gap-1">
+                    <div className="flex min-w-0 flex-col items-center gap-2.5">
                         <TurnPrompt steps={turn.steps} text={turn.prompt} notice={notice} />
                         <Hand
                             key={view.round}
@@ -226,24 +247,16 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
                         />
                     </div>
 
-                    <div className="mb-4 flex flex-col gap-3 short:mb-2 short:gap-1.5">
+                    <div className="mb-4 flex flex-col gap-3">
                         <SortSwitch sort={sort} onChange={actions.sortHand} />
-                        <Button
-                            size="lg"
-                            variant="secondary"
-                            disabled={!turn.goDown.enabled}
-                            onClick={actions.openGoDown}
-                            className="short:h-10"
-                        >
+                        <Button size="lg" variant="secondary" disabled={!turn.goDown.enabled} onClick={actions.openGoDown}>
                             Go down
                         </Button>
-                        <span className="text-center text-[13px] text-muted-foreground short:hidden">{turn.goDown.hint}</span>
+                        <span className="text-center text-[13px] text-muted-foreground">{turn.goDown.hint}</span>
                     </div>
                 </section>
 
-                <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => setDialog(open ? "scores" : null)} view={view} />
-                <RulesDialog open={dialog === "rules"} onOpenChange={(open) => setDialog(open ? "rules" : null)} />
-                <RotatePrompt />
+                {dialogs}
             </div>
         </TableDnd>
     );

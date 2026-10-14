@@ -26,7 +26,7 @@ function PlayingCard({card, setrunType, alt, className, style}: PlayingCardProps
                 className="block size-full rounded-[5%/3.3%] shadow-[0_2px_6px_rgb(0_0_0/0.35)]"
             />
             {setrunType && isWild(card) && (
-                <span className="absolute -top-2.5 left-0 rounded-full border-[1.5px] border-white bg-wild px-1.5 text-[11px] leading-4 font-bold whitespace-nowrap text-white">
+                <span className="absolute -top-2.5 left-0 rounded-full border-[1.5px] border-white bg-wild px-1.5 text-[11px] leading-4 font-bold whitespace-nowrap text-white short:-top-2 short:px-1 short:text-[9px] short:leading-3">
                     {"=" + standInName(card, setrunType)}
                 </span>
             )}

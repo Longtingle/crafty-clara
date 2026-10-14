@@ -53,30 +53,42 @@ export interface YourTurn {
     /** the steps of your turn, or null when it isn't your turn */
     steps: TurnStep[] | null;
     prompt: string;
+    /** the prompt in a few words, for the status line on a phone */
+    brief: string;
 }
 
 /** Whether a seat is taking its turn: drawing, or playing after drawing. */
 export const isInTurn = (view: GameView, seat: number): boolean =>
     view.turn === seat && (view.phase === "draw" || view.phase === "play");
 
-// The turn prompt: which step of your turn you're on, and what to do next. It
-// never says whether you can go down: spotting that is part of the game.
+// The turn prompt: which step of your turn you're on, and what to do next,
+// with a brief version for phones. It never says whether you can go down:
+// spotting that is part of the game.
 const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget[], playable: boolean[]):
-    {steps: TurnStep[] | null; prompt: string} => {
+    {steps: TurnStep[] | null; prompt: string; brief: string} => {
     let me = view.seats[view.seat];
     let {discard, claim} = view;
     let middle = me.isDown ? "Add to melds" : "Go down";
 
-    if (view.phase === "roundEnd" || view.phase === "gameEnd") return {steps : null, prompt : "Round over."};
+    if (view.phase === "roundEnd" || view.phase === "gameEnd") return {steps : null, prompt : "Round over.", brief : "Round over"};
 
     if (view.turn === view.seat && view.phase === "draw") {
-        let text;
-        if (!view.deck.canDraw) text = "The deck is empty. Take the " + shortName(discard[0]) + ".";
-        else if (discard.length > 0) text = "Draw from the deck or take the " + shortName(discard[0]) + ".";
-        else text = "Draw from the deck.";
+        let text, brief;
+        if (!view.deck.canDraw) {
+            text = "The deck is empty. Take the " + shortName(discard[0]) + ".";
+            brief = "The deck is empty: take the " + shortName(discard[0]);
+        } else if (discard.length > 0) {
+            text = "Draw from the deck or take the " + shortName(discard[0]) + ".";
+            brief = "draw, or take the " + shortName(discard[0]);
+        } else {
+            text = "Draw from the deck.";
+            brief = "draw a card";
+        }
+        let starting = view.log.length === 0;
         return {
             steps : [{label : "Draw", state : "current"}, {label : middle, state : "todo"}, {label : "Discard", state : "todo"}],
-            prompt : ((view.log.length === 0) ? "You start this round. " : "Your turn. ") + text
+            prompt : (starting ? "You start this round. " : "Your turn. ") + text,
+            brief : view.deck.canDraw ? (starting ? "You start: " : "Your turn: ") + brief : brief
         };
     }
 
@@ -87,36 +99,47 @@ const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget
             {label : "Discard", state : selected ? "current" : "todo"}
         ];
         let swap = targets.find(target => target.returnedAce);
-        let prompt;
+        let prompt, brief;
         if (claim && !(selected && targets.length > 0)) {
             // you can't discard until the others have claimed or passed
             prompt = "Waiting to see if anyone claims the " + shortName(claim.card) + ".";
+            brief = "Waiting to see if anyone claims the " + shortName(claim.card);
         } else if (!selected) {
             if (me.isDown) {
                 prompt = "Select a card to add to a meld or discard." +
                     (playable.some(Boolean) ? " Gold dots mark cards that fit." : "");
+                brief = "Pick a card to add to a meld or discard";
             } else {
                 prompt = "Select a card to discard. To go down you need " + requirementText(view.requirement) + ".";
+                brief = "Pick a card to discard";
             }
         } else if (swap) {
             prompt = shortName(selected) + " can replace the wild " + shortName(swap.returnedAce!) + " in " + swap.owner +
                 ", and the ace comes back to you.";
+            brief = "Swap " + shortName(selected) + " for the wild " + shortName(swap.returnedAce!) + ", or discard it";
         } else if (targets.length > 0) {
             prompt = "Add " + shortName(selected) + " to a highlighted meld, or discard it to end your turn.";
+            brief = "Add " + shortName(selected) + " to a gold meld, or discard it";
         } else if (me.isDown) {
             prompt = shortName(selected) + " doesn't fit any meld. Discard it to end your turn.";
+            brief = shortName(selected) + " fits no meld: discard it";
         } else {
             prompt = "Discard " + shortName(selected) + " to end your turn, or pick another card.";
+            brief = "Discard " + shortName(selected) + " to end your turn";
         }
-        return {steps, prompt};
+        return {steps, prompt, brief};
     }
 
     let name = view.seats[view.turn].name;
     if (claim?.canAnswer) {
-        return {steps : null, prompt : name + " drew from the deck. Claim the " + shortName(claim.card) + ", or pass?"};
+        return {
+            steps : null,
+            prompt : name + " drew from the deck. Claim the " + shortName(claim.card) + ", or pass?",
+            brief : "Claim the " + shortName(claim.card) + ", or pass?"
+        };
     }
-    if (view.log.length === 0) return {steps : null, prompt : name + " starts this round."};
-    return {steps : null, prompt : name + " is playing."};
+    if (view.log.length === 0) return {steps : null, prompt : name + " starts this round.", brief : name + " starts this round"};
+    return {steps : null, prompt : name + " is playing.", brief : name + " is playing"};
 }
 
 /** What you can do now. selectedIndex is the selected card's place in your hand. */
