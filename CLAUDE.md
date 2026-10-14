@@ -112,7 +112,7 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - `checkSetrun(cards, type)` and `addToSetrun(setrun, card)` are the single source of truth for setrun validity.
 - Both go through the ways a group of cards can be read (`readings`): which red aces play as themselves and which are wilds.
 - `explainSetrun(cards, type)` says in plain words why cards aren't a valid setrun yet, and returns `null` exactly when `checkSetrun` accepts them. The go-down dialog shows it.
-- `sortHand` sorts by value or by suit.
+- `sortHand` sorts by value (then suit) or by suit (then value). Suits go ♥ ♣ ♦ ♠, so the colours alternate.
 
 **`cards.ts`** holds `Card`, `Setrun`, `SET`/`RUN`, `ROUND_REQUIREMENTS`, `createCard` and `getPoints`. For red aces it has:
 - `isRedAce`: a red ace, which can be wild.
@@ -144,7 +144,7 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 Function components only; there is no global store.
 - **`App.tsx`** shows the home screen, or a game. Starting a game calls `startLocalGame` and `createGameClient`. An effect stops the game's host and bots when the game is replaced or App unmounts.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
-  - the order of your hand: card ids, so arranged cards keep their places and new ones join on the right (`arrange`)
+  - how your hand is laid out (`hand-order.ts`): kept sorted by value or by suit as cards come and go (by value to start), or in your own order once you drag a card. In your own order, arranged cards keep their places and new ones join on the right. A new deal is sorted again the way you last chose.
   - the selected card, by id
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
@@ -154,7 +154,7 @@ Function components only; there is no global store.
 - **`your-turn.ts`** (`yourTurn(view, hand, selectedIndex)`) works out what you can do right now, with no React, so it is tested on its own:
   - where the selected card can go (via `addToSetrun`), and the gold "fits a meld" dots
   - what the deck and the discard pile do if clicked. While a claim window is open on your turn, you can't discard.
-  - whether you can go down (`planGoDown`)
+  - whether the go-down dialog can open. Nothing says whether your hand is ready to go down: spotting that is part of the game.
   - the turn prompt and its steps
 - **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic.
 - **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).

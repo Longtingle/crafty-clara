@@ -49,13 +49,20 @@ interface SlotProps {
     onRemove: (index: number) => void;
 }
 
+// A click anywhere in the box picks the slot, except on its cards and buttons,
+// which do their own thing. The title button is the way in for the keyboard.
 function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemove}: SlotProps) {
     return (
-        <div className={cn(
-            "flex flex-col gap-2.5 rounded-2xl border-2 bg-white/4 p-3",
-            check.valid ? "border-ok" : (cards.length > 0 ? "border-warn" : "border-white/18"),
-            active && "shadow-[0_0_0_5px_rgb(244_239_227/0.14)]"
-        )}>
+        <div
+            onClick={(event) => {
+                if (!(event.target as Element).closest("button")) onActivate();
+            }}
+            className={cn(
+                "flex flex-col gap-2.5 rounded-2xl border-2 bg-white/4 p-3",
+                check.valid ? "border-ok" : (cards.length > 0 ? "border-warn" : "border-white/18"),
+                active ? "shadow-[0_0_0_5px_rgb(244_239_227/0.14)]" : "cursor-pointer hover:bg-white/7"
+            )}
+        >
             <div className="flex items-center gap-2.5">
                 <button
                     type="button"

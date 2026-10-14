@@ -1,4 +1,4 @@
-import {render, screen, fireEvent} from '@testing-library/react';
+import {render, screen, fireEvent, within} from '@testing-library/react';
 import App from './App.tsx';
 
 it('shows the home screen before a game starts', () => {
@@ -10,8 +10,10 @@ it('shows the home screen before a game starts', () => {
 it('starts a game against three opponents, with you to play first', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
-    expect(await screen.findByRole('group', {name : 'Your hand'})).toBeInTheDocument();
-    expect(screen.getAllByRole('button', {pressed : false})).toHaveLength(12);
+    const hand = await screen.findByRole('group', {name : 'Your hand'});
+    expect(within(hand).getAllByRole('button')).toHaveLength(12);
+    const sort = screen.getByRole('group', {name : 'Sort hand'});
+    expect(within(sort).getByRole('button', {pressed : true})).toHaveTextContent('By value');
     for (let name of ["Opponent 1", "Opponent 2", "Opponent 3"]) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     expect(screen.getByText(/You start this round/)).toBeInTheDocument();
 });

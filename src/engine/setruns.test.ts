@@ -187,9 +187,14 @@ describe('addToSetrun', () => {
 });
 
 describe('sortHand', () => {
-    it('sorts by value for sets and by suit then value for runs', () => {
+    it('sorts by value then suit for sets, and by suit then value for runs', () => {
         const hand = cards("9S 2H 9C 13D 2C");
-        expect(sortHand(hand, SET).map(c => c.value)).toEqual([2, 2, 9, 9, 13]);
-        expect(sortHand(hand, RUN).map(c => c.displayString)).toEqual(["2C", "9C", "13D", "2H", "9S"]);
+        expect(sortHand(hand, SET).map(c => c.displayString)).toEqual(["2H", "2C", "9C", "9S", "13D"]);
+        expect(sortHand(hand, RUN).map(c => c.displayString)).toEqual(["2H", "2C", "9C", "13D", "9S"]);
+    });
+
+    it('alternates red and black suits', () => {
+        const hand = cards("5S 5D 5C 5H");
+        expect(sortHand(hand, RUN).map(c => c.suit)).toEqual(["H", "C", "D", "S"]);
     });
 });

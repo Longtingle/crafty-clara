@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {RUN, SET, type Card, type SetrunType} from '@/engine/cards.ts';
 import {checkSetrun} from '@/engine/setruns.ts';
-import {shortName} from '@/engine/card-names.ts';
+import {requirementText, shortName} from '@/engine/card-names.ts';
 import {apply, createGame, expireClaims, type Command, type GameState} from '@/engine/game.ts';
 import {viewFor} from '@/engine/view.ts';
 import {cards} from '@/engine/testing.ts';
@@ -77,13 +77,17 @@ describe('yourTurn', () => {
         expect(yourTurn(view, hand, null).prompt).toBe("Select a card to add to a meld or discard. Gold dots mark cards that fit.");
     });
 
-    it('says when your hand meets the requirement', () => {
+    it("doesn't say whether your hand meets the requirement", () => {
         const state = play(newGame(), 0, {type : "draw", from : "discard"});
-        state.seats[0].hand = cards("7C 7D 7S 9C 9H 9S 2D");
-        const view = viewFor(state, 0, 0);
-        const turn = yourTurn(view, view.hand, null);
-        expect(turn.goDown).toEqual({enabled : true, ready : true, hint : "You have what you need!"});
-        expect(turn.prompt).toBe("You have what you need. Go down, or select a card to discard.");
+        const ready = cards("7C 7D 7S 9C 9H 9S 2D");
+        const notReady = cards("7C 7D 3S 9C 9H 4S 2D");
+        for (let hand of [ready, notReady]) {
+            state.seats[0].hand = hand;
+            const view = viewFor(state, 0, 0);
+            const turn = yourTurn(view, view.hand, null);
+            expect(turn.goDown).toEqual({enabled : true, hint : "Need " + requirementText(view.requirement)});
+            expect(turn.prompt).toBe("Select a card to discard. To go down you need " + requirementText(view.requirement) + ".");
+        }
     });
 
     it("lets you claim on someone else's turn, and nothing else", () => {

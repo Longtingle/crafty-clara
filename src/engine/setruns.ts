@@ -1,4 +1,4 @@
-import {SET, SUITS, asItself, asWild, isRedAce, isWild, type Card, type Setrun, type SetrunType} from './cards.ts';
+import {SET, asItself, asWild, isRedAce, isWild, type Card, type Setrun, type SetrunType, type Suit} from './cards.ts';
 import {SUIT_SYMBOL, rankName} from './card-names.ts';
 
 // Red aces are wild. When one is used in a setrun as another card, its value
@@ -37,10 +37,16 @@ const readings = (cards: Card[], type: SetrunType): Reading[] => {
     }));
 };
 
-// Sorts for sets (by value) or for runs (by suit, then value).
+// Suits in a sorted hand, alternating red and black.
+const SUIT_ORDER: readonly Suit[] = ["H", "C", "D", "S"];
+
+// Sorts for sets (by value, then suit) or for runs (by suit, then value).
 const sortHand = <C extends Card>(hand: C[], type: SetrunType): C[] => {
-    if (type === SET) return hand.toSorted((a, b) => a.value - b.value);
-    return hand.toSorted((a, b) => SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit) || a.value - b.value);
+    let bySuit = (a: C, b: C) => SUIT_ORDER.indexOf(a.suit) - SUIT_ORDER.indexOf(b.suit);
+    let byValue = (a: C, b: C) => a.value - b.value;
+    return hand.toSorted((type === SET)
+        ? (a, b) => byValue(a, b) || bySuit(a, b)
+        : (a, b) => bySuit(a, b) || byValue(a, b));
 };
 
 const checkSet = (naturals: Card[], wilds: Card[]): Card[] | null => {

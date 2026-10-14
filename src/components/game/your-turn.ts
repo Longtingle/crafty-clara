@@ -1,6 +1,5 @@
 import type {Card} from '@/engine/cards.ts';
 import {addToSetrun} from '@/engine/setruns.ts';
-import {planGoDown} from '@/engine/bot.ts';
 import {shortName, longName, requirementText} from '@/engine/card-names.ts';
 import type {GameView} from '@/engine/view.ts';
 
@@ -49,8 +48,6 @@ export interface YourTurn {
     goDown: {
         /** whether the go-down dialog can open */
         enabled: boolean;
-        /** whether your hand meets the round's requirement */
-        ready: boolean;
         hint: string;
     };
     /** the steps of your turn, or null when it isn't your turn */
@@ -62,8 +59,9 @@ export interface YourTurn {
 export const isInTurn = (view: GameView, seat: number): boolean =>
     view.turn === seat && (view.phase === "draw" || view.phase === "play");
 
-// The turn prompt: which step of your turn you're on, and what to do next.
-const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget[], playable: boolean[], ready: boolean):
+// The turn prompt: which step of your turn you're on, and what to do next. It
+// never says whether you can go down: spotting that is part of the game.
+const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget[], playable: boolean[]):
     {steps: TurnStep[] | null; prompt: string} => {
     let me = view.seats[view.seat];
     let {discard, claim} = view;
@@ -97,8 +95,6 @@ const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget
             if (me.isDown) {
                 prompt = "Select a card to add to a meld or discard." +
                     (playable.some(Boolean) ? " Gold dots mark cards that fit." : "");
-            } else if (ready) {
-                prompt = "You have what you need. Go down, or select a card to discard.";
             } else {
                 prompt = "Select a card to discard. To go down you need " + requirementText(view.requirement) + ".";
             }
@@ -145,7 +141,6 @@ export const yourTurn = (view: GameView, hand: Card[], selectedIndex: number | n
     }));
     let allSetruns = view.seats.flatMap(player => player.table);
     let playable = hand.map(card => building && allSetruns.some(setrun => addToSetrun(setrun, card).valid));
-    let ready = playing && !me.isDown && planGoDown(hand, view.requirement) !== null;
 
     let discardPile: PileMove | null = null;
     if (drawing && view.discard.length > 0) {
@@ -162,7 +157,6 @@ export const yourTurn = (view: GameView, hand: Card[], selectedIndex: number | n
     if (me.isDown) hint = "You're down this round";
     else if (drawing) hint = "Draw a card first";
     else if (!myTurn) hint = "You can go down on your turn";
-    else if (ready) hint = "You have what you need!";
     else hint = "Need " + requirementText(view.requirement);
 
     let fits = targets.flat().filter(target => target !== null);
@@ -174,7 +168,7 @@ export const yourTurn = (view: GameView, hand: Card[], selectedIndex: number | n
         playable,
         deckLive : drawing && view.deck.canDraw,
         discardPile,
-        goDown : {enabled : playing && !me.isDown, ready, hint},
-        ...describeTurn(view, selected?.card ?? null, fits, playable, ready)
+        goDown : {enabled : playing && !me.isDown, hint},
+        ...describeTurn(view, selected?.card ?? null, fits, playable)
     };
 };

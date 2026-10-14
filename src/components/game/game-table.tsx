@@ -19,6 +19,7 @@ import RotatePrompt from './rotate-prompt.tsx';
 import {opponentSeats, opponentIndex} from './players.ts';
 import {activityEntries, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
+import type {HandSort} from './hand-order.ts';
 
 /** Everything you can do at the table. GameScreen turns each into a command or a change to your hand. */
 export interface TableActions {
@@ -30,8 +31,7 @@ export interface TableActions {
     addToMeld(seat: number, index: number): void;
     select(index: number): void;
     reorder(from: number, to: number): void;
-    sortBySuit(): void;
-    sortByValue(): void;
+    sortHand(sort: HandSort): void;
     openGoDown(): void;
 }
 
@@ -39,6 +39,7 @@ interface GameTableProps {
     view: GameView;
     /** your cards in the order you've arranged them */
     hand: Card[];
+    sort: HandSort;
     /** what you can do now (yourTurn) */
     turn: YourTurn;
     newCard: NewCard | null;
@@ -51,9 +52,47 @@ interface GameTableProps {
 
 const sectionLabel = "text-[13px] font-bold tracking-widest text-muted-foreground uppercase";
 
+// The choices for laying out your hand, with shorter labels for short screens.
+const SORTS: {sort: HandSort; label: string; short: string}[] = [
+    {sort : "value", label : "By value", short : "Value"},
+    {sort : "suit", label : "By suit", short : "Suit"},
+    {sort : "own", label : "Your order", short : "Your order"}
+];
+
+// How your hand is laid out. A sort keeps the hand sorted as cards come and
+// go; dragging a card switches to your own order.
+function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort) => void}) {
+    return (
+        <div role="group" aria-labelledby="sort-hand" className="flex flex-col gap-1.5">
+            <span id="sort-hand" className={cn(sectionLabel, "short:hidden")}>Sort hand</span>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1">
+                {SORTS.map(option => (
+                    <Button
+                        key={option.sort}
+                        variant="ghost"
+                        aria-pressed={sort === option.sort}
+                        onClick={() => onChange(option.sort)}
+                        className={cn(
+                            "aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a] short:h-9 short:px-2 short:text-sm",
+                            option.sort === "own" && "col-span-2"
+                        )}
+                    >
+                        {(option.label === option.short) ? option.label : (
+                            <>
+                                <span className="short:hidden">{option.label}</span>
+                                <span className="hidden short:inline">{option.short}</span>
+                            </>
+                        )}
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom.
-function GameTable({view, hand, turn, newCard, speech, notice, actions}: GameTableProps) {
+function GameTable({view, hand, sort, turn, newCard, speech, notice, actions}: GameTableProps) {
     let [dialog, setDialog] = useState<"scores" | "rules" | null>(null);
     // The `short:` layout (see index.css) moves opponents into the top bar.
     // Opponents' cards are rendered for one layout only, because each card
@@ -178,19 +217,13 @@ function GameTable({view, hand, turn, newCard, speech, notice, actions}: GameTab
                 </div>
 
                 <div className="mb-4 flex flex-col gap-3 short:mb-2 short:gap-1.5">
-                    <div role="group" aria-labelledby="sort-hand" className="flex flex-col gap-1.5">
-                        <span id="sort-hand" className={cn(sectionLabel, "short:hidden")}>Sort hand</span>
-                        <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 short:grid-cols-1">
-                            <Button variant="ghost" onClick={actions.sortByValue} className="short:h-9 short:text-sm">By value</Button>
-                            <Button variant="ghost" onClick={actions.sortBySuit} className="short:h-9 short:text-sm">By suit</Button>
-                        </div>
-                    </div>
+                    <SortSwitch sort={sort} onChange={actions.sortHand} />
                     <Button
                         size="lg"
-                        variant={turn.goDown.ready ? "default" : "secondary"}
+                        variant="secondary"
                         disabled={!turn.goDown.enabled}
                         onClick={actions.openGoDown}
-                        className={cn(turn.goDown.ready && "pulse-gold", "short:h-10")}
+                        className="short:h-10"
                     >
                         Go down
                     </Button>

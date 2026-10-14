@@ -1,6 +1,4 @@
 import {useEffect, useState} from 'react';
-import {SET, RUN, type Card} from '@/engine/cards.ts';
-import {sortHand} from '@/engine/setruns.ts';
 import type {GameClient, Refusal} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
 import GameTable, {type TableActions} from './game-table.tsx';
@@ -9,19 +7,11 @@ import RoundEndDialog from './round-end-dialog.tsx';
 import {opponentSeats} from './players.ts';
 import {newCardTag, speechFor} from './log-text.ts';
 import {yourTurn} from './your-turn.ts';
+import {moveCard, orderHand, type HandSort} from './hand-order.ts';
 
 // How long an opponent's line of speech, and a refused move's notice, stay up (ms).
 const SPEECH_MS = 2000;
 const NOTICE_MS = 3000;
-
-// Your cards in the order you've put them: cards you've arranged keep their
-// places, and any others join on the right in the order you got them.
-const arrange = (hand: Card[], order: string[]): Card[] => {
-    let byId = new Map(hand.map(card => [card.id, card]));
-    let placed = order.filter(id => byId.has(id));
-    let isPlaced = new Set(placed);
-    return [...placed.map(id => byId.get(id)!), ...hand.filter(card => !isPlaced.has(card.id))];
-}
 
 // What each opponent is saying, by seat: a line for a moment after some
 // moves, and a grumble from one of them as each round is dealt. It listens to
@@ -78,11 +68,14 @@ function useNotice(refusal: Refusal | null): string | null {
 }
 
 // A game in progress, as your seat sees it through the client. Everything
-// here besides the view is yours alone: the order of your hand, the card
+// here besides the view is yours alone: how your hand is sorted, the card
 // you've selected, and the open dialogs. Moves go to the host as commands.
 function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => void}) {
     let {view, refusal, send} = useGame(client);
-    let [order, setOrder] = useState<string[]>([]);
+    // The hand stays sorted the way you last chose until you arrange it
+    // yourself. Your own order lasts until the next deal, which comes sorted.
+    let [sorted, setSorted] = useState<Exclude<HandSort, "own">>("value");
+    let [own, setOwn] = useState<{round: number; order: string[]} | null>(null);
     let [selectedId, setSelectedId] = useState<string | null>(null);
     let [goingDown, setGoingDown] = useState(false);
     let speech = useSpeech(client);
@@ -91,7 +84,8 @@ function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => v
     if (!view) return <div className="h-dvh bg-felt" />;
 
     let me = view.seats[view.seat];
-    let hand = arrange(view.hand, order);
+    let sort: HandSort = (own && own.round === view.round) ? "own" : sorted;
+    let hand = orderHand(view.hand, sort, own?.order ?? []);
     let selectedIndex = hand.findIndex(card => card.id === selectedId);
     let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex);
     let selected = turn.selected?.card;
@@ -114,13 +108,16 @@ function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => v
         select : (index) => {
             if (turn.playing) setSelectedId(hand[index].id);
         },
-        reorder : (from, to) => {
-            let ids = hand.map(card => card.id);
-            ids.splice(to, 0, ids.splice(from, 1)[0]);
-            setOrder(ids);
+        reorder : (from, to) => setOwn({round : view.round, order : moveCard(hand, from, to)}),
+        sortHand : (next) => {
+            if (next === "own") {
+                // keep the cards where they are, and stop sorting them
+                setOwn({round : view.round, order : hand.map(card => card.id)});
+            } else {
+                setSorted(next);
+                setOwn(null);
+            }
         },
-        sortBySuit : () => setOrder(sortHand(hand, RUN).map(card => card.id)),
-        sortByValue : () => setOrder(sortHand(hand, SET).map(card => card.id)),
         openGoDown : () => {
             setSelectedId(null);
             setGoingDown(true);
@@ -137,6 +134,7 @@ function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => v
             <GameTable
                 view={view}
                 hand={hand}
+                sort={sort}
                 turn={turn}
                 newCard={newCardTag(view)}
                 speech={speech}
