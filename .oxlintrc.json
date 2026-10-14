@@ -5,7 +5,6 @@
     "browser": true,
     "es2024": true
   },
-  "ignorePatterns": ["src/classes/**"],
   "rules": {
     "no-undef": "error",
     "react/rules-of-hooks": "error",
