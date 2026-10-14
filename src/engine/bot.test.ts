@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {RUN, SET, type Card, type Setrun} from './cards.ts';
+import {RUN, SET, type Card, type Setrun, type SetrunType} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
 import {getRuns, getSets, scoreHand, wantsCard, chooseDiscard, planGoDown, findAddition, botMove} from './bot.ts';
 import {apply, createGame, type GameState} from './game.ts';
@@ -108,10 +108,19 @@ describe('chooseDiscard', () => {
         expect(hand[chooseDiscard(hand, {S : 2, R : 0}, true)].displayString).toBe("3C");
     });
 
+    it('at the hard level, collects the run it can still finish', () => {
+        const hand = cards("5S 6S 7S 2D 3D 4D");
+        // a normal bot keeps the higher run; a hard bot that knows the spades are dead keeps the diamonds
+        expect(hand[chooseDiscard(hand, {S : 0, R : 1}, false)].displayString).toBe("4D");
+        const insight = {danger : () => 0, outs : (_type: SetrunType, run: Card[]) => (run[0].suit === "S") ? 0 : 4};
+        expect(hand[chooseDiscard(hand, {S : 0, R : 1}, false, insight)].displayString).toBe("7S");
+    });
+
     it('given the danger of each card, weighs it against the points', () => {
         const discard = (str: string, danger?: (c: Card) => number) => {
             const hand = cards(str);
-            return hand[chooseDiscard(hand, {S : 2, R : 0}, false, danger)].displayString;
+            const insight = danger && {danger, outs : () => 4};
+            return hand[chooseDiscard(hand, {S : 2, R : 0}, false, insight)].displayString;
         };
         // a normal bot throws the highest card, and a hard bot the most points
         expect(discard("1S 13C 12D 4C")).toBe("13C");

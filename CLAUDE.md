@@ -102,9 +102,13 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - `botMove(view, profile)` returns a bot's next command, or null while it waits. A bot sees only its own view.
 - A `BotProfile` is a level and a seed. There are two levels:
   - **Normal** plays its own hand.
-  - **Hard** discards by points rather than face value, so it throws away useless black aces (25 points). It also reads the table (`clues.ts`), and of two discards worth about the same, throws the one nobody seems to want (`DANGER_WEIGHT`).
-  - In tournaments Hard scores about 52 points a game fewer than Normal. Almost all of that comes from discarding by points.
-  - Weighting danger more heavily, to hold high cards back from others, cost more points than it saved.
+  - **Hard** discards by points rather than face value, so it throws away useless black aces (25 points). It also reads the table (`clues.ts`), as an `Insight` passed to `scoreHand`, `wantsCard` and `chooseDiscard`:
+    - It marks down unfinished setruns short of outs (`rated`, `OUTS_WEIGHT`). So it collects what it can still finish, not runs whose cards are gone or that others are collecting.
+    - Of two discards worth about the same, it throws the one nobody seems to want (`DANGER_WEIGHT`).
+  - In tournaments Hard scores about 87 points a game fewer than Normal. Discarding by points is worth about 50 of that, steering by outs about 24, and safer discards about 4.
+  - Tried and dropped:
+    - Weighting danger more heavily, to hold high cards back from others, cost more points than it saved.
+    - Choosing where to lay wild aces, so fewer cards could swap them out, made no difference.
 - It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
 - `planGoDown(hand, requirement, tables)` tries every way to go down with exactly the round's setruns: each red ace as itself or as a wild, with wilds filling gaps in runs. For each way, it plays out what it could then add to the tables, and keeps the one that leaves the fewest points in hand (plus `CARD_COST` a card). So it lays kings rather than 2s, and keeps back a set it can add to someone else's.
@@ -118,6 +122,10 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
   - **What a card says depends on the round:** in a round of sets it points to the card's value, and in a round of runs to its neighbours in the suit. A mixed round splits the weight between the two.
   - **A seat that's down** wants whatever fits a setrun on the table.
 - `danger(card)` is the chance a discard reaches someone it helps. The next player can take it; the others only by claiming it.
+- `gone(value, suit)` counts copies out of reach: on the tables (a wild counts as its ace), and, as far as the bot remembers, discarded since the last reshuffle or taken by someone else. It doesn't count the bot's own hand or the discard on top.
+- `outs(type, cards)` is how many cards still to be had would grow an unfinished set or run, each discounted by how much others want it.
+  - The player just before you counts double, since they see most discards first and come ahead of you for every claim.
+  - In tournaments, counting dead cards alone was worth about 14 points a game, and allowing for what others want about 8 more. Weighting the player before you double did no better than counting everyone the same.
 - **Memory:** a bot remembers each log entry with a chance that fades with each turn (`remembers`).
   - The seed decides which entries, so its choices don't flicker from one move to the next, and a game still replays exactly.
   - In tournaments, perfect memory was barely better than Hard's.

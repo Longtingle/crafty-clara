@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {SET} from './cards.ts';
+import {RUN, SET} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
 import {createGame, type LogEntry} from './game.ts';
 import {viewFor} from './view.ts';
@@ -16,7 +16,7 @@ const viewWith = (round: number, log: LogEntry[]) => {
     return viewFor(state, 0, 0);
 };
 
-const took = (seat: number, str: string): LogEntry => ({type : "draw", seat, from : "discard", card : card(str)});
+const took = (seat: number, str: string, id = str): LogEntry => ({type : "draw", seat, from : "discard", card : card(str, id)});
 
 describe('readClues', () => {
     it('reads a pickup in a round of sets as collecting that value', () => {
@@ -75,6 +75,62 @@ describe('readClues', () => {
     it("forgets what it doesn't remember", () => {
         const clues = readClues(viewWith(0, [took(1, "3C")]), {seed : 1, fresh : 0, fade : 1});
         expect(clues.wants(1, card("3D"))).toBe(0);
+    });
+});
+
+describe('counting cards', () => {
+    const threw = (seat: number, str: string, id = str): LogEntry => ({type : "discard", seat, card : card(str, id)});
+
+    it('counts cards on the tables, and a wild ace as the ace it is', () => {
+        const view = viewWith(2, []);
+        const run = checkSetrun(cards("4S 5S 1H 7S"), RUN);
+        if (!run.valid) throw new Error("not a run");
+        view.seats[1].table = [run.setrun];
+        view.seats[1].isDown = true;
+        const clues = readClues(view, PERFECT);
+        expect(clues.gone(5, "S")).toBe(1);
+        expect(clues.gone(6, "S")).toBe(0);
+        expect(clues.gone(1, "H")).toBe(1);
+    });
+
+    it("counts what it saw discarded or taken by others, but not its own hand or the discard on top", () => {
+        const view = viewWith(2, [threw(1, "9C", "a"), took(2, "9C", "a"), threw(2, "9C", "b"), threw(3, "4D", "c"), took(0, "4D", "c"), threw(0, "8H", "d")]);
+        view.hand = [card("4D", "c")];
+        view.discard = [card("8H", "d")];
+        const clues = readClues(view, PERFECT);
+        expect(clues.gone(9, "C")).toBe(2);
+        expect(clues.gone(4, "D")).toBe(0);
+        expect(clues.gone(8, "H")).toBe(0);
+    });
+
+    it('forgets discards once the pile is shuffled back into the deck', () => {
+        const view = viewWith(2, [threw(1, "9C"), {type : "reshuffle", seat : 2}]);
+        expect(readClues(view, PERFECT).gone(9, "C")).toBe(0);
+    });
+});
+
+describe('outs', () => {
+    it('counts the cards still to be had that would grow a setrun', () => {
+        const view = viewWith(2, []);
+        view.hand = cards("5S 6S 7S 7C 7D");
+        view.discard = [];
+        const clues = readClues(view, PERFECT);
+        // two each of the 4♠ and 8♠
+        expect(clues.outs(RUN, cards("5S 6S 7S"))).toBe(4);
+        // two of every 7, less the three in hand (the 7♠ too)
+        expect(clues.outs(SET, cards("7C 7D"))).toBe(5);
+    });
+
+    it('discounts cards others want, the player before you most', () => {
+        const outsWhen = (seat: number) => {
+            const view = viewWith(2, [took(seat, "3S")]);
+            view.hand = cards("5S 6S 7S");
+            view.discard = [];
+            return readClues(view, PERFECT).outs(RUN, cards("5S 6S 7S"));
+        };
+        // seat 3 plays just before seat 0, and wants the 4♠
+        expect(outsWhen(3)).toBe(2);
+        expect(outsWhen(1)).toBe(3);
     });
 });
 

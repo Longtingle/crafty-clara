@@ -5,11 +5,12 @@
 //
 // There are two levels. A normal bot plays its own hand. A hard bot also
 // reads the table (clues.ts): it remembers, imperfectly, what the others
-// pick up and throw away, and avoids discarding what would help them.
+// pick up and throw away, and which cards are gone. It avoids discarding what
+// would help them, and collects the setruns it can still finish.
 
 import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
 import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
-import {readClues, type Memory} from './clues.ts';
+import {readClues, type Clues, type Memory} from './clues.ts';
 import type {Command, Target} from './game.ts';
 import type {GameView} from './view.ts';
 
@@ -25,6 +26,19 @@ export const NORMAL_BOT: BotProfile = {level : "normal", seed : 0};
 
 /** How well a hard bot remembers what it saw (see clues.ts). */
 const HARD_MEMORY: Omit<Memory, "seed"> = {fresh : 0.95, fade : 0.92};
+
+/** What a hard bot reads from the table. A normal bot plays without it. */
+export type Insight = Pick<Clues, "danger" | "outs">;
+
+/**
+ * A hard bot marks an unfinished setrun down by OUTS_WEIGHT for each card it
+ * is short of OUTS_CAP cards still to be had that would grow it. So it keeps
+ * collecting what it can finish, rather than what's gone or what others want.
+ * In tournaments this saved about 22 points a game; anything from 5 to 10
+ * did about as well.
+ */
+const OUTS_WEIGHT = 7;
+const OUTS_CAP = 4;
 
 /**
  * How many points a hard bot would keep in hand rather than discard a card
@@ -130,6 +144,18 @@ const getSets = <C extends Card>(hand: C[]): {numFullSets: number; sets: Candida
 
 type HandScore = ReturnType<typeof scoreWith>;
 
+// The candidates, best first, once a hard bot has marked down the unfinished
+// ones it's unlikely to finish.
+const rated = <C extends Card>(candidates: Candidate<C>[], insight?: Insight): Candidate<C>[] => {
+    if (!insight) return candidates;
+    return candidates
+        .map(candidate => candidate.complete ? candidate : {
+            ...candidate,
+            score : candidate.score - OUTS_WEIGHT * (OUTS_CAP - Math.min(OUTS_CAP, insight.outs(candidate.type, candidate.cards)))
+        })
+        .sort((a, b) => (b.score - a.score) || (b.cards[0].value - a.cards[0].value));
+};
+
 // Scores a hand against the requirement: 20 points per card in the best runs
 // and sets, plus 5 for each card near a run that could extend it. Each card
 // of bestHand and usefulCards carries its index in the hand.
@@ -137,11 +163,11 @@ type HandScore = ReturnType<typeof scoreWith>;
 // Each red ace is tried both as a wild, which completes a setrun that is one
 // card short, and as an ace, which can make a set of aces or the ace of a run
 // in its own suit. The best reading counts; on a tie, the one with more wilds.
-const scoreHand = (pHand: Card[], requirement: Requirement): HandScore => {
+const scoreHand = (pHand: Card[], requirement: Requirement, insight?: Insight): HandScore => {
     let redAces = pHand.flatMap((card, index) => isRedAce(card) ? [index] : []);
     let best: HandScore | null = null;
     for (let asAces of subsets(redAces).reverse()) {
-        let score = scoreWith(pHand, requirement, new Set(asAces));
+        let score = scoreWith(pHand, requirement, new Set(asAces), insight);
         let better = !best ||
             (score.readyToGoDown !== best.readyToGoDown ? score.readyToGoDown : score.score > best.score);
         if (better) best = score;
@@ -150,7 +176,7 @@ const scoreHand = (pHand: Card[], requirement: Requirement): HandScore => {
 };
 
 // asAces: the hand indices of the red aces that play as themselves.
-const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>) => {
+const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>, insight?: Insight) => {
     if (requirement.S === 0 && requirement.R === 0) {
         throw new Error("requirement should include at least one set or run");
     }
@@ -168,7 +194,7 @@ const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>)
     let usedIndices = new Set<number>();
 
     if (requirement.R > 0) {
-        let runs = getRuns(hand).runs.slice(0, requirement.R);
+        let runs = rated(getRuns(hand).runs, insight).slice(0, requirement.R);
         runs.forEach(run => run.cards.forEach(card => usedIndices.add(card.index)));
 
         for (let run of runs) {
@@ -204,7 +230,7 @@ const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>)
 
     if (requirement.S > 0) {
         let setHand = hand.filter(card => !usedIndices.has(card.index));
-        let sets = getSets(setHand).sets.slice(0, requirement.S);
+        let sets = rated(getSets(setHand).sets, insight).slice(0, requirement.S);
 
         for (let set of sets) {
             //can we use a red ace to complete this set?
@@ -230,23 +256,23 @@ const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>)
 };
 
 /** Whether a card is worth taking, from the discard pile or by claiming it. */
-const wantsCard = (hand: Card[], requirement: Requirement, card: Card): boolean =>
-    scoreHand([...hand, card], requirement).score > scoreHand(hand, requirement).score + 5;
+const wantsCard = (hand: Card[], requirement: Requirement, card: Card, insight?: Insight): boolean =>
+    scoreHand([...hand, card], requirement, insight).score > scoreHand(hand, requirement, insight).score + 5;
 
 /**
  * The index of the card to discard: the highest card that isn't useful, then
  * the highest not in the best hand. Red aces are kept if possible.
  *
- * Given how dangerous each card is to discard (the chance it helps someone
- * else), it weighs that against the card's points instead of discarding the
- * highest.
+ * A hard bot judges what's useful by what it can still finish, and weighs
+ * how dangerous each card is to discard (the chance it helps someone else)
+ * against the card's points instead of discarding the highest.
  */
-const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, danger?: (card: Card) => number): number => {
+const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, insight?: Insight): number => {
     let indexed: Indexed[] = hand.map((card, index) => ({...card, index}));
     let candidates = indexed;
 
     if (!isDown) {
-        let handResult = scoreHand(hand, requirement);
+        let handResult = scoreHand(hand, requirement, insight);
         let useful = new Set(handResult.usefulCards.map(card => card.index));
         let best = new Set(handResult.bestHand.flatMap(setrun => setrun.cards.map(card => card.index)));
         candidates = indexed.filter(card => !useful.has(card.index));
@@ -257,8 +283,8 @@ const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, 
     let notWild = candidates.filter(card => !isRedAce(card));
     if (notWild.length > 0) candidates = notWild;
 
-    if (danger) {
-        let worth = (card: Card): number => getPoints([card]) - DANGER_WEIGHT * danger(card);
+    if (insight) {
+        let worth = (card: Card): number => getPoints([card]) - DANGER_WEIGHT * insight.danger(card);
         return candidates.reduce((best, card) => (worth(card) > worth(best)) ? card : best).index;
     }
     return candidates.reduce((highest, card) => (card.value > highest.value) ? card : highest).index;
@@ -400,12 +426,12 @@ const findAddition = (hand: Card[], tables: Setrun[][]): {card: Card; target: Ta
 //   to pair with another is no good, as nobody can lay the pair down
 // - a card the bot would throw straight back, because its hand is so full of
 //   setruns that the new card is the one it can best spare
-const worthTaking = (view: GameView, card: Card): boolean => {
+const worthTaking = (view: GameView, card: Card, insight?: Insight): boolean => {
     let {hand, requirement} = view;
     if (view.seats[view.seat].isDown) return findAddition([card], view.seats.map(seat => seat.table)) !== null;
-    if (!wantsCard(hand, requirement, card)) return false;
+    if (!wantsCard(hand, requirement, card, insight)) return false;
     let after = [...hand, card];
-    return after[chooseDiscard(after, requirement, false)].id !== card.id;
+    return after[chooseDiscard(after, requirement, false, insight)].id !== card.id;
 };
 
 /**
@@ -419,17 +445,22 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
     let me = view.seats[view.seat];
     let tables = view.seats.map(seat => seat.table);
 
+    // a hard bot reads the table when it has something to decide
+    let read: Insight | undefined;
+    const insight = (): Insight | undefined =>
+        (profile.level === "hard") ? (read ??= readClues(view, {seed : profile.seed, ...HARD_MEMORY})) : undefined;
+
     if (view.phase === "roundEnd") return me.ready ? null : {type : "ready"};
     if (view.claim?.canAnswer) {
         // a bot that is down only takes cards on its own turn
-        let wants = !me.isDown && wantsCard(hand, requirement, view.claim.card);
+        let wants = !me.isDown && wantsCard(hand, requirement, view.claim.card, insight());
         return {type : wants ? "claim" : "pass"};
     }
     if (view.turn !== view.seat) return null;
 
     if (view.phase === "draw") {
         let top = view.discard[0];
-        let takeDiscard = top !== undefined && (!view.deck.canDraw || worthTaking(view, top));
+        let takeDiscard = top !== undefined && (!view.deck.canDraw || worthTaking(view, top, insight()));
         return {type : "draw", from : takeDiscard ? "discard" : "deck"};
     }
     // let the others claim or pass before playing on
@@ -444,8 +475,7 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
         let addition = findAddition(hand, tables);
         if (addition) return {type : "addToSetrun", card : addition.card.id, target : addition.target};
     }
-    let danger = (profile.level === "hard") ? readClues(view, {seed : profile.seed, ...HARD_MEMORY}).danger : undefined;
-    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, danger)].id};
+    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, insight())].id};
 };
 
 export {

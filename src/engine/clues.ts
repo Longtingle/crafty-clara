@@ -1,14 +1,15 @@
 // What a bot works out about the other players from what it has seen this
 // round: which cards each of them seems to be collecting, judged by what
-// they picked up, passed over and threw away. A hard bot uses it to avoid
-// discarding cards that would help someone else.
+// they picked up, passed over and threw away, and which cards are gone. A
+// hard bot uses it to avoid discarding cards that would help someone else,
+// and to collect setruns it can still finish.
 //
 // Its memory isn't perfect. It remembers each thing it saw with a chance that
 // fades as turns go by. Its seed decides which things it remembers, so it
 // doesn't change its mind from one move to the next, and once it has
 // forgotten something it stays forgotten.
 
-import {isRedAce, type Card} from './cards.ts';
+import {SET, SUITS, createCard, isRedAce, isWild, type Card, type SetrunType, type Suit} from './cards.ts';
 import {addToSetrun} from './setruns.ts';
 import {random} from './random.ts';
 import type {GameView} from './view.ts';
@@ -27,6 +28,13 @@ export interface Clues {
     wants(seat: number, card: Card): number;
     /** the chance that a card you discard goes to someone it helps, from 0 to 1 */
     danger(card: Card): number;
+    /** how many copies of a card are out of your reach, as far as you know: on the tables, or seen discarded or taken */
+    gone(value: number, suit: Suit): number;
+    /**
+     * For an unfinished set or run, how many cards that would grow it are
+     * still to be had, each discounted by how much other players want it
+     */
+    outs(type: SetrunType, cards: Card[]): number;
 }
 
 /** Whether a bot remembers the log entry at `index` of a round, `age` turns after it happened. */
@@ -46,6 +54,11 @@ const NEAR = [0, 1, 0.6];
 // draws from the deck instead.
 const NEXT_REACH = 1;
 const OTHER_REACH = 0.5;
+// How much another player wanting a card keeps it from you: the player just
+// before you sees most discards first and comes ahead of you for every claim.
+// (In tournaments, counting every player the same did about as well.)
+const UPSTREAM_CONTEST = 1;
+const OTHER_CONTEST = 0.5;
 
 // A card's place or places in a run: an ace can be low or high.
 const runPlaces = (card: Card): number[] => (card.value === 1) ? [1, 14] : [card.value];
@@ -122,5 +135,55 @@ export const readClues = (view: GameView, memory: Memory): Clues => {
         return 1 - safe;
     };
 
-    return {wants, danger};
+    // Copies out of reach, by card: everything on the tables, and what it
+    // remembers being discarded since the last reshuffle or taken by someone
+    // else. Not the cards in its hand, nor the discard on top, which it can still get.
+    let goneIds = new Map<string, string>();
+    for (let table of tables) {
+        for (let setrun of table) {
+            for (let card of setrun.cards) {
+                let real = isWild(card) ? card.ace! : card;
+                goneIds.set(card.id, cardKey(real.value, real.suit));
+            }
+        }
+    }
+    let reshuffled = log.findLastIndex(entry => entry.type === "reshuffle");
+    for (let [i, entry] of log.entries()) {
+        if (!remembers(memory, view.round, i, discardsAfter[i])) continue;
+        let card: Card | null = null;
+        if (entry.type === "discard" && i > reshuffled) card = entry.card;
+        if ((entry.type === "claim" || (entry.type === "draw" && entry.from === "discard")) && entry.seat !== view.seat) card = entry.card;
+        if (card) goneIds.set(card.id, cardKey(card.value, card.suit));
+    }
+    for (let card of [...view.hand, ...view.discard.slice(0, 1)]) goneIds.delete(card.id);
+    let goneCount = new Map<string, number>();
+    for (let key of goneIds.values()) add(goneCount, key, 1);
+    let mine = new Map<string, number>();
+    for (let card of view.hand) add(mine, cardKey(card.value, card.suit), 1);
+
+    const gone = (value: number, suit: Suit): number => goneCount.get(cardKey(value, suit)) ?? 0;
+    // copies you could still get, of two in the decks
+    const live = (value: number, suit: Suit): number =>
+        Math.max(0, 2 - gone(value, suit) - (mine.get(cardKey(value, suit)) ?? 0));
+
+    let upstream = (view.seat - 1 + seats) % seats;
+    const contest = (value: number, suit: Suit): number => {
+        let card = createCard((value === 14) ? 1 : value, suit, "?");
+        let most = 0;
+        for (let seat = 0; seat < seats; seat++) {
+            if (seat === view.seat) continue;
+            most = Math.max(most, wants(seat, card) * ((seat === upstream) ? UPSTREAM_CONTEST : OTHER_CONTEST));
+        }
+        return most;
+    };
+    const odds = (value: number, suit: Suit): number => live(value, suit) * (1 - contest(value, suit));
+
+    const outs = (type: SetrunType, cards: Card[]): number => {
+        if (type === SET) return SUITS.reduce((sum, suit) => sum + odds(cards[0].value, suit), 0);
+        let suit = cards[0].suit;
+        let ends = [cards[0].value - 1, cards[cards.length - 1].value + 1].filter(value => value >= 1 && value <= 14);
+        return ends.reduce((sum, value) => sum + odds(value, suit), 0);
+    };
+
+    return {wants, danger, gone, outs};
 };
