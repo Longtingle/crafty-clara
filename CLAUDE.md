@@ -28,6 +28,7 @@ npm test                                       # Vitest, watch mode
 npm test -- --run                              # single run
 npx vitest run src/engine/game.test.ts         # one file
 npx vitest run -t "checkSetrun"                # tests matching a name
+npm run tournament -- --deals 200 --lineup normal,normal,normal,normal   # bots against each other (Node 22.12+)
 ```
 
 - Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.ts`. Tests that need no browser (the engine, host and client, and the UI's pure modules) start with `// @vitest-environment node`.
@@ -107,6 +108,12 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 **`simulate.ts`**
 - `simulateGame(seed, options)` plays a whole bot game with no timers.
 - `simulate.test.ts` plays dozens of games for 2 to 6 players and checks every state against the rules: all 104 cards present once, valid setruns, scores and claim windows. Run it after changing rules or bots.
+- Each seat is played by a `Player`, a function from a view to a command (`botMove` by default), so different bots can play each other.
+
+**`tournament.ts`**
+- `playTournament({lineup, deals})` plays each deal once for every rotation of the lineup, so every bot gets every seat and the same cards. It reports each bot's average score, win rate and how often it went out. With two bots it also gives the first one's edge, in points per game, with its standard error.
+- Use it to check that a bot change really helps. An edge bigger than two standard errors is real; a few hundred deals usually gets there.
+- `npm run tournament` runs it from `scripts/tournament.js`, which lists the bots by name. The script is plain JavaScript that Node runs with the engine's types stripped, so it needs Node 22.12+. `.oxlintrc.json` gives `scripts/` Node's globals.
 
 **`setruns.ts`**
 - `checkSetrun(cards, type)` and `addToSetrun(setrun, card)` are the single source of truth for setrun validity.

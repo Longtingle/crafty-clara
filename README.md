@@ -25,3 +25,4 @@ Then open http://localhost:5173.
 | `npm test`        | Run the tests with Vitest in watch mode (`npm test -- --run` for a single run) |
 | `npm run lint`    | Lint with oxlint                                  |
 | `npm run typecheck` | Type-check with TypeScript                      |
+| `npm run tournament` | Play bots against each other and compare how they score (Node 22.12+) |

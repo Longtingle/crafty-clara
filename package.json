@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "typecheck": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "tournament": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tournament.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
