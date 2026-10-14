@@ -6,6 +6,7 @@ import {createGameClient, type GameClient} from './client/game-client.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
 import GameScreen from './components/game/game-screen.tsx';
+import {goFullscreen} from './lib/fullscreen.ts';
 
 interface Session {
     game: LocalGame;
@@ -62,7 +63,15 @@ function App() {
         saveLevels(next);
     };
 
+    // On a phone or tablet, starting a game goes full screen (if you've left
+    // full screen since, dealing goes back to it)
+    let startGame = () => {
+        void goFullscreen();
+        setChoosing(true);
+    };
+
     let deal = () => {
+        void goFullscreen();
         let game = startLocalGame({name : "You", seed : devSeed(), levels});
         setSession({game, client : createGameClient(game.port), levels : [null, ...levels]});
     };
@@ -79,7 +88,7 @@ function App() {
     } else if (choosing) {
         screen = <NewGame levels={levels} onLevelsChange={changeLevels} onDeal={deal} onBack={() => setChoosing(false)} />;
     } else {
-        screen = <Home onStartGame={() => setChoosing(true)} />;
+        screen = <Home onStartGame={startGame} />;
     }
 
     // animations respect the "reduce motion" system setting
