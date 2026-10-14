@@ -99,12 +99,28 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - A view is JSON-safe, ready to send over a socket.
 
 **`bot.ts`**
-- `botMove(view)` returns a bot's next command, or null while it waits. A bot sees only its own view.
+- `botMove(view, profile)` returns a bot's next command, or null while it waits. A bot sees only its own view.
+- A `BotProfile` is a level and a seed. There are two levels:
+  - **Normal** plays its own hand.
+  - **Hard** discards by points rather than face value, so it throws away useless black aces (25 points). It also reads the table (`clues.ts`), and of two discards worth about the same, throws the one nobody seems to want (`DANGER_WEIGHT`).
+  - In tournaments Hard scores about 52 points a game fewer than Normal. Almost all of that comes from discarding by points.
+  - Weighting danger more heavily, to hold high cards back from others, cost more points than it saved.
 - It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
 - `planGoDown(hand, requirement, tables)` tries every way to go down with exactly the round's setruns: each red ace as itself or as a wild, with wilds filling gaps in runs. For each way, it plays out what it could then add to the tables, and keeps the one that leaves the fewest points in hand (plus `CARD_COST` a card). So it lays kings rather than 2s, and keeps back a set it can add to someone else's.
 - `scoreHand` still guides what to collect and discard, but it is greedy and misses some ways to go down, so don't use it to decide whether the bot can go down.
 - `worthTaking` stops the two take-and-throw-back loops the simulations found.
+
+**`clues.ts`**
+- `readClues(view, memory)` works out from the round's log what each other seat seems to want, from 0 to 1:
+  - **Pickups count for:** taking a discard or claiming one.
+  - **Count against:** throwing a card away, or drawing past it.
+  - **What a card says depends on the round:** in a round of sets it points to the card's value, and in a round of runs to its neighbours in the suit. A mixed round splits the weight between the two.
+  - **A seat that's down** wants whatever fits a setrun on the table.
+- `danger(card)` is the chance a discard reaches someone it helps. The next player can take it; the others only by claiming it.
+- **Memory:** a bot remembers each log entry with a chance that fades with each turn (`remembers`).
+  - The seed decides which entries, so its choices don't flicker from one move to the next, and a game still replays exactly.
+  - In tournaments, perfect memory was barely better than Hard's.
 
 **`simulate.ts`**
 - `simulateGame(seed, options)` plays a whole bot game with no timers.
@@ -138,8 +154,8 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 - **`transport.ts`:** a `Port` is one end of a connection (`send`, `listen`, `close`). `createLocalPair` connects two ends in the page. Each message arrives a moment after it is sent, never during `send`, and as a copy made through JSON, as over a socket. A WebSocket can later be wrapped as a `Port`.
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
 - **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
-- **`bot-player.ts`:** `startBot(port)` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `App.tsx` starts one per game.
+- **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
+- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game; in development, `?bots=hard,normal,hard` in the URL sets the levels and `?seed=N` the deal.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
 
 ### The client (`src/client/`)

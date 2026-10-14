@@ -2,7 +2,8 @@
 import {ROUND_REQUIREMENTS, type Card} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
 import type {GameState} from './game.ts';
-import {simulateGame, type SimulationOptions} from './simulate.ts';
+import {simulateGame, type Player, type SimulationOptions} from './simulate.ts';
+import {botMove} from './bot.ts';
 
 // Everything that must hold in every state of every game.
 const problems = (state: GameState): string[] => {
@@ -65,6 +66,14 @@ describe('bot games', {timeout : 30_000}, () => {
     it('close claim windows at their deadline when a player never answers', () => {
         for (let seed = 1; seed <= 10; seed++) {
             const game = play(seed, {silent : [0, 2]});
+            expect({seed, problems : game.problems, stalled : game.stalled}).toEqual({seed, problems : [], stalled : false});
+        }
+    });
+
+    it('play by the rules with hard bots too', () => {
+        const hard: Player = view => botMove(view, {level : "hard", seed : 3});
+        for (let seed = 1; seed <= 10; seed++) {
+            const game = play(seed, {players : [hard, botMove, hard, botMove]});
             expect({seed, problems : game.problems, stalled : game.stalled}).toEqual({seed, problems : [], stalled : false});
         }
     });

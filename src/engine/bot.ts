@@ -2,11 +2,37 @@
 // and answers with a command (botMove). The decisions rest on scoreHand, a
 // heuristic that finds the best partial and complete setruns for the round's
 // requirement.
+//
+// There are two levels. A normal bot plays its own hand. A hard bot also
+// reads the table (clues.ts): it remembers, imperfectly, what the others
+// pick up and throw away, and avoids discarding what would help them.
 
 import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
 import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
+import {readClues, type Memory} from './clues.ts';
 import type {Command, Target} from './game.ts';
 import type {GameView} from './view.ts';
+
+export type BotLevel = "normal" | "hard";
+
+/** Who a bot is: its level, and a seed for what it forgets. */
+export interface BotProfile {
+    level: BotLevel;
+    seed: number;
+}
+
+export const NORMAL_BOT: BotProfile = {level : "normal", seed : 0};
+
+/** How well a hard bot remembers what it saw (see clues.ts). */
+const HARD_MEMORY: Omit<Memory, "seed"> = {fresh : 0.95, fade : 0.92};
+
+/**
+ * How many points a hard bot would keep in hand rather than discard a card
+ * someone surely wants. Small on purpose: in tournaments, keeping high cards
+ * back to deny others cost more points than it saved, but choosing the safer
+ * of two discards worth about the same helped (by about 4 points a game).
+ */
+const DANGER_WEIGHT = 2;
 
 type Indexed = Card & {index: number};
 
@@ -210,8 +236,12 @@ const wantsCard = (hand: Card[], requirement: Requirement, card: Card): boolean 
 /**
  * The index of the card to discard: the highest card that isn't useful, then
  * the highest not in the best hand. Red aces are kept if possible.
+ *
+ * Given how dangerous each card is to discard (the chance it helps someone
+ * else), it weighs that against the card's points instead of discarding the
+ * highest.
  */
-const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean): number => {
+const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, danger?: (card: Card) => number): number => {
     let indexed: Indexed[] = hand.map((card, index) => ({...card, index}));
     let candidates = indexed;
 
@@ -227,6 +257,10 @@ const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean):
     let notWild = candidates.filter(card => !isRedAce(card));
     if (notWild.length > 0) candidates = notWild;
 
+    if (danger) {
+        let worth = (card: Card): number => getPoints([card]) - DANGER_WEIGHT * danger(card);
+        return candidates.reduce((best, card) => (worth(card) > worth(best)) ? card : best).index;
+    }
     return candidates.reduce((highest, card) => (card.value > highest.value) ? card : highest).index;
 };
 
@@ -380,7 +414,7 @@ const worthTaking = (view: GameView, card: Card): boolean => {
  * it can, then adds cards to setruns one at a time, and discards last. It is
  * ready for the next round as soon as a round ends.
  */
-const botMove = (view: GameView): Command | null => {
+const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | null => {
     let {hand, requirement} = view;
     let me = view.seats[view.seat];
     let tables = view.seats.map(seat => seat.table);
@@ -410,7 +444,8 @@ const botMove = (view: GameView): Command | null => {
         let addition = findAddition(hand, tables);
         if (addition) return {type : "addToSetrun", card : addition.card.id, target : addition.target};
     }
-    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown)].id};
+    let danger = (profile.level === "hard") ? readClues(view, {seed : profile.seed, ...HARD_MEMORY}).danger : undefined;
+    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, danger)].id};
 };
 
 export {

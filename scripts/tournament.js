@@ -2,7 +2,7 @@
 // change makes a bot play better. Each deal is played once for every
 // rotation of the lineup, so every bot gets every seat. For example:
 //
-//   npm run tournament -- --deals 200 --lineup normal,normal,normal,normal
+//   npm run tournament -- --deals 200 --lineup hard,normal,normal,normal
 //
 // It runs the engine's TypeScript directly, so it needs Node 22.12 or later.
 
@@ -11,12 +11,13 @@ import {botMove} from '../src/engine/bot.ts';
 import {playTournament} from '../src/engine/tournament.ts';
 
 const BOTS = {
-    normal : botMove
+    normal : view => botMove(view),
+    hard : view => botMove(view, {level : "hard", seed : 1})
 };
 
 const {values} = parseArgs({options : {
     deals : {type : "string", default : "100"},
-    lineup : {type : "string", default : "normal,normal,normal,normal"},
+    lineup : {type : "string", default : "hard,normal,normal,normal"},
     seed : {type : "string", default : "1"}
 }});
 

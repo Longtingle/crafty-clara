@@ -107,6 +107,20 @@ describe('chooseDiscard', () => {
         const hand = cards("1H 3C 2D");
         expect(hand[chooseDiscard(hand, {S : 2, R : 0}, true)].displayString).toBe("3C");
     });
+
+    it('given the danger of each card, weighs it against the points', () => {
+        const discard = (str: string, danger?: (c: Card) => number) => {
+            const hand = cards(str);
+            return hand[chooseDiscard(hand, {S : 2, R : 0}, false, danger)].displayString;
+        };
+        // a normal bot throws the highest card, and a hard bot the most points
+        expect(discard("1S 13C 12D 4C")).toBe("13C");
+        expect(discard("1S 13C 12D 4C", () => 0)).toBe("1S");
+        // of two cards worth about the same, the safer one
+        expect(discard("13C 12D 4C", c => (c.displayString === "13C") ? 1 : 0)).toBe("12D");
+        // but not a card worth much less
+        expect(discard("13C 5D 4C", c => (c.displayString === "13C") ? 1 : 0)).toBe("13C");
+    });
 });
 
 describe('findAddition', () => {
@@ -128,6 +142,15 @@ describe('botMove', () => {
         if (!result.ok) throw new Error(result.error);
         return result.state;
     };
+
+    it('at the hard level, discards what the next player seems not to want', () => {
+        let state = play(newGame(), 0, {type : "draw", from : "discard"});
+        state.seats[0].hand = cards("12D 11S 4C");
+        state.log.push({type : "draw", seat : 1, from : "discard", card : card("12C")});
+        expect(botMove(viewFor(state, 0, 0))).toMatchObject({type : "discard", card : "12D"});
+        // (a hard bot with seed 3 happens to remember the pickup; it forgets 1 thing in 20 straight away)
+        expect(botMove(viewFor(state, 0, 0), {level : "hard", seed : 3})).toMatchObject({type : "discard", card : "11S"});
+    });
 
     it('draws on its turn and waits otherwise', () => {
         const state = newGame();

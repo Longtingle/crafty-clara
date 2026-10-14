@@ -2,7 +2,7 @@
 // the views the host sends it, and pauses before each move so a person can
 // follow what it does.
 
-import {botMove} from '../engine/bot.ts';
+import {NORMAL_BOT, botMove, type BotProfile} from '../engine/bot.ts';
 import type {Command} from '../engine/game.ts';
 import type {GameView} from '../engine/view.ts';
 import {systemClock, type Clock, type TimerId} from './clock.ts';
@@ -23,6 +23,8 @@ export interface BotPace {
 export const BOT_PACE: BotPace = {draw : 1000, answer : 1000, move : 800, ready : 0};
 
 export interface BotOptions {
+    /** its level and seed; a normal bot by default */
+    profile?: BotProfile;
     clock?: Clock;
     pace?: BotPace;
     /**
@@ -45,6 +47,7 @@ const pauseFor = (pace: BotPace, command: Command): number => {
 
 /** Plays the seat at this end of the port. Returns a function that stops the bot. */
 export const startBot = (port: SeatPort, {
+    profile = NORMAL_BOT,
     clock = systemClock,
     pace = BOT_PACE,
     onRefused = message => console.warn("A bot's move was refused:", message)
@@ -60,7 +63,7 @@ export const startBot = (port: SeatPort, {
     // The view may have changed during the pause, so decide again on the latest.
     const move = (): void => {
         pause = undefined;
-        let command = view && botMove(view);
+        let command = view && botMove(view, profile);
         if (command) port.send({type : "command", command});
     };
 
@@ -72,7 +75,7 @@ export const startBot = (port: SeatPort, {
             return;
         }
         view = message.view;
-        let command = botMove(view);
+        let command = botMove(view, profile);
         if (!command) {
             cancel();
         } else if (pause === undefined) {

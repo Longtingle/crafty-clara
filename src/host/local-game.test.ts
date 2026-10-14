@@ -33,7 +33,7 @@ describe('a local game', () => {
     it('plays out to the end, with the claim windows you ignore closing at their deadline', () => {
         const warn = vi.spyOn(console, "warn");
         const clock = createTestClock();
-        const game = startLocalGame({name : "You", seed : 7, clock});
+        const game = startLocalGame({name : "You", seed : 7, levels : ["hard", "normal", "hard"], clock});
         const you = playAsYou(game.port, clock, ["claim", "pass"]);
         clock.runAll();
 
