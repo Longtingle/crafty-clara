@@ -24,24 +24,26 @@ interface NewGameProps {
     onBack: () => void;
 }
 
-// Before a game: how crafty each opponent is.
+// Before a game: how crafty each opponent is. On a phone held sideways (a
+// short screen) it's tightened to fit on one screen, with the key to the
+// levels beside the Deal button.
 function NewGame({levels, onLevelsChange, onDeal, onBack}: NewGameProps) {
     let setLevel = (index: number, level: BotLevel) => onLevelsChange(levels.map((old, i) => (i === index) ? level : old));
     return (
-        <main className="relative grid min-h-dvh place-items-center bg-felt p-6 shadow-[inset_0_0_180px_rgb(0_0_0/0.4)] short:px-6 short:py-4">
-            <div className="flex w-full max-w-176 flex-col items-center gap-7 short:max-w-none short:items-stretch short:gap-3">
+        <main className="relative grid min-h-dvh place-items-center bg-felt p-6 shadow-[inset_0_0_180px_rgb(0_0_0/0.4)] short:px-5 short:py-1.5">
+            <div className="flex w-full max-w-176 flex-col items-center gap-7 short:max-w-none short:items-stretch short:gap-1">
                 <header className="flex flex-col items-center gap-2.5 text-center short:flex-row short:gap-2 short:text-left">
                     <Button variant="ghost" onClick={onBack} className="absolute top-6 left-6 pl-3 max-sm:static max-sm:self-start short:static short:size-11 short:px-0">
                         <ChevronLeft aria-hidden="true" className="size-5" strokeWidth={2.5} />
                         <span className="short:sr-only">Back</span>
                     </Button>
-                    <h1 className="font-heading text-[56px] leading-none font-extrabold tracking-tight short:text-[32px]">New game</h1>
-                    <p className="text-lg text-muted-foreground short:ml-2 short:text-[15px]">Choose how crafty each opponent is.</p>
+                    <h1 className="font-heading text-[56px] leading-none font-extrabold tracking-tight short:text-[28px]">New game</h1>
+                    <p className="text-lg text-muted-foreground short:ml-1 short:min-w-0 short:truncate short:text-[15px]">Choose how crafty each opponent is.</p>
                 </header>
 
-                <ul aria-label="Opponents" className="w-full rounded-2xl border border-border bg-panel py-1.5 short:py-1">
+                <ul aria-label="Opponents" className="w-full rounded-2xl border border-border bg-panel py-1.5 short:py-0.5">
                     {levels.map((level, index) => (
-                        <li key={index} className="flex flex-wrap items-center gap-4 border-white/8 px-5 py-3.5 not-first:border-t short:flex-nowrap short:gap-3 short:py-1.5 short:pr-3 short:pl-3.5">
+                        <li key={index} className="flex flex-wrap items-center gap-4 border-white/8 px-5 py-3.5 not-first:border-t short:flex-nowrap short:gap-3 short:py-0.5 short:pr-1.5 short:pl-3.5">
                             <span
                                 aria-hidden="true"
                                 className="grid size-11 flex-none place-items-center rounded-full text-lg font-bold text-white short:size-9 short:text-base"
@@ -53,7 +55,7 @@ function NewGame({levels, onLevelsChange, onDeal, onBack}: NewGameProps) {
                                 <span id={"opponent-" + index} className="text-lg font-bold short:text-base">Opponent {index + 1}</span>
                                 <span className="text-sm text-muted-foreground short:truncate short:text-[13px]">{seatNote(index, levels.length)}</span>
                             </div>
-                            <div role="group" aria-labelledby={"opponent-" + index} className="ml-auto grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1">
+                            <div role="group" aria-labelledby={"opponent-" + index} className="ml-auto grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 short:p-0.5">
                                 {LEVELS.map(option => (
                                     <Button
                                         key={option.level}
@@ -82,7 +84,7 @@ function NewGame({levels, onLevelsChange, onDeal, onBack}: NewGameProps) {
                         <b className="text-foreground">Normal</b> plays its own hand well. <b className="text-foreground">Hard</b> counts
                         every point, and keeps an eye on what everyone picks up.
                     </p>
-                    <Button size="lg" onClick={onDeal} className="px-9 text-lg short:flex-none short:px-7">Deal the cards</Button>
+                    <Button size="lg" onClick={onDeal} className="px-9 text-lg short:h-11 short:flex-none short:px-7">Deal the cards</Button>
                 </div>
             </div>
         </main>
