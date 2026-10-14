@@ -32,14 +32,19 @@ const result = playTournament({lineup, deals, firstSeed : Number(values.seed)});
 const seconds = (performance.now() - started) / 1000;
 
 const percent = value => (value * 100).toFixed(1) + "%";
+const points = value => (value === null) ? "–" : Number(value.toFixed(1));
 console.log(`${deals} deals × ${lineup.length} rotations = ${result.games} games` +
     ` (${result.stalled} stalled) in ${seconds.toFixed(0)}s\n`);
 console.table(Object.fromEntries(result.standings.map(standing => [standing.name, {
     "seats" : standing.seats,
     "score per game" : Number(standing.meanScore.toFixed(1)),
     "wins" : percent(standing.winRate),
-    "went out" : percent(standing.wentOutRate)
+    "went out" : percent(standing.wentOutRate),
+    "got down" : percent(standing.downRate),
+    "pts when down" : points(standing.pointsWhenDown),
+    "pts when caught" : points(standing.pointsWhenCaught)
 }])));
+console.log("Points are per round. Getting down includes going out; caught means the round ended before it got down.");
 
 if (result.edge) {
     const [first, second] = result.standings.map(standing => standing.name);

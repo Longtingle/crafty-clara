@@ -136,7 +136,13 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - Each seat is played by a `Player`, a function from a view to a command (`botMove` by default), so different bots can play each other.
 
 **`tournament.ts`**
-- `playTournament({lineup, deals})` plays each deal once for every rotation of the lineup, so every bot gets every seat and the same cards. It reports each bot's average score, win rate and how often it went out. With two bots it also gives the first one's edge, in points per game, with its standard error.
+- `playTournament({lineup, deals})` plays each deal once for every rotation of the lineup, so every bot gets every seat and the same cards. With two bots it also gives the first one's edge, in points per game, with its standard error. For each bot it reports:
+  - its average score and win rate
+  - how often it went out, and how often it got down
+  - its points per round when it got down, and when it was caught without getting down
+- Getting down is what matters most.
+  - In tournaments a bot caught with its hand scores about 100–110 points that round, against 5–11 when it got down. So each extra point of "got down" is worth about 7 points a game.
+  - Look at the down rate as well as the score: it tells a change that gets the bot down more often from one that only keeps its points low.
 - Use it to check that a bot change really helps. An edge bigger than two standard errors is real; a few hundred deals usually gets there.
 - `npm run tournament` runs it from `scripts/tournament.js`, which lists the bots by name. The script is plain JavaScript that Node runs with the engine's types stripped, so it needs Node 22.12+. `.oxlintrc.json` gives `scripts/` Node's globals.
 

@@ -55,6 +55,11 @@ describe('bot games', {timeout : 30_000}, () => {
             for (let seat of game.state.seats) expect(seat.scores).toHaveLength(ROUND_REQUIREMENTS.length);
             // someone went out each round, scoring nothing
             expect(game.state.seats.some(seat => seat.scores.at(-1) === 0)).toBe(true);
+            // whoever went out had gone down
+            expect(game.down).toHaveLength(ROUND_REQUIREMENTS.length);
+            game.wentOut.forEach((seat, round) => {
+                if (seat !== null) expect(game.down[round][seat]).toBe(true);
+            });
         }
     });
 

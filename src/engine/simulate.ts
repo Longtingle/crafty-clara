@@ -27,6 +27,8 @@ export interface SimulationResult {
     turns: number[];
     /** who went out in each round (null when the deck ran out) */
     wentOut: (number | null)[];
+    /** for each round, whether each seat had gone down by its end */
+    down: boolean[][];
     /** whether the game stopped because a round ran past maxTurns */
     stalled: boolean;
 }
@@ -41,6 +43,7 @@ export const simulateGame = (seed: number, {seats = 4, players = [], silent = []
     let now = 0;
     let turns = [0];
     let wentOut: (number | null)[] = [];
+    let down: boolean[][] = [];
     onState?.(state);
 
     while (state.phase !== "gameEnd") {
@@ -59,10 +62,13 @@ export const simulateGame = (seed: number, {seats = 4, players = [], silent = []
             now = state.claim.deadline;
             state = expireClaims(state, now);
         }
-        if (phase === "play" && (state.phase === "roundEnd" || state.phase === "gameEnd")) wentOut.push(state.wentOut);
+        if (phase === "play" && (state.phase === "roundEnd" || state.phase === "gameEnd")) {
+            wentOut.push(state.wentOut);
+            down.push(state.seats.map(seat => seat.isDown));
+        }
         if (state.round !== round) turns.push(0);
-        if (turns[turns.length - 1] > maxTurns) return {state, turns, wentOut, stalled : true};
+        if (turns[turns.length - 1] > maxTurns) return {state, turns, wentOut, down, stalled : true};
         onState?.(state);
     }
-    return {state, turns, wentOut, stalled : false};
+    return {state, turns, wentOut, down, stalled : false};
 };

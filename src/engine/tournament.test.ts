@@ -1,4 +1,5 @@
 // @vitest-environment node
+import {ROUND_REQUIREMENTS} from './cards.ts';
 import {botMove} from './bot.ts';
 import type {Player} from './simulate.ts';
 import {playTournament} from './tournament.ts';
@@ -27,5 +28,14 @@ describe('playTournament', () => {
         // sits where, so neither can have an edge
         expect(result.edge?.mean).toBeCloseTo(0);
         expect(a.meanScore).toBeCloseTo(b.meanScore);
+        expect(a.downRate).toBeCloseTo(b.downRate);
+
+        // a game's score is its rounds' scores, down or caught
+        for (let standing of [a, b]) {
+            expect(standing.downRate).toBeGreaterThan(0);
+            expect(standing.downRate).toBeLessThan(1);
+            const perRound = standing.downRate * standing.pointsWhenDown! + (1 - standing.downRate) * standing.pointsWhenCaught!;
+            expect(standing.meanScore).toBeCloseTo(ROUND_REQUIREMENTS.length * perRound);
+        }
     }, 30_000);
 });

@@ -29,6 +29,15 @@ export interface Standing {
     winRate: number;
     /** share of rounds in which this contestant went out */
     wentOutRate: number;
+    /**
+     * Share of rounds in which this contestant got down (going out
+     * included). The rest it was caught with a full hand, which usually
+     * costs far more than anything else.
+     */
+    downRate: number;
+    /** average points a round when it got down, and when it was caught (null if it never was) */
+    pointsWhenDown: number | null;
+    pointsWhenCaught: number | null;
 }
 
 export interface TournamentResult {
@@ -49,7 +58,7 @@ const mean = (values: number[]): number => values.reduce((sum, value) => sum + v
 export const playTournament = ({lineup, deals, firstSeed = 1}: TournamentOptions): TournamentResult => {
     let seats = lineup.length;
     let names = [...new Set(lineup.map(contestant => contestant.name))];
-    let tally = new Map(names.map(name => [name, {seats : 0, score : 0, wins : 0, rounds : 0, wentOut : 0}]));
+    let tally = new Map(names.map(name => [name, {seats : 0, score : 0, wins : 0, rounds : 0, wentOut : 0, down : 0, pointsDown : 0, pointsCaught : 0}]));
     let edges: number[] = [];
     let games = 0;
     let stalled = 0;
@@ -74,6 +83,15 @@ export const playTournament = ({lineup, deals, firstSeed = 1}: TournamentOptions
                 if (totals[seat] === best) entry.wins += 1 / winners;
                 entry.rounds += result.wentOut.length;
                 entry.wentOut += result.wentOut.filter(out => out === seat).length;
+                result.down.forEach((downs, round) => {
+                    let points = result.state.seats[seat].scores[round];
+                    if (downs[seat]) {
+                        entry.down++;
+                        entry.pointsDown += points;
+                    } else {
+                        entry.pointsCaught += points;
+                    }
+                });
             });
             if (names.length === 2) {
                 let scoreOf = (name: string) => mean(totals.filter((_, seat) => table[seat].name === name));
@@ -99,7 +117,10 @@ export const playTournament = ({lineup, deals, firstSeed = 1}: TournamentOptions
                 seats : entry.seats,
                 meanScore : entry.score / entry.seats,
                 winRate : entry.wins / entry.seats,
-                wentOutRate : entry.wentOut / entry.rounds
+                wentOutRate : entry.wentOut / entry.rounds,
+                downRate : entry.down / entry.rounds,
+                pointsWhenDown : (entry.down > 0) ? entry.pointsDown / entry.down : null,
+                pointsWhenCaught : (entry.rounds > entry.down) ? entry.pointsCaught / (entry.rounds - entry.down) : null
             };
         }),
         edge
