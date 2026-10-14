@@ -14,6 +14,8 @@ export interface SeatView {
     /** points for each round played */
     scores: number[];
     total: number;
+    /** once the round is over: whether they are ready for the next */
+    ready: boolean;
 }
 
 export interface ClaimView {
@@ -67,7 +69,8 @@ export const viewFor = (state: GameState, seat: number, now: number): GameView =
             table : player.table,
             isDown : player.isDown,
             scores : player.scores,
-            total : player.scores.reduce((sum, score) => sum + score, 0)
+            total : player.scores.reduce((sum, score) => sum + score, 0),
+            ready : player.ready
         })),
         deck : {count : state.deck.length, top : state.deck[0]?.id ?? null, canDraw : canDrawFromDeck(state)},
         discard : state.discard,

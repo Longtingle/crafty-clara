@@ -33,6 +33,8 @@ export interface SeatState {
     isDown: boolean;
     /** points for each round played */
     scores: number[];
+    /** once the round is over: whether they are ready for the next */
+    ready: boolean;
 }
 
 /**
@@ -78,7 +80,9 @@ export type Command =
     | {type: "pass"}
     | {type: "goDown"; setruns: {type: SetrunType; cards: string[]}[]}
     | {type: "addToSetrun"; card: string; target: Target}
-    | {type: "discard"; card: string};
+    | {type: "discard"; card: string}
+    /** ready for the next round, which is dealt once every seat is ready */
+    | {type: "ready"};
 
 export type Result = {ok: true; state: GameState} | {ok: false; error: string};
 
@@ -132,7 +136,7 @@ export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): Ga
         round : 0,
         phase : "draw",
         turn : 0,
-        seats : names.map(name => ({name, hand : [], table : [], isDown : false, scores : []})),
+        seats : names.map(name => ({name, hand : [], table : [], isDown : false, scores : [], ready : false})),
         deck : [],
         discard : [],
         discardedBy : null,
@@ -144,15 +148,6 @@ export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): Ga
     state.idPrefix = Math.floor(random(state) * 36 ** 4).toString(36).padStart(4, "0");
     deal(state);
     return state;
-};
-
-/** Deals the next round. The first player moves one seat on each round. */
-export const startNextRound = (state: GameState): Result => {
-    if (state.phase !== "roundEnd") return {ok : false, error : "The round isn't over"};
-    let next = structuredClone(state);
-    next.round++;
-    deal(next);
-    return {ok : true, state : next};
 };
 
 /** Applies a seat's command, or says why it can't be done. */
@@ -175,8 +170,9 @@ export const canDrawFromDeck = (state: Pick<GameState, "deck" | "discard">): boo
     state.deck.length > 0 || state.discard.length > 1;
 
 // The rest change `state` in place. They are only ever given apply's or
-// startNextRound's copy.
+// createGame's copy.
 
+// Deals a round. The first player moves one seat on each round.
 const deal = (state: GameState): void => {
     let cards: Card[] = [];
     for (let value = 1; value <= 13; value++) {
@@ -189,6 +185,7 @@ const deal = (state: GameState): void => {
         seat.hand = deck.splice(0, HAND_SIZE);
         seat.table = [];
         seat.isDown = false;
+        seat.ready = false;
     }
     state.discard = deck.splice(0, 1);
     state.deck = deck;
@@ -218,6 +215,7 @@ const run = (state: GameState, seat: number, command: Command, now: number): str
         case "goDown": return goDown(state, seat, command.setruns);
         case "addToSetrun": return addCard(state, seat, command.card, command.target);
         case "discard": return discard(state, seat, command.card);
+        case "ready": return ready(state, seat);
         default: return "Unknown command";
     }
 };
@@ -382,6 +380,18 @@ const discard = (state: GameState, seat: number, cardId: string): string | null 
     }
     state.turn = (seat + 1) % state.seats.length;
     state.phase = "draw";
+    return null;
+};
+
+const ready = (state: GameState, seat: number): string | null => {
+    if (state.phase === "gameEnd") return "The game is over";
+    if (state.phase !== "roundEnd") return "The round isn't over";
+    if (state.seats[seat].ready) return "Waiting for the other players";
+    state.seats[seat].ready = true;
+    if (state.seats.every(player => player.ready)) {
+        state.round++;
+        deal(state);
+    }
     return null;
 };
 

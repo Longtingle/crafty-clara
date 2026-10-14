@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {RUN, SET, getPoints, type Setrun} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
-import {apply, createGame, expireClaims, startNextRound, type Command, type GameState, type Result} from './game.ts';
+import {apply, createGame, expireClaims, type Command, type GameState, type Result} from './game.ts';
 import {card} from './testing.ts';
 
 const NAMES = ["Ann", "Bob", "Cat", "Dan"];
@@ -315,20 +315,25 @@ describe('the end of a round', () => {
         expect(state).toMatchObject({phase : "roundEnd", wentOut : 0});
     });
 
-    it('is followed by a new deal, started by the next seat along', () => {
-        const ended = play(lastCard(), 0, {type : "discard", card : "0.0"});
-        const next = unwrap(startNextRound(ended));
+    it('is followed by a new deal once every seat is ready, started by the next seat along', () => {
+        let state = play(lastCard(), 0, {type : "discard", card : "0.0"});
+        expect(refusal(newGame(), 0, {type : "ready"})).toBe("The round isn't over");
+        for (let seat of [0, 1, 2]) state = play(state, seat, {type : "ready"});
+        expect(state).toMatchObject({round : 0, phase : "roundEnd"});
+        expect(state.seats.map(seat => seat.ready)).toEqual([true, true, true, false]);
+        expect(refusal(state, 1, {type : "ready"})).toBe("Waiting for the other players");
+
+        const next = play(state, 3, {type : "ready"});
         expect(next).toMatchObject({round : 1, turn : 1, phase : "draw", wentOut : null, log : []});
         expect(next.seats.map(seat => seat.hand.length)).toEqual([12, 12, 12, 12]);
-        expect(next.seats.every(seat => !seat.isDown && seat.table.length === 0)).toBe(true);
+        expect(next.seats.every(seat => !seat.isDown && !seat.ready && seat.table.length === 0)).toBe(true);
         expect(next.seats.map(seat => seat.scores)).toEqual([[0], [30], [0], [22]]);
-        expect(startNextRound(newGame())).toEqual({ok : false, error : "The round isn't over"});
     });
 
     it('ends the game after the last round', () => {
         const state = play(arrange(lastCard(), {round : 6}), 0, {type : "discard", card : "0.0"});
         expect(state.phase).toBe("gameEnd");
-        expect(startNextRound(state).ok).toBe(false);
+        expect(refusal(state, 1, {type : "ready"})).toBe("The game is over");
     });
 
     it('scores a hand with getPoints', () => {

@@ -2,7 +2,7 @@
 // out rule or bot changes. Time stands still until every seat is waiting on
 // a claim window; then the clock jumps to its deadline.
 
-import {apply, createGame, expireClaims, startNextRound, type GameState, type Result} from './game.ts';
+import {apply, createGame, expireClaims, type GameState, type Result} from './game.ts';
 import {viewFor} from './view.ts';
 import {botMove} from './bot.ts';
 
@@ -39,27 +39,24 @@ export const simulateGame = (seed: number, {seats = 4, silent = [], maxTurns = 1
     onState?.(state);
 
     while (state.phase !== "gameEnd") {
-        if (state.phase === "roundEnd") {
-            state = unwrap(startNextRound(state));
-            turns.push(0);
-        } else {
-            let moved = false;
-            for (let seat = 0; seat < seats && !moved; seat++) {
-                let command = botMove(viewFor(state, seat, now));
-                if (!command) continue;
-                if (silent.includes(seat) && (command.type === "claim" || command.type === "pass")) continue;
-                state = unwrap(apply(state, seat, command, now));
-                if (command.type === "discard") turns[turns.length - 1]++;
-                moved = true;
-            }
-            if (!moved) {
-                if (!state.claim) throw new Error("Nobody can move");
-                now = state.claim.deadline;
-                state = expireClaims(state, now);
-            }
-            if (state.phase === "roundEnd" || state.phase === "gameEnd") wentOut.push(state.wentOut);
-            if (turns[turns.length - 1] > maxTurns) return {state, turns, wentOut, stalled : true};
+        let {round, phase} = state;
+        let moved = false;
+        for (let seat = 0; seat < seats && !moved; seat++) {
+            let command = botMove(viewFor(state, seat, now));
+            if (!command) continue;
+            if (silent.includes(seat) && (command.type === "claim" || command.type === "pass")) continue;
+            state = unwrap(apply(state, seat, command, now));
+            if (command.type === "discard") turns[turns.length - 1]++;
+            moved = true;
         }
+        if (!moved) {
+            if (!state.claim) throw new Error("Nobody can move");
+            now = state.claim.deadline;
+            state = expireClaims(state, now);
+        }
+        if (phase === "play" && (state.phase === "roundEnd" || state.phase === "gameEnd")) wentOut.push(state.wentOut);
+        if (state.round !== round) turns.push(0);
+        if (turns[turns.length - 1] > maxTurns) return {state, turns, wentOut, stalled : true};
         onState?.(state);
     }
     return {state, turns, wentOut, stalled : false};

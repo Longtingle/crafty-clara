@@ -136,6 +136,14 @@ describe('botMove', () => {
         expect(botMove(viewFor(state, 0, 0))).toBeNull();
     });
 
+    it('is ready for the next round as soon as a round ends', () => {
+        const state = newGame();
+        state.phase = "roundEnd";
+        expect(botMove(viewFor(state, 2, 0))).toEqual({type : "ready"});
+        state.seats[2].ready = true;
+        expect(botMove(viewFor(state, 2, 0))).toBeNull();
+    });
+
     it('goes down when it can, then adds cards one at a time, then discards', () => {
         let state = play(newGame(), 0, {type : "draw", from : "discard"});
         state.seats[0].hand = cards("7C 7H 7D 9S 9H 9C 8S 4D");

@@ -260,13 +260,15 @@ const worthTaking = (view: GameView, card: Card): boolean => {
 /**
  * The bot's next command, or null while it has nothing to do. It answers a
  * claim window as soon as one opens; on its own turn it draws, goes down when
- * it can, then adds cards to setruns one at a time, and discards last.
+ * it can, then adds cards to setruns one at a time, and discards last. It is
+ * ready for the next round as soon as a round ends.
  */
 const botMove = (view: GameView): Command | null => {
     let {hand, requirement} = view;
     let me = view.seats[view.seat];
     let tables = view.seats.map(seat => seat.table);
 
+    if (view.phase === "roundEnd") return me.ready ? null : {type : "ready"};
     if (view.claim?.canAnswer) {
         // a bot that is down only takes cards on its own turn
         let wants = !me.isDown && wantsCard(hand, requirement, view.claim.card);
