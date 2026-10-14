@@ -1,17 +1,24 @@
-import {Button} from '@/components/ui/button.jsx';
-import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
+import {Button} from '@/components/ui/button.tsx';
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
-import Scoreboard from './scoreboard.jsx';
-import {scoreRows} from './scores.js';
-import {opponentSeats} from './players.js';
+import type {GameView} from '@/engine/view.ts';
+import Scoreboard from './scoreboard.tsx';
+import {scoreRows} from './scores.ts';
+import {opponentSeats} from './players.ts';
 
-const keepOpen = (event) => event.preventDefault();
+const keepOpen = (event: {preventDefault(): void}) => event.preventDefault();
+
+interface RoundEndDialogProps {
+    view: GameView;
+    onReady: () => void;
+    onNewGame: () => void;
+}
 
 // Shown when a round ends. After the last round it names the winner (lowest
 // total) and offers a new game. The next round is dealt once everyone is
 // ready, so once you are, it says who it's waiting for.
-function RoundEndDialog({view, onReady, onNewGame}) {
+function RoundEndDialog({view, onReady, onNewGame}: RoundEndDialogProps) {
     if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
     let {round, rounds : roundCount} = view;

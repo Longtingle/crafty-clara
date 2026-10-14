@@ -43,7 +43,8 @@ const play = (seed: number, options: SimulationOptions = {}) => {
     return {...result, problems : [...found]};
 };
 
-describe('bot games', () => {
+// whole games take a few seconds, near Vitest's default timeout
+describe('bot games', {timeout : 30_000}, () => {
     it('play out to the end with the rules holding at every step', () => {
         for (let seed = 1; seed <= 40; seed++) {
             const game = play(seed);

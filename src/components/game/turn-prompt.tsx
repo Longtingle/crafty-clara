@@ -1,9 +1,16 @@
 import {Check, CircleAlert} from 'lucide-react';
-import {cn} from '@/lib/utils.js';
+import {cn} from '@/lib/utils.ts';
+import type {TurnStep} from './your-turn.ts';
 
-// steps: [{label, state : "done" | "current" | "todo"}], or null when it's not your turn.
-// notice, when set, says why a move didn't work, in place of text.
-function TurnPrompt({steps, text, notice}) {
+interface TurnPromptProps {
+    /** null when it's not your turn */
+    steps: TurnStep[] | null;
+    text: string;
+    /** why a move didn't work, shown in place of text */
+    notice: string | null;
+}
+
+function TurnPrompt({steps, text, notice}: TurnPromptProps) {
     return (
         <div
             role="status"

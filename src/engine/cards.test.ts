@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {createCard, getPoints, isRedAce} from './cards.ts';
+import {asWild, createCard, getPoints, isRedAce, isWild} from './cards.ts';
 import {random, shuffle} from './random.ts';
 import {card, cards} from './testing.ts';
 
@@ -12,6 +12,16 @@ describe('createCard', () => {
         expect(card("1D").ace).toEqual({value : 1, suit : "D", colour : "red"});
         expect(card("1S").ace).toEqual({value : 1, suit : "S", colour : "black"});
         expect(cards("1H 1D 1C 13H").map(isRedAce)).toEqual([true, true, false, false]);
+    });
+});
+
+describe('isWild', () => {
+    it('is a red ace standing in for another card, not one playing as itself', () => {
+        expect(isWild(asWild(card("1H"), 7, "C"))).toBe(true);
+        expect(isWild(asWild(card("1D"), 1, "H"))).toBe(true);
+        expect(isWild(card("1H"))).toBe(false);
+        expect(isWild({...card("1D"), value : 14})).toBe(false);
+        expect(isWild(asWild(card("1S"), 7, "C"))).toBe(false);
     });
 });
 

@@ -1,15 +1,31 @@
-import {useState} from 'react';
-import {DndContext, PointerSensor, closestCenter, useSensor, useSensors} from '@dnd-kit/core';
+import {useState, type CSSProperties} from 'react';
+import {DndContext, PointerSensor, closestCenter, useSensor, useSensors, type Announcements, type DragEndEvent, type UniqueIdentifier} from '@dnd-kit/core';
 import {SortableContext, horizontalListSortingStrategy, useSortable} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
-import {cn} from '@/lib/utils.js';
+import {cn} from '@/lib/utils.ts';
+import type {Card} from '@/engine/cards.ts';
 import {longName} from '@/engine/card-names.ts';
-import {PlayingCard, MovingCard, CardTag} from './playing-card.jsx';
-import {FLIGHT} from './cards.js';
+import {PlayingCard, MovingCard, CardTag} from './playing-card.tsx';
+import {FLIGHT} from './cards.ts';
+import type {NewCard} from './log-text.ts';
+
+interface HandCardProps {
+    card: Card;
+    index: number;
+    /** the hand's card ids joined, which changes whenever a card moves */
+    order: string;
+    isSelected: boolean;
+    selectable: boolean;
+    tag: string | null;
+    playable: boolean;
+    dealing: boolean;
+    onDealt: () => void;
+    onSelect: (index: number) => void;
+}
 
 // One card in the hand. The button is what dnd-kit drags; the MovingCard
 // inside it is what Motion animates (lifting, sliding, flying to a pile).
-function HandCard({card, index, order, isSelected, selectable, tag, playable, dealing, onDealt, onSelect}) {
+function HandCard({card, index, order, isSelected, selectable, tag, playable, dealing, onDealt, onSelect}: HandCardProps) {
     let {setNodeRef, listeners, transform, transition, isDragging} = useSortable({
         id : card.id,
         // Motion animates the card into its new slot after a drop
@@ -58,10 +74,22 @@ function HandCard({card, index, order, isSelected, selectable, tag, playable, de
     );
 }
 
+interface HandProps {
+    cards: Card[];
+    /** index of the selected card */
+    selected: number | null;
+    selectable: boolean;
+    newCard: NewCard | null;
+    /** for each card: whether it fits a setrun on the table (a gold dot) */
+    playable: boolean[];
+    onSelect: (index: number) => void;
+    onReorder: (from: number, to: number) => void;
+}
+
 // The human's cards. Click to select; drag (mouse or touch) to reorder. Cards
-// with a gold dot fit a setrun on the table; newCard ({id, label}) gets a tag.
+// with a gold dot fit a setrun on the table; newCard gets a tag.
 // Mount a new Hand for each deal (give it a key) so the cards are dealt in.
-function Hand({cards, selected, selectable, newCard, playable, onSelect, onReorder}) {
+function Hand({cards, selected, selectable, newCard, playable, onSelect, onReorder}: HandProps) {
     // a small movement threshold, so a tap or click still selects
     let sensors = useSensors(useSensor(PointerSensor, {activationConstraint : {distance : 8}}));
     let ids = cards.map(card => card.id);
@@ -71,21 +99,22 @@ function Hand({cards, selected, selectable, newCard, playable, onSelect, onReord
     // in from wherever they came from instead.
     let [dealing, setDealing] = useState(true);
 
-    let nameOf = (id) => longName(cards[ids.indexOf(id)]);
-    let announcements = {
+    let position = (id: UniqueIdentifier): number => ids.indexOf(String(id));
+    let nameOf = (id: UniqueIdentifier): string => longName(cards[position(id)]);
+    let announcements: Announcements = {
         onDragStart : ({active}) => "Picked up " + nameOf(active.id) + ".",
         onDragOver : ({active, over}) => over
-            ? nameOf(active.id) + " is at position " + (ids.indexOf(over.id) + 1) + " of " + ids.length + "."
+            ? nameOf(active.id) + " is at position " + (position(over.id) + 1) + " of " + ids.length + "."
             : nameOf(active.id) + " is outside the hand.",
         onDragEnd : ({active, over}) => over
-            ? nameOf(active.id) + " moved to position " + (ids.indexOf(over.id) + 1) + " of " + ids.length + "."
+            ? nameOf(active.id) + " moved to position " + (position(over.id) + 1) + " of " + ids.length + "."
             : nameOf(active.id) + " put back.",
         onDragCancel : ({active}) => nameOf(active.id) + " put back."
     };
 
-    let handleDragEnd = ({active, over}) => {
+    let handleDragEnd = ({active, over}: DragEndEvent) => {
         if (!over || active.id === over.id) return;
-        onReorder(ids.indexOf(active.id), ids.indexOf(over.id));
+        onReorder(position(active.id), position(over.id));
     }
 
     return (
@@ -100,7 +129,7 @@ function Hand({cards, selected, selectable, newCard, playable, onSelect, onReord
                     role="group"
                     aria-label="Your hand"
                     className="hand-fan flex w-full justify-center pt-6 pb-4 short:pt-5 short:pb-3"
-                    style={{"--n" : cards.length}}
+                    style={{"--n" : cards.length} as CSSProperties}
                 >
                     {cards.map((card, index) => {
                         let isSelected = selected === index;

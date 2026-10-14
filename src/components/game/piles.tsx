@@ -1,14 +1,33 @@
 import {useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
-import {cn} from '@/lib/utils.js';
-import {Button} from '@/components/ui/button.jsx';
+import {cn} from '@/lib/utils.ts';
+import {Button} from '@/components/ui/button.tsx';
+import type {Card} from '@/engine/cards.ts';
 import {longName, shortName} from '@/engine/card-names.ts';
-import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.jsx';
+import {PlayingCard, MovingCard, CardBack, CardTag} from './playing-card.tsx';
+
+/** What clicking the discard pile does, while it does something. */
+export interface PileAction {
+    /** the tag on the pile */
+    chip: string;
+    /** for screen readers */
+    label: string;
+    onClick: () => void;
+}
+
+/** The discard on offer while you can claim it. */
+export interface ClaimOffer {
+    card: Card;
+    /** ms left to answer when the offer arrived */
+    closesIn: number;
+    onClaim: () => void;
+    onPass: () => void;
+}
 
 // Claim or pass on the top discard. The claim button counts down the time
-// left (closesIn, ms) from when it mounts; later views don't restart it. It
-// sits beside the discard pile so the table doesn't move when it appears.
-function ClaimChoice({card, closesIn, onClaim, onPass}) {
+// left from when it mounts; later views don't restart it. It sits beside the
+// discard pile so the table doesn't move when it appears.
+function ClaimChoice({card, closesIn, onClaim, onPass}: ClaimOffer) {
     let [duration] = useState(closesIn);
     return (
         <div className="flex items-center gap-1 rounded-2xl bg-card p-1 shadow-lg ring-1 ring-border">
@@ -34,17 +53,27 @@ function ClaimChoice({card, closesIn, onClaim, onPass}) {
     );
 }
 
+interface PilesProps {
+    /** the id of the deck's top card, which is all the view gives */
+    deckTopId: string | null;
+    deckCount: number;
+    deckActive: boolean;
+    onDeckClick: () => void;
+    /** top card first */
+    discard: Card[];
+    discardAction: PileAction | null;
+    claim: ClaimOffer | null;
+}
+
 // The deck and the discard pile. A pile glows when clicking it does
-// something: discardAction is {chip, ariaLabel, onClick} when the discard pile
-// is live, and claim is {card, closesIn, onClaim, onPass} while you can claim.
+// something.
 //
-// The deck's top card (deckTopId, as the view gives only its id) and the top
-// two discards are MovingCards, so cards fly out of and onto the piles. When
-// a card leaves, AnimatePresence keeps it long enough to cross-fade into what
-// it becomes (a face in your hand, a back in an opponent's). The second
-// discard sits under the top one, so the pile isn't empty while a card is in
-// the air.
-function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim}) {
+// The deck's top card and the top two discards are MovingCards, so cards fly
+// out of and onto the piles. When a card leaves, AnimatePresence keeps it
+// long enough to cross-fade into what it becomes (a face in your hand, a back
+// in an opponent's). The second discard sits under the top one, so the pile
+// isn't empty while a card is in the air.
+function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardAction, claim}: PilesProps) {
     let discardTop = discard[0];
     return (
         <div className="flex items-start gap-8 short:gap-4">
@@ -91,7 +120,7 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                     disabled={!discardAction}
                     onClick={discardAction?.onClick}
                     aria-label={discardAction
-                        ? discardAction.ariaLabel
+                        ? discardAction.label
                         : "Discard pile" + (discardTop ? ", " + longName(discardTop) + " on top" : ", empty")}
                     className={cn(
                         "relative w-(--pile-w) rounded-[5%/3.3%] shadow-[0_12px_24px_rgb(0_0_0/0.4)]",

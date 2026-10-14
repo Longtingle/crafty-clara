@@ -1,7 +1,7 @@
 import {useSyncExternalStore} from 'react';
 
 // Whether a CSS media query matches, kept up to date as the window changes.
-export function useMediaQuery(query) {
+export function useMediaQuery(query: string): boolean {
     return useSyncExternalStore(
         (onChange) => {
             let list = window.matchMedia?.(query);

@@ -1,8 +1,15 @@
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
-import Scoreboard from './scoreboard.jsx';
-import {scoreRows} from './scores.js';
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
+import type {GameView} from '@/engine/view.ts';
+import Scoreboard from './scoreboard.tsx';
+import {scoreRows} from './scores.ts';
 
-function ScoresDialog({open, onOpenChange, view}) {
+interface ScoresDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    view: GameView;
+}
+
+function ScoresDialog({open, onOpenChange, view}: ScoresDialogProps) {
     let roundsPlayed = view.seats[view.seat].scores.length;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

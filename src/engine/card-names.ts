@@ -1,4 +1,4 @@
-import {SET, type Card, type Requirement, type Setrun, type SetrunType, type Suit} from './cards.ts';
+import {SET, isWild, type Card, type Requirement, type Setrun, type SetrunType, type Suit} from './cards.ts';
 
 const RANK: Record<number, string> = {1 : "A", 11 : "J", 12 : "Q", 13 : "K", 14 : "A"};
 const RANK_WORD: Record<number, string> = {
@@ -27,10 +27,6 @@ const longName = (card: Card): string => {
     return RANK_WORD[value] + " of " + SUIT_WORD[suit];
 };
 
-// A red ace in a setrun standing in for some other card.
-const isStandIn = (card: Card): boolean => card.ace !== undefined && card.ace.colour === "red" &&
-    !(card.value === card.ace.value && card.suit === card.ace.suit);
-
 // What a wild stands in for: "K" in a set, "5♦" in a run.
 const standInName = (card: Card, type: SetrunType): string =>
     rankName(card.value) + (type === SET ? "" : SUIT_SYMBOL[card.suit]);
@@ -39,7 +35,7 @@ const standInName = (card: Card, type: SetrunType): string =>
 const setrunCaption = (setrun: Setrun): string => {
     let cards = setrun.cards;
     if (setrun.type === SET) {
-        let value = (cards.find(card => !isStandIn(card)) ?? cards[0]).value;
+        let value = (cards.find(card => !isWild(card)) ?? cards[0]).value;
         return "Set of " + (RANK_PLURAL[value] ?? value + "s");
     }
     let first = cards[0];
@@ -60,7 +56,6 @@ export {
     rankName,
     shortName,
     longName,
-    isStandIn,
     standInName,
     setrunCaption,
     requirementText,

@@ -1,5 +1,5 @@
 import {render, screen, fireEvent} from '@testing-library/react';
-import App from './App.jsx';
+import App from './App.tsx';
 
 it('shows the home screen before a game starts', () => {
     render(<App />);

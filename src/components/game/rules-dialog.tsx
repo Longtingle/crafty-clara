@@ -1,8 +1,9 @@
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
+import type {ReactNode} from 'react';
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
 
-function Section({title, children}) {
+function Section({title, children}: {title: string; children: ReactNode}) {
     return (
         <section className="flex flex-col gap-1.5">
             <h3 className="font-heading text-lg font-bold">{title}</h3>
@@ -11,7 +12,7 @@ function Section({title, children}) {
     );
 }
 
-function RulesDialog({open, onOpenChange}) {
+function RulesDialog({open, onOpenChange}: {open: boolean; onOpenChange: (open: boolean) => void}) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[640px]">
@@ -26,7 +27,7 @@ function RulesDialog({open, onOpenChange}) {
 
                 <Section title="Melds">
                     <p>A <strong>set</strong> is 3 or more cards of the same value. A <strong>run</strong> is 4 or more cards in a row, all one suit. Aces can be low (A 2 3) or high (Q K A).</p>
-                    <p><strong>Red aces are wild</strong>, but a meld can't have more wilds than natural cards. If someone plays the card a wild ace stands in for, it replaces the ace and the ace goes back to their hand.</p>
+                    <p><strong>Red aces are wild</strong>, but a meld can't have more wilds than natural cards. A red ace playing as itself, in a set of aces or as the ace of a run in its own suit, counts as a natural card. If someone plays the card a wild ace stands in for, it replaces the ace and the ace goes back to their hand.</p>
                 </Section>
 
                 <Section title="Each round">

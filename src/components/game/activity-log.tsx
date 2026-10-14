@@ -1,10 +1,11 @@
 import {motion} from 'motion/react';
+import type {ActivityEntry} from './log-text.ts';
 
 const SHOWN = 5;
 
 // The latest moves, newest first, so nothing an opponent does goes unseen.
-// entries: [{id, name, color, text}] (activityEntries in log-text.js).
-function ActivityLog({entries}) {
+// entries come from activityEntries (log-text.ts).
+function ActivityLog({entries}: {entries: ActivityEntry[]}) {
     return (
         <aside aria-label="Activity" className="w-[300px] max-w-full rounded-2xl bg-panel px-4 pt-3 pb-3.5">
             <div className="mb-2.5 flex items-baseline justify-between">

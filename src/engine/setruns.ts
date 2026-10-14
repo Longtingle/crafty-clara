@@ -1,12 +1,41 @@
-import {SET, SUITS, isRedAce, type Card, type Setrun, type SetrunType, type Suit} from './cards.ts';
+import {SET, SUITS, asItself, asWild, isRedAce, isWild, type Card, type Setrun, type SetrunType} from './cards.ts';
 import {SUIT_SYMBOL, rankName} from './card-names.ts';
 
-// Red aces are wild. When one is used in a setrun its value and suit are set
-// to the card it stands in for, and card.ace keeps what it really is.
-const asWild = (ace: Card, value: number, suit: Suit): Card => ({...ace, value, suit});
+// Red aces are wild. When one is used in a setrun as another card, its value
+// and suit are set to that card's (asWild), and card.ace keeps what it really
+// is. A red ace playing as itself is a natural card (isWild).
 
 type CheckResult = {valid: true; setrun: Setrun} | {valid: false};
 type AddResult = {valid: true; setrun: Setrun; returnedAce: Card | null} | {valid: false};
+
+/** One way to play a group of cards: which are natural and which are wild. */
+interface Reading {
+    naturals: Card[];
+    wilds: Card[];
+}
+
+// Every way of choosing some of the items, the biggest choices first.
+const subsets = <T>(items: T[]): T[][] =>
+    items.reduce<T[][]>((all, item) => [...all, ...all.map(subset => [...subset, item])], [[]])
+        .sort((a, b) => b.length - a.length);
+
+// The ways to read cards as naturals and wilds, most naturals first. A red
+// ace is natural in a set of aces, and can be in a run of its own suit as its
+// ace (or else be a wild somewhere else in the run). Any other red ace is wild.
+const readings = (cards: Card[], type: SetrunType): Reading[] => {
+    let redAces = cards.filter(isRedAce).map(asItself);
+    let others = cards.filter(card => !isRedAce(card));
+    if (type === SET) {
+        let ofAces = others.every(card => card.value === 1);
+        return [ofAces ? {naturals : [...others, ...redAces], wilds : []} : {naturals : others, wilds : redAces}];
+    }
+    let suit = others[0]?.suit;
+    let ownSuit = redAces.filter(ace => ace.suit === suit);
+    return subsets(ownSuit).map(asAces => ({
+        naturals : [...others, ...asAces],
+        wilds : redAces.filter(ace => !asAces.includes(ace))
+    }));
+};
 
 // Sorts for sets (by value) or for runs (by suit, then value).
 const sortHand = <C extends Card>(hand: C[], type: SetrunType): C[] => {
@@ -71,16 +100,12 @@ const checkRun = (naturals: Card[], wilds: Card[]): Card[] | null => {
 // (4+ in a row of one suit). Red aces are wild but can't outnumber the
 // natural cards. Returns the setrun in order, with wild values assigned.
 const checkSetrun = (cards: Card[], type: SetrunType): CheckResult => {
-    let wilds = cards.filter(isRedAce);
-    let naturals = cards.filter(card => !isRedAce(card));
-    if (wilds.length > naturals.length) return {valid : false};
-
-    let ordered = (type === SET) ? checkSet(naturals, wilds) : checkRun(naturals, wilds);
-    if (ordered === null) return {valid : false};
-    return {
-        valid : true,
-        setrun : {type, cards : ordered}
-    };
+    for (let {naturals, wilds} of readings(cards, type)) {
+        if (wilds.length > naturals.length) continue;
+        let ordered = (type === SET) ? checkSet(naturals, wilds) : checkRun(naturals, wilds);
+        if (ordered) return {valid : true, setrun : {type, cards : ordered}};
+    }
+    return {valid : false};
 };
 
 // The values missing from a run's natural cards, e.g. [5] for 3 4 6 7. With
@@ -103,23 +128,32 @@ const runGaps = (naturals: Card[]): number[] => {
 // Says why cards don't make a valid set or run yet, or returns null when
 // checkSetrun would accept them. The go-down dialog shows this to the player.
 const explainSetrun = (cards: Card[], type: SetrunType): string | null => {
-    let wilds = cards.filter(isRedAce);
-    let naturals = cards.filter(card => !isRedAce(card));
+    if (checkSetrun(cards, type).valid) return null;
 
     if (type === SET) {
+        let {naturals, wilds} = readings(cards, SET)[0];
         if (cards.length === 0) return "Pick 3 or more cards of the same value.";
         if (naturals.some(card => card.value !== naturals[0].value)) return "Every card in a set must have the same value.";
         if (wilds.length > naturals.length) return "Wild aces can't outnumber natural cards.";
         if (cards.length < 3) return "A set needs at least 3 cards. Add " + (3 - cards.length) + " more.";
-        return null;
+        return "These cards don't make a set.";
     }
 
     if (cards.length === 0) return "Pick 4 or more cards in a row, all the same suit.";
-    if (naturals.some(card => card.suit !== naturals[0].suit)) return "Every card in a run must be the same suit.";
+    let others = cards.filter(card => !isRedAce(card));
+    if (others.some(card => card.suit !== others[0].suit)) return "Every card in a run must be the same suit.";
+
+    // explain the reading that comes closest: wilds don't outnumber naturals,
+    // then the fewest gaps left unfilled
+    let gapsIn = (reading: Reading): number[] => (reading.naturals.length > 1) ? runGaps(reading.naturals) : [];
+    let unfilled = (reading: Reading): number => Math.max(0, gapsIn(reading).length - reading.wilds.length);
+    let outnumbered = (reading: Reading): number => (reading.wilds.length > reading.naturals.length) ? 1 : 0;
+    let {naturals, wilds} = readings(cards, type).reduce((best, reading) =>
+        (outnumbered(reading) - outnumbered(best) || unfilled(reading) - unfilled(best)) < 0 ? reading : best);
+
     if (wilds.length > naturals.length) return "Wild aces can't outnumber natural cards.";
     if (new Set(naturals.map(card => card.value)).size !== naturals.length) return "A run can't have two cards of the same value.";
-
-    let gaps = (naturals.length > 1) ? runGaps(naturals) : [];
+    let gaps = gapsIn({naturals, wilds});
     if (gaps.length > wilds.length) {
         let missing = gaps.map(value => rankName(value) + SUIT_SYMBOL[naturals[0].suit]);
         return (missing.length === 1)
@@ -128,52 +162,55 @@ const explainSetrun = (cards: Card[], type: SetrunType): string | null => {
     }
     if (cards.length < 4) return "A run needs at least 4 cards. Add " + (4 - cards.length) + " more.";
     if (naturals.length < 3) return "A run needs at least 3 natural cards.";
-    if (checkRun(naturals, wilds)) return null;
     return "These cards don't make a run.";
 };
 
-// Tries to add one card to a setrun already on the table. A natural card
-// matching a red ace's stand-in value replaces it and the ace is returned to
-// the hand; otherwise the card has to extend the setrun.
+// Tries to add one card to a setrun already on the table. The natural card a
+// wild stands in for replaces it, and the wild goes back to the hand.
+// Otherwise the card has to extend the setrun: a red ace as itself if it can
+// (onto a set of aces, or as the ace of its own suit's run), or else as a wild.
 const addToSetrun = (setrun: Setrun, card: Card): AddResult => {
     let cards = setrun.cards;
+    let first = cards[0];
+    let last = cards[cards.length - 1];
     let result = (newCards: Card[]): AddResult => ({valid : true, setrun : {...setrun, cards : newCards}, returnedAce : null});
 
-    if (isRedAce(card)) {
-        let wildCount = cards.filter(isRedAce).length + 1;
-        if (wildCount > cards.length + 1 - wildCount) return {valid : false};
-        if (setrun.type === SET) return result([...cards, asWild(card, cards[0].value, card.ace!.suit)]);
-        let first = cards[0];
-        let last = cards[cards.length - 1];
-        if (first.value > 1) return result([asWild(card, first.value - 1, first.suit), ...cards]);
-        if (last.value < 14) return result([...cards, asWild(card, last.value + 1, first.suit)]);
-        return {valid : false};
-    }
-
-    let replaced = cards.find(wild => isRedAce(wild) &&
-        wild.value === card.value && (setrun.type === SET || wild.suit === card.suit));
+    // an ace is the natural for a wild standing in for a high ace too
+    let replaced = cards.find(wild => isWild(wild) &&
+        (wild.value === card.value || (card.value === 1 && wild.value === 14)) &&
+        (setrun.type === SET || wild.suit === card.suit));
     if (replaced) {
         return {
             valid : true,
-            setrun : {...setrun, cards : cards.map(c => c === replaced ? card : c)},
-            returnedAce : {...replaced, value : 1, suit : replaced.ace!.suit}
+            setrun : {...setrun, cards : cards.map(c => c === replaced ? {...card, value : replaced.value} : c)},
+            returnedAce : asItself(replaced)
         };
     }
 
     if (setrun.type === SET) {
-        return (card.value === cards[0].value) ? result([...cards, card]) : {valid : false};
+        if (card.value === first.value) return result([...cards, card]);
+        if (!isRedAce(card)) return {valid : false};
+    } else if (card.suit === first.suit) {
+        if (card.value === first.value - 1) return result([card, ...cards]);
+        if (card.value === last.value + 1) return result([...cards, card]);
+        if (card.value === 1 && last.value === 13) return result([...cards, {...card, value : 14}]);
+        if (!isRedAce(card)) return {valid : false};
+    } else if (!isRedAce(card)) {
+        return {valid : false};
     }
 
-    let first = cards[0];
-    let last = cards[cards.length - 1];
-    if (card.suit !== first.suit) return {valid : false};
-    if (card.value === first.value - 1) return result([card, ...cards]);
-    if (card.value === last.value + 1) return result([...cards, card]);
-    if (card.value === 1 && last.value === 13) return result([...cards, {...card, value : 14}]);
+    // a red ace that can't play as itself goes on as a wild, if there would
+    // still be no more wilds than naturals
+    let wilds = cards.filter(isWild).length + 1;
+    if (wilds > cards.length + 1 - wilds) return {valid : false};
+    if (setrun.type === SET) return result([...cards, asWild(card, first.value, card.ace!.suit)]);
+    if (first.value > 1) return result([asWild(card, first.value - 1, first.suit), ...cards]);
+    if (last.value < 14) return result([...cards, asWild(card, last.value + 1, first.suit)]);
     return {valid : false};
 };
 
 export {
+    subsets,
     sortHand,
     checkSetrun,
     explainSetrun,

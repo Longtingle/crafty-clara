@@ -1,38 +1,59 @@
 import {useState} from 'react';
 import {Check, CircleAlert} from 'lucide-react';
-import {cn} from '@/lib/utils.js';
-import {Button} from '@/components/ui/button.jsx';
-import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.jsx';
-import {SET, RUN} from '@/engine/cards.ts';
+import {cn} from '@/lib/utils.ts';
+import {Button} from '@/components/ui/button.tsx';
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
+import {SET, RUN, type Card, type Requirement, type SetrunType} from '@/engine/cards.ts';
 import {checkSetrun, explainSetrun} from '@/engine/setruns.ts';
 import {longName, setrunCaption, requirementText} from '@/engine/card-names.ts';
-import {PlayingCard, CardTag} from './playing-card.jsx';
+import {PlayingCard, CardTag} from './playing-card.tsx';
+
+/** A finished setrun from the dialog: its type and its cards, as indices into your hand. */
+export interface GoDownSlot {
+    type: SetrunType;
+    indices: number[];
+}
+
+interface SlotSpec {
+    type: SetrunType;
+    title: string;
+}
+
+type SetrunCheck = ReturnType<typeof checkSetrun>;
 
 // One slot per meld the round needs: sets first, then runs.
-const makeSlots = (requirement) => [
-    ...Array.from({length : requirement.S}, (_, i) => ({type : SET, title : (requirement.S > 1) ? "Set " + (i + 1) : "Set"})),
-    ...Array.from({length : requirement.R}, (_, i) => ({type : RUN, title : (requirement.R > 1) ? "Run " + (i + 1) : "Run"}))
+const makeSlots = (requirement: Requirement): SlotSpec[] => [
+    ...Array.from({length : requirement.S}, (_, i): SlotSpec => ({type : SET, title : (requirement.S > 1) ? "Set " + (i + 1) : "Set"})),
+    ...Array.from({length : requirement.R}, (_, i): SlotSpec => ({type : RUN, title : (requirement.R > 1) ? "Run " + (i + 1) : "Run"}))
 ];
 
 // The cards in a slot in display order, each with its hand index. A valid
-// setrun is shown the way checkSetrun lays it out; wild aces in it are copies
-// that share the original's card.ace object.
-const slotCards = (hand, indices, check) => {
+// setrun is shown the way checkSetrun lays it out, with wild aces as copies
+// of the cards in your hand, so they're matched up by id.
+const slotCards = (hand: Card[], indices: number[], check: SetrunCheck): {card: Card; index: number}[] => {
     if (!check.valid) {
         return [...indices].sort((a, b) => hand[a].value - hand[b].value).map(index => ({card : hand[index], index}));
     }
-    return check.setrun.cards.map(card => ({
-        card,
-        index : indices.find(index => hand[index] === card || (hand[index].ace !== undefined && hand[index].ace === card.ace))
-    }));
+    return check.setrun.cards.map(card => ({card, index : indices.find(index => hand[index].id === card.id)!}));
 }
 
-function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemove}) {
-    let valid = check.valid;
+interface SlotProps {
+    slot: SlotSpec;
+    active: boolean;
+    cards: {card: Card; index: number}[];
+    check: SetrunCheck;
+    /** why the cards aren't a valid setrun yet */
+    problem: string | null;
+    onActivate: () => void;
+    onClear: () => void;
+    onRemove: (index: number) => void;
+}
+
+function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemove}: SlotProps) {
     return (
         <div className={cn(
             "flex flex-col gap-2.5 rounded-2xl border-2 bg-white/4 p-3",
-            valid ? "border-ok" : (cards.length > 0 ? "border-warn" : "border-white/18"),
+            check.valid ? "border-ok" : (cards.length > 0 ? "border-warn" : "border-white/18"),
             active && "shadow-[0_0_0_5px_rgb(244_239_227/0.14)]"
         )}>
             <div className="flex items-center gap-2.5">
@@ -62,23 +83,30 @@ function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemov
                             aria-label={"Take " + longName(card) + " out of the " + slot.title.toLowerCase()}
                             className="relative w-(--meld-w) flex-none transition-transform hover:-translate-y-1.5"
                         >
-                            <PlayingCard card={card} setrunType={valid ? slot.type : undefined} alt="" className="w-full" />
+                            <PlayingCard card={card} setrunType={check.valid ? slot.type : undefined} alt="" className="w-full" />
                         </button>
                     ))}
             </div>
-            <p className={cn("flex items-start gap-2 text-sm leading-snug", valid ? "text-ok" : "text-warn")}>
-                {valid
+            <p className={cn("flex items-start gap-2 text-sm leading-snug", check.valid ? "text-ok" : "text-warn")}>
+                {check.valid
                     ? <Check className="mt-px size-4.5 flex-none" strokeWidth={3} aria-hidden="true" />
                     : <CircleAlert className="mt-px size-4.5 flex-none" aria-hidden="true" />}
-                {valid ? setrunCaption(check.setrun) + " is ready." : problem}
+                {check.valid ? setrunCaption(check.setrun) + " is ready." : problem}
             </p>
         </div>
     );
 }
 
-function GoDownBody({hand, requirement, onCancel, onSubmit}) {
+interface GoDownBodyProps {
+    hand: Card[];
+    requirement: Requirement;
+    onCancel: () => void;
+    onSubmit: (slots: GoDownSlot[]) => void;
+}
+
+function GoDownBody({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
     let slots = makeSlots(requirement);
-    let [picks, setPicks] = useState(() => slots.map(() => []));
+    let [picks, setPicks] = useState<number[][]>(() => slots.map(() => []));
     let [active, setActive] = useState(0);
 
     let results = picks.map((indices, slotIndex) => {
@@ -86,21 +114,21 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}) {
         let check = checkSetrun(cards, slots[slotIndex].type);
         return {
             check,
-            problem : check.valid ? null : explainSetrun(cards, slots[slotIndex].type),
+            problem : explainSetrun(cards, slots[slotIndex].type),
             cards : slotCards(hand, indices, check)
         };
     });
-    let usedIn = new Map();
+    let usedIn = new Map<number, number>();
     picks.forEach((indices, slotIndex) => indices.forEach(index => usedIn.set(index, slotIndex)));
     let readyCount = results.filter(result => result.check.valid).length;
     let allReady = readyCount === slots.length;
 
     // cards that would complete the slot being filled
     let activeCards = picks[active].map(index => hand[index]);
-    let fits = (index) => !results[active].check.valid && !usedIn.has(index) &&
+    let fits = (index: number): boolean => !results[active].check.valid && !usedIn.has(index) &&
         checkSetrun([...activeCards, hand[index]], slots[active].type).valid;
 
-    let setSlot = (slotIndex, indices) => setPicks(picks.map((old, i) => (i === slotIndex) ? indices : old));
+    let setSlot = (slotIndex: number, indices: number[]) => setPicks(picks.map((old, i) => (i === slotIndex) ? indices : old));
 
     return (
         <>
@@ -132,23 +160,24 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}) {
                 <div className="flex flex-wrap gap-1 pt-3">
                     {hand.map((card, index) => {
                         let slotIndex = usedIn.get(index);
-                        let used = slotIndex !== undefined;
                         let fitsHere = fits(index);
                         return (
                             <button
                                 key={index}
                                 type="button"
-                                disabled={used}
+                                disabled={slotIndex !== undefined}
                                 onClick={() => setSlot(active, [...picks[active], index])}
-                                aria-label={longName(card) + (used ? ", in " + slots[slotIndex].title.toLowerCase() : (fitsHere ? ", completes the " + slots[active].title.toLowerCase() : ""))}
+                                aria-label={longName(card) + ((slotIndex !== undefined)
+                                    ? ", in " + slots[slotIndex].title.toLowerCase()
+                                    : (fitsHere ? ", completes the " + slots[active].title.toLowerCase() : ""))}
                                 className={cn(
                                     "relative w-[clamp(44px,5vw,64px)] flex-none rounded-[5%/3.3%] transition-transform enabled:hover:-translate-y-1.5",
-                                    used && "opacity-35",
+                                    slotIndex !== undefined && "opacity-35",
                                     fitsHere ? "shadow-[0_0_0_3px_var(--gold),0_6px_14px_rgb(0_0_0/0.4)]" : "shadow-[0_4px_10px_rgb(0_0_0/0.35)]"
                                 )}
                             >
                                 <PlayingCard card={card} alt="" className="w-full" />
-                                {used && <CardTag className="left-0.5 bg-white/85 px-1.5 normal-case tracking-normal">{slots[slotIndex].title}</CardTag>}
+                                {slotIndex !== undefined && <CardTag className="left-0.5 bg-white/85 px-1.5 normal-case tracking-normal">{slots[slotIndex].title}</CardTag>}
                                 {fitsHere && <CardTag className="left-0.5 bg-gold px-1.5 text-gold-foreground normal-case tracking-normal">Fits</CardTag>}
                             </button>
                         );
@@ -169,9 +198,13 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}) {
     );
 }
 
+interface GoDownDialogProps extends GoDownBodyProps {
+    open: boolean;
+}
+
 // Lay down the round's melds. Checks each slot as cards go in and says what's
 // missing; Go down only works once every slot is valid.
-function GoDownDialog({open, hand, requirement, onCancel, onSubmit}) {
+function GoDownDialog({open, hand, requirement, onCancel, onSubmit}: GoDownDialogProps) {
     return (
         <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel(); }}>
             <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[960px]">

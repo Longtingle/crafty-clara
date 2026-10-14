@@ -46,6 +46,12 @@ describe('scoreHand', () => {
         expect(scoreHand(cards("7C 7H 7S 4S 5S 6S 1D"), {S : 1, R : 1}).readyToGoDown).toBe(true);
     });
 
+    it('plays red aces as aces when that makes a setrun', () => {
+        expect(scoreHand(cards("1C 1H 1D 7S 9C"), {S : 1, R : 0}).readyToGoDown).toBe(true);
+        expect(planGoDown(cards("1C 1H 1D 7S 9C"), {S : 1, R : 0})?.table.map(set => names(set).toSorted())).toEqual([["1C", "1D", "1H"]]);
+        expect(planGoDown(cards("1H 2H 3H 1D 9C"), {S : 0, R : 1})?.table.map(names)).toEqual([["1H", "2H", "3H", "1D"]]);
+    });
+
     it('does not use the same card in a run and a set', () => {
         const result = scoreHand(cards("4S 5S 6S 7S 7C 7H"), {S : 1, R : 1});
         expect(result.readyToGoDown).toBe(false);

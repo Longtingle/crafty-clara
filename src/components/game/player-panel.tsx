@@ -1,8 +1,15 @@
-import {cn} from '@/lib/utils.js';
-import {Avatar, Chip} from './opponent-panel.jsx';
-import {YOU_COLOR} from './players.js';
+import {cn} from '@/lib/utils.ts';
+import {Avatar, Chip} from './opponent-panel.tsx';
+import {YOU_COLOR} from './players.ts';
 
-function PlayerPanel({active, isDown, score, cardCount}) {
+interface PlayerPanelProps {
+    active: boolean;
+    isDown: boolean;
+    score: number;
+    cardCount: number;
+}
+
+function PlayerPanel({active, isDown, score, cardCount}: PlayerPanelProps) {
     return (
         <div className={cn(
             "flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-3 short:px-2.5 short:py-1.5",

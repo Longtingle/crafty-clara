@@ -30,14 +30,14 @@ npx vitest run src/engine/game.test.ts         # one file
 npx vitest run -t "checkSetrun"                # tests matching a name
 ```
 
-- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.js`. Engine, host and client tests start with `// @vitest-environment node`, which shows they need no browser.
-- `.oxlintrc.json` turns on `no-undef`. Undefined identifiers were the main source of runtime crashes in this codebase, so treat lint errors as real bugs. `src/classes/` is excluded from lint (see below).
-- `tsconfig.json`:
-  - It is strict, and it checks `.ts` files only (`checkJs` is off). The UI is plain `.jsx`, and there are no React type definitions, so code that imports React (such as `use-game.js`) stays in `.js`.
+- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.ts`. Tests that need no browser (the engine, host and client, and the UI's pure modules) start with `// @vitest-environment node`.
+- `.oxlintrc.json` turns on `no-undef`. Undefined identifiers were the main source of runtime crashes in this codebase, so treat lint errors as real bugs.
+- Everything in `src/` is TypeScript: `.ts`, or `.tsx` for files with JSX. `tsconfig.json`:
+  - It is strict. The view and the commands are typed in the engine, so the components are checked against exactly what the host sends.
   - `erasableSyntaxOnly` rules out enums, namespaces and constructor parameter properties, so Node can run the engine just by stripping its types.
   - Type-only imports need `import type` (`verbatimModuleSyntax`).
-- Files containing JSX must use the `.jsx` extension. Imports include explicit extensions (`./hand.jsx`, `./game.ts`). `@/` is an alias for `src/` (`vite.config.js`, `tsconfig.json`); the UI components use it.
-- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded from Vite's base URL by `src/components/game/cards.js`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`). The rest of `art/` is unused source card art; it is outside `public/` so it isn't copied into builds.
+- Imports include explicit extensions (`./hand.tsx`, `./game.ts`), except in the shadcn components. `@/` is an alias for `src/` (`vite.config.js`, `tsconfig.json`); the UI uses it.
+- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded from Vite's base URL by `src/components/game/cards.ts`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`). The rest of `art/` is unused source card art; it is outside `public/` so it isn't copied into builds.
 
 ## Game rules
 
@@ -51,7 +51,8 @@ These are the engine's rules (`src/engine/game.ts`).
 **Setruns**
 - A **set** is 3+ cards of one value, with at least 2 natural cards. A **run** is 4+ consecutive cards of one suit, with at least 3 natural cards. An ace can be low (A-2-3) or high (Q-K-A).
 - **Red aces (1H, 1D) are wild**, but there can't be more wilds than naturals.
-- If someone adds the natural card that a red ace stands in for, the natural card replaces it and the ace goes back to that player's hand.
+- A red ace playing as itself is a natural card, not a wild: in a set of aces, or as the ace (low or high) of a run in its own suit. So A♠ A♥ A♦ is a set, and A♥ 2♥ 3♥ 4♥ has no wilds.
+- If someone adds the natural card that a wild stands in for, the natural card replaces it and the ace goes back to that player's hand. A red ace playing as itself is never swapped out.
 
 **A turn**
 - Draw from the deck or take the top discard.
@@ -99,7 +100,7 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 **`bot.ts`**
 - `botMove(view)` returns a bot's next command, or null while it waits. A bot sees only its own view.
 - It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
-- `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run).
+- `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
 - `planGoDown` re-checks each setrun with `checkSetrun`, because `scoreHand` only estimates.
 - `worthTaking` stops the two take-and-throw-back loops the simulations found.
 
@@ -109,10 +110,14 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 
 **`setruns.ts`**
 - `checkSetrun(cards, type)` and `addToSetrun(setrun, card)` are the single source of truth for setrun validity.
+- Both go through the ways a group of cards can be read (`readings`): which red aces play as themselves and which are wilds.
 - `explainSetrun(cards, type)` says in plain words why cards aren't a valid setrun yet, and returns `null` exactly when `checkSetrun` accepts them. The go-down dialog shows it.
 - `sortHand` sorts by value or by suit.
 
-**`cards.ts`** holds `Card`, `Setrun`, `SET`/`RUN`, `ROUND_REQUIREMENTS`, `createCard`, `isRedAce` and `getPoints`.
+**`cards.ts`** holds `Card`, `Setrun`, `SET`/`RUN`, `ROUND_REQUIREMENTS`, `createCard` and `getPoints`. For red aces it has:
+- `isRedAce`: a red ace, which can be wild.
+- `isWild`: a card in a setrun that is a red ace standing in for another card. Use it, not `isRedAce`, to count wilds.
+- `asWild` and `asItself`: a red ace placed in a setrun as another card, and the ace back as itself.
 
 **`card-names.ts`** turns cards and setruns into text: `shortName` ("7♦"), `longName` ("Seven of diamonds", for screen readers), `setrunCaption` ("Run 3–6 ♦") and `requirementText` ("1 set + 1 run").
 
@@ -126,40 +131,45 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
 - **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
 - **`bot-player.ts`:** `startBot(port)` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `App.jsx` starts one per game.
+- **`local-game.ts`:** `startLocalGame({name})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `App.tsx` starts one per game.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
 
 ### The client (`src/client/`)
 
 - **`game-client.ts`:** `createGameClient(port)` listens to your seat's port and keeps a snapshot, `{view, refusal}`: the latest view, and the last command the host refused (`{command, error, seq}`). Each message replaces the snapshot whole. `send(command)` sends a command.
-- **`use-game.js`:** `useGame(client)` reads the snapshot with `useSyncExternalStore` and returns `{view, refusal, send}`.
+- **`use-game.ts`:** `useGame(client)` reads the snapshot with `useSyncExternalStore` and returns `{view, refusal, send}`.
 
 ### The UI
 
 Function components only; there is no global store.
-- **`App.jsx`** shows the home screen, or a game. Starting a game calls `startLocalGame` and `createGameClient`. An effect stops the game's host and bots when the game is replaced or App unmounts.
-- **`game-screen.jsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
+- **`App.tsx`** shows the home screen, or a game. Starting a game calls `startLocalGame` and `createGameClient`. An effect stops the game's host and bots when the game is replaced or App unmounts.
+- **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
   - the order of your hand: card ids, so arranged cards keep their places and new ones join on the right (`arrange`)
   - the selected card, by id
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
   
-  It turns clicks into commands, and renders `GameTable` and the go-down and round-end dialogs.
-- **`game-table.jsx`** lays out the table from the view and works out what you can do right now: valid setrun targets for the selected card (via `addToSetrun`), the gold "fits a meld" dots, whether you can go down (`planGoDown`), and the turn prompt. While a claim window is open on your turn, you can't discard.
-- **`log-text.js`** turns `view.log` into words: the activity panel, each opponent's last move, and the "New" / "Claimed" / "Back" tag on the card you just got. **`players.js`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
-- `go-down-dialog.jsx` keeps its slot picks in local state and only hands back the finished setruns, as indices into your hand.
+  It works out what you can do (`yourTurn`), turns clicks into commands (`TableActions`), and renders `GameTable` and the go-down and round-end dialogs.
+- **`your-turn.ts`** (`yourTurn(view, hand, selectedIndex)`) works out what you can do right now, with no React, so it is tested on its own:
+  - where the selected card can go (via `addToSetrun`), and the gold "fits a meld" dots
+  - what the deck and the discard pile do if clicked. While a claim window is open on your turn, you can't discard.
+  - whether you can go down (`planGoDown`)
+  - the turn prompt and its steps
+- **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic.
+- **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
+- `go-down-dialog.tsx` keeps its slot picks in local state and only hands back the finished setruns, as indices into your hand.
 - The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people.
-- `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`). They are copied into the repo to be edited: `button.jsx` sizes were raised so every button is at least 44px.
+- `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`, which writes `.tsx`). They are copied into the repo to be edited: `button.tsx` sizes were raised so every button is at least 44px.
 - **Animation** uses Motion (`motion/react`):
-  - Every element that shows a card on the table is a `MovingCard` (`playing-card.jsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.
-  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the opponents' setruns and hands are rendered for the current layout only (`useMediaQuery` in `game-table.jsx`), and the go-down dialog uses plain `PlayingCard`s.
-  - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.jsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
+  - Every element that shows a card on the table is a `MovingCard` (`playing-card.tsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.
+  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the opponents' setruns and hands are rendered for the current layout only (`useMediaQuery` in `game-table.tsx`; on short screens their setruns are `CompactMelds`), and the go-down dialog uses plain `PlayingCard`s.
+  - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.tsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
   - The deck's top card (by the id in `view.deck.top`) and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
   - In the hand, dnd-kit (`@dnd-kit/sortable`) does drag-to-reorder for mouse and touch, and Motion animates the lift, the sliding and the deal. `Hand` is keyed by round so each deal remounts it.
   - App wraps everything in `MotionConfig reducedMotion="user"`.
 - Styling is Tailwind utility classes. The theme lives in `src/index.css`: colour tokens (felt green, gold for "you can act here", violet for wild-ace badges), the fonts, and card sizes as CSS variables (`--hand-w`, `--pile-w`, `--meld-w`) that scale with the viewport.
-  - Rows of setruns never wrap: `MeldRow` (`meld.jsx`) lowers `--meld-w` until a player's setruns fit on one line, the way the hand's overlap grows with its size.
+  - Rows of setruns never wrap: `MeldRow` (`meld.tsx`) lowers `--meld-w` until a player's setruns fit on one line, the way the hand's overlap grows with its size.
   - Two custom variants trim the layout for small windows: `compact:` (height 780px or less) and `short:` (height 560px or less, i.e. a phone in landscape).
   - A phone held upright gets a "turn your phone sideways" screen.
 
@@ -173,7 +183,7 @@ A card is the object `createCard` (`src/engine/cards.ts`) returns:
 
 - `id` is the game's prefix and a number given in shuffled order, so it says nothing about the card. Cards are renumbered whenever they are shuffled, so nobody can follow a card through a shuffle. Otherwise an id stays with the physical card wherever it goes, including wild-ace copies and an ace returned from a setrun. The UI uses ids for React keys, Motion `layoutId`s and dnd-kit.
 - `displayString` is also the image filename. Aces are `1`, and J/Q/K are `11`/`12`/`13`.
-- Inside a setrun, a red ace is a copy whose `value` and `suit` are set to the card it stands in for. `card.ace` and `displayString` still identify it as the real ace.
+- Inside a setrun, a wild red ace is a copy whose `value` and `suit` are set to the card it stands in for. `card.ace` and `displayString` still identify it as the real ace. A red ace playing as itself keeps its own suit and `value` 1, or 14 when high (`isWild` tells them apart).
 - A high ace in a run is a copy with `value: 14`.
 - Setruns are `{type: "SET"|"RUN", cards}`, with runs ordered by value.
 
@@ -184,8 +194,3 @@ A card is the object `createCard` (`src/engine/cards.ts`) returns:
 - *requirement*: the round's `{S, R}` pair.
 - *seat*: a player's place at the table, 0-based, in turn order.
 - *view*: what one seat may see of the game (`viewFor`).
-
-## Leftovers
-
-- `src/classes/` (`card.js`, `hand.js`) and the root `testing.js` are old standalone experiments. Nothing imports them, and they would throw if imported.
-- `src/project notes.txt` is the author's TODO list.

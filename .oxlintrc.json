@@ -12,7 +12,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.{js,jsx,ts}"],
+      "files": ["**/*.test.{ts,tsx}"],
       "env": { "vitest": true }
     }
   ]

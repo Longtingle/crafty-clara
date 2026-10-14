@@ -1,15 +1,17 @@
+import type {ReactNode} from 'react';
 import {AnimatePresence} from 'motion/react';
-import {cn} from '@/lib/utils.js';
-import {CardBack, MovingCard} from './playing-card.jsx';
-import {MeldRow} from './meld.jsx';
-import {aiColor} from './players.js';
+import {cn} from '@/lib/utils.ts';
+import type {GameView, SeatView} from '@/engine/view.ts';
+import {CardBack, MovingCard} from './playing-card.tsx';
+import {MeldRow} from './meld.tsx';
+import {aiColor, opponentIndex} from './players.ts';
 
 // Where an opponent's cards fly to and from. Their hand is hidden (the view
 // gives only the cards' ids), so each card is a small back, all stacked in one
 // spot. A card that arrives shows while it flies in, then fades out over the
 // static card backs underneath; the cards dealt at the start (initial={false})
 // start out hidden.
-function HiddenHand({ids, className}) {
+function HiddenHand({ids, className}: {ids: string[]; className?: string}) {
     return (
         <AnimatePresence initial={false}>
             {ids.map(id => (
@@ -27,7 +29,7 @@ function HiddenHand({ids, className}) {
     );
 }
 
-function Chip({gold, children}) {
+function Chip({gold, children}: {gold?: boolean; children: ReactNode}) {
     return (
         <span className={cn(
             "rounded-full px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap uppercase",
@@ -38,7 +40,7 @@ function Chip({gold, children}) {
     );
 }
 
-function Avatar({color, label, className}) {
+function Avatar({color, label, className}: {color: string; label: ReactNode; className?: string}) {
     return (
         <span
             aria-hidden="true"
@@ -50,10 +52,21 @@ function Avatar({color, label, className}) {
     );
 }
 
-// An opponent's name, status and score, with their setruns (children) below.
-// player is their seat in the view. The line under the name shows what they
-// are saying, or else their last move.
-function OpponentPanel({player, index, active, speech, lastAction, children}) {
+interface OpponentPanelProps {
+    player: SeatView;
+    /** their opponent number, from 0 */
+    index: number;
+    active: boolean;
+    /** what they are saying, if anything */
+    speech: string | null | undefined;
+    lastAction: string | null;
+    /** their setruns */
+    children: ReactNode;
+}
+
+// An opponent's name, status and score, with their setruns below. The line
+// under the name shows what they are saying, or else their last move.
+function OpponentPanel({player, index, active, speech, lastAction, children}: OpponentPanelProps) {
     let status = speech ? "“" + speech + "”" : (lastAction ?? "Waiting for their turn");
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
@@ -96,4 +109,25 @@ function OpponentPanel({player, index, active, speech, lastAction, children}) {
     );
 }
 
-export {OpponentPanel, HiddenHand, Chip, Avatar};
+// On short screens there's no room for the opponent panels, so the setruns
+// of the opponents who are down sit beside the piles, each player's marked
+// with their number. melds renders a seat's setruns.
+function CompactMelds({view, seats, melds}: {view: GameView; seats: number[]; melds: (seat: number) => ReactNode}) {
+    let down = seats.filter(seat => view.seats[seat].isDown);
+    if (down.length === 0) return <p className="my-auto text-sm text-muted-foreground">No opponent is down yet.</p>;
+    return down.map(seat => (
+        <div key={seat} className="flex items-start gap-1.5">
+            <span
+                aria-hidden="true"
+                className="mt-2.5 grid size-5 flex-none place-items-center rounded-full text-[11px] font-bold text-white"
+                style={{backgroundColor : aiColor(opponentIndex(view, seat))}}
+            >
+                {opponentIndex(view, seat) + 1}
+            </span>
+            <span className="sr-only">{view.seats[seat].name}</span>
+            <div className="flex flex-wrap gap-1.5">{melds(seat)}</div>
+        </div>
+    ));
+}
+
+export {OpponentPanel, CompactMelds, HiddenHand, Chip, Avatar};

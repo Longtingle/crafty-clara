@@ -51,8 +51,22 @@ export const createCard = (value: number, suit: Suit, id: string): Card => {
     return card;
 };
 
-/** Red aces (1H, 1D) are wild. */
+/** Red aces (1H, 1D) can be wild. */
 export const isRedAce = (card: Card): boolean => card.ace?.colour === "red";
+
+/**
+ * Whether a card in a setrun is a wild: a red ace standing in for another
+ * card. A red ace playing as itself, in a set of aces or as the ace of its own
+ * suit's run (low or high), is a natural card.
+ */
+export const isWild = (card: Card): boolean => isRedAce(card) &&
+    !(card.suit === card.ace!.suit && (card.value === 1 || card.value === 14));
+
+/** A red ace placed in a setrun as another card. card.ace still says what it really is. */
+export const asWild = <C extends Card>(ace: C, value: number, suit: Suit): C => ({...ace, value, suit});
+
+/** An ace taken out of a setrun, as itself again. */
+export const asItself = <C extends Card>(ace: C): C => ({...ace, value : 1, suit : ace.ace!.suit});
 
 /** What the cards left in a hand cost at the end of a round: aces 25, 10 to King 10, others face value. */
 export const getPoints = (hand: Card[]): number => hand.reduce((sum, card) => {

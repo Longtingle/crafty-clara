@@ -1,11 +1,25 @@
+import type {ReactNode} from 'react';
 import {Check, CircleHelp, Trophy} from 'lucide-react';
-import {cn} from '@/lib/utils.js';
-import {Button} from '@/components/ui/button.jsx';
+import {cn} from '@/lib/utils.ts';
+import {Button} from '@/components/ui/button.tsx';
+import type {Requirement} from '@/engine/cards.ts';
 import {plural} from '@/engine/card-names.ts';
-import {aiColor} from './players.js';
-import {HiddenHand} from './opponent-panel.jsx';
+import {aiColor} from './players.ts';
+import {HiddenHand} from './opponent-panel.tsx';
 
-function RequirementChip({met, children}) {
+/** An opponent as the top bar shows them on short screens. */
+export interface OpponentChip {
+    /** their opponent number, from 0 */
+    index: number;
+    name: string;
+    count: number;
+    isDown: boolean;
+    active: boolean;
+    /** their cards' ids, set only on short screens, where their cards fly to and from here */
+    cards: string[] | null;
+}
+
+function RequirementChip({met, children}: {met: boolean; children: ReactNode}) {
     return (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary py-1 pr-3 pl-2 text-sm font-bold short:text-xs">
             {met
@@ -17,9 +31,8 @@ function RequirementChip({met, children}) {
 }
 
 // On short screens the opponent panels don't fit, so opponents show here as
-// chips, and their cards fly to and from the avatars (opponent.cards, their
-// card ids, is only set then).
-function OpponentChips({opponents}) {
+// chips, and their cards fly to and from the avatars.
+function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
     return (
         <ul aria-label="Opponents" className="hidden gap-1.5 short:flex">
             {opponents.map(opponent => (
@@ -46,8 +59,19 @@ function OpponentChips({opponents}) {
     );
 }
 
+interface TopBarProps {
+    /** from 0 */
+    round: number;
+    roundCount: number;
+    requirement: Requirement;
+    requirementMet: boolean;
+    opponents: OpponentChip[];
+    onShowScores: () => void;
+    onShowRules: () => void;
+}
+
 // Round, what this round needs, and the scores and rules.
-function TopBar({round, roundCount, requirement, requirementMet, opponents, onShowScores, onShowRules}) {
+function TopBar({round, roundCount, requirement, requirementMet, opponents, onShowScores, onShowRules}: TopBarProps) {
     return (
         <header className="grid h-15 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-white/8 bg-black/34 px-6 short:flex short:h-11 short:gap-2 short:px-3">
             <div className="truncate font-heading text-2xl font-extrabold tracking-tight short:hidden">Crafty Clara</div>

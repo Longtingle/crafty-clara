@@ -1,13 +1,20 @@
 // @vitest-environment node
-import {RUN, SET} from '@/engine/cards.ts';
+import {RUN, SET, type SetrunType} from '@/engine/cards.ts';
 import {checkSetrun} from '@/engine/setruns.ts';
+import type {LogEntry} from '@/engine/game.ts';
+import type {GameView} from '@/engine/view.ts';
 import {card, cards} from '@/engine/testing.ts';
-import {describeEntry, activityEntries, lastAction, newCardTag} from './log-text.js';
+import {describeEntry, activityEntries, lastAction, newCardTag, speechFor} from './log-text.ts';
 
-const setrun = (str, type) => checkSetrun(cards(str), type).setrun;
+const setrun = (str: string, type: SetrunType) => {
+    let result = checkSetrun(cards(str), type);
+    if (!result.valid) throw new Error(str + " isn't a valid " + type);
+    return result.setrun;
+};
 
-// A view from seat 0 of four, with a set on seat 1's table and a run on yours.
-const viewWith = (log) => ({
+// A view from seat 0 of four, with a set on seat 1's table and a run on
+// yours. It has only what log-text reads.
+const viewWith = (log: LogEntry[]) => ({
     seat : 0,
     round : 2,
     seats : [
@@ -17,11 +24,11 @@ const viewWith = (log) => ({
         {name : "Opponent 3", table : []}
     ],
     log
-});
+}) as GameView;
 
 describe('describeEntry', () => {
     const view = viewWith([]);
-    const says = (entry) => describeEntry(entry, view);
+    const says = (entry: LogEntry) => describeEntry(entry, view);
 
     it('names the card you drew, but not one an opponent drew', () => {
         expect(says({type : "draw", seat : 0, from : "deck", card : card("10H")})).toBe("drew 10♥ from the deck");
@@ -37,11 +44,12 @@ describe('describeEntry', () => {
     });
 
     it('says whose setrun a card went onto', () => {
-        const add = (seat, target) => ({type : "add", seat, card : card("8S"), target : {seat : target, index : 0}, returnedAce : null});
+        const add = (seat: number, target: number): LogEntry =>
+            ({type : "add", seat, card : card("8S"), target : {seat : target, index : 0}, returnedAce : null});
         expect(says(add(1, 0))).toBe("added 8♠ to your run");
         expect(says(add(1, 1))).toBe("added 8♠ to their set");
         expect(says(add(0, 1))).toBe("added 8♠ to Opponent 1's set");
-        expect(says({...add(0, 1), returnedAce : card("1H")})).toBe("added 8♠ to Opponent 1's set and took back the wild A♥");
+        expect(says({...add(0, 1), returnedAce : card("1H")} as LogEntry)).toBe("added 8♠ to Opponent 1's set and took back the wild A♥");
     });
 });
 
@@ -68,14 +76,28 @@ describe('lastAction', () => {
 
 describe('newCardTag', () => {
     it('tags the card you drew, claimed or got back, until you discard', () => {
-        const drew = {type : "draw", seat : 0, from : "deck", card : card("10H", "a")};
-        const claimed = {type : "claim", seat : 0, card : card("3C", "b")};
-        const back = {type : "add", seat : 0, card : card("8S"), target : {seat : 1, index : 0}, returnedAce : card("1H", "c")};
-        const discarded = {type : "discard", seat : 0, card : card("12S")};
+        const drew: LogEntry = {type : "draw", seat : 0, from : "deck", card : card("10H", "a")};
+        const claimed: LogEntry = {type : "claim", seat : 0, card : card("3C", "b")};
+        const back: LogEntry = {type : "add", seat : 0, card : card("8S"), target : {seat : 1, index : 0}, returnedAce : card("1H", "c")};
+        const discarded: LogEntry = {type : "discard", seat : 0, card : card("12S")};
         expect(newCardTag(viewWith([drew]))).toEqual({id : "a", label : "New"});
         expect(newCardTag(viewWith([drew, {type : "discard", seat : 1, card : card("2C")}]))).toEqual({id : "a", label : "New"});
         expect(newCardTag(viewWith([drew, discarded]))).toBeNull();
         expect(newCardTag(viewWith([drew, discarded, claimed]))).toEqual({id : "b", label : "Claimed"});
         expect(newCardTag(viewWith([drew, back]))).toEqual({id : "c", label : "Back"});
+    });
+});
+
+describe('speechFor', () => {
+    it('has the player speak after a move, and the next player think after a discard', () => {
+        const view = viewWith([]);
+        expect(speechFor({type : "claim", seat : 2, card : card("3C")}, view)).toEqual([[2, "I'll take that!"]]);
+        expect(speechFor({type : "discard", seat : 3, card : card("3C")}, view)).toEqual([[3, "Does anyone want this?"], [0, "...thinking..."]]);
+    });
+
+    it("has an opponent react when you add to their setrun", () => {
+        const add = (seat: number): LogEntry => ({type : "add", seat, card : card("9S"), target : {seat : 1, index : 0}, returnedAce : null});
+        expect(speechFor(add(0), viewWith([]))).toEqual([[1, "Woah, steady there!"]]);
+        expect(speechFor(add(2), viewWith([]))).toEqual([]);
     });
 });

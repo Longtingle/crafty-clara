@@ -1,6 +1,8 @@
 # Crafty Clara
 
-A single-player rummy card game against AI opponents, built with React, Redux, Vite, Tailwind CSS and shadcn/ui.
+A contract rummy card game against computer opponents, built with TypeScript, React, Vite, Tailwind CSS, shadcn/ui and Motion.
+
+The rules engine, the host that runs a game and the screen talk only through messages, so the game can later be played online. See `CLAUDE.md` for how it fits together.
 
 ## Getting started
 
@@ -22,3 +24,4 @@ Then open http://localhost:5173.
 | `npm run preview` | Serve the production build locally                |
 | `npm test`        | Run the tests with Vitest in watch mode (`npm test -- --run` for a single run) |
 | `npm run lint`    | Lint with oxlint                                  |
+| `npm run typecheck` | Type-check with TypeScript                      |

@@ -3,8 +3,8 @@
 // heuristic that finds the best partial and complete setruns for the round's
 // requirement.
 
-import {RUN, SET, SUITS, isRedAce, type Card, type Requirement, type Setrun, type SetrunType, type Suit} from './cards.ts';
-import {addToSetrun, checkSetrun, sortHand} from './setruns.ts';
+import {RUN, SET, SUITS, asWild, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
+import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
 import type {Command, Target} from './game.ts';
 import type {GameView} from './view.ts';
 
@@ -19,8 +19,6 @@ interface Candidate<C extends Card> {
     /** cards near a run that could join it later */
     potentialCards: C[];
 }
-
-const asWild = <C extends Card>(ace: C, value: number, suit: Suit): C => ({...ace, value, suit});
 
 const withoutIndex = ({index: _index, ...card}: Indexed): Card => card;
 
@@ -106,17 +104,36 @@ const getSets = <C extends Card>(hand: C[]): {numFullSets: number; sets: Candida
     };
 };
 
+type HandScore = ReturnType<typeof scoreWith>;
+
 // Scores a hand against the requirement: 20 points per card in the best runs
-// and sets, plus 5 for each card near a run that could extend it. Red aces
-// complete a setrun that is one card short. Each card of bestHand and
-// usefulCards carries its index in the hand.
-const scoreHand = (pHand: Card[], requirement: Requirement) => {
+// and sets, plus 5 for each card near a run that could extend it. Each card
+// of bestHand and usefulCards carries its index in the hand.
+//
+// Each red ace is tried both as a wild, which completes a setrun that is one
+// card short, and as an ace, which can make a set of aces or the ace of a run
+// in its own suit. The best reading counts; on a tie, the one with more wilds.
+const scoreHand = (pHand: Card[], requirement: Requirement): HandScore => {
+    let redAces = pHand.flatMap((card, index) => isRedAce(card) ? [index] : []);
+    let best: HandScore | null = null;
+    for (let asAces of subsets(redAces).reverse()) {
+        let score = scoreWith(pHand, requirement, new Set(asAces));
+        let better = !best ||
+            (score.readyToGoDown !== best.readyToGoDown ? score.readyToGoDown : score.score > best.score);
+        if (better) best = score;
+    }
+    return best!;
+};
+
+// asAces: the hand indices of the red aces that play as themselves.
+const scoreWith = (pHand: Card[], requirement: Requirement, asAces: Set<number>) => {
     if (requirement.S === 0 && requirement.R === 0) {
         throw new Error("requirement should include at least one set or run");
     }
     let all: Indexed[] = pHand.map((card, index) => ({...card, index}));
-    let redAces = all.filter(isRedAce);
-    let hand = all.filter(card => !isRedAce(card));
+    let wild = (card: Indexed): boolean => isRedAce(card) && !asAces.has(card.index);
+    let redAces = all.filter(wild);
+    let hand = all.filter(card => !wild(card));
     let output = {
         score : 0,
         readyToGoDown : false,

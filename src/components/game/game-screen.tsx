@@ -1,12 +1,14 @@
 import {useEffect, useState} from 'react';
-import {SET, RUN} from '@/engine/cards.ts';
+import {SET, RUN, type Card} from '@/engine/cards.ts';
 import {sortHand} from '@/engine/setruns.ts';
-import {useGame} from '@/client/use-game.js';
-import GameTable from './game-table.jsx';
-import GoDownDialog from './go-down-dialog.jsx';
-import RoundEndDialog from './round-end-dialog.jsx';
-import {opponentSeats} from './players.js';
-import {newCardTag} from './log-text.js';
+import type {GameClient, Refusal} from '@/client/game-client.ts';
+import {useGame} from '@/client/use-game.ts';
+import GameTable, {type TableActions} from './game-table.tsx';
+import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
+import RoundEndDialog from './round-end-dialog.tsx';
+import {opponentSeats} from './players.ts';
+import {newCardTag, speechFor} from './log-text.ts';
+import {yourTurn} from './your-turn.ts';
 
 // How long an opponent's line of speech, and a refused move's notice, stay up (ms).
 const SPEECH_MS = 2000;
@@ -14,36 +16,23 @@ const NOTICE_MS = 3000;
 
 // Your cards in the order you've put them: cards you've arranged keep their
 // places, and any others join on the right in the order you got them.
-const arrange = (hand, order) => {
+const arrange = (hand: Card[], order: string[]): Card[] => {
     let byId = new Map(hand.map(card => [card.id, card]));
     let placed = order.filter(id => byId.has(id));
     let isPlaced = new Set(placed);
-    return [...placed.map(id => byId.get(id)), ...hand.filter(card => !isPlaced.has(card.id))];
-}
-
-// What an opponent says after a move: [[seat, line]].
-const linesFor = (entry, view) => {
-    switch (entry.type) {
-        case "draw": return [[entry.seat, (entry.from === "deck") ? "Picked from deck" : "Picked from discard"]];
-        case "claim": return [[entry.seat, "I'll take that!"]];
-        case "goDown": return [[entry.seat, "Right, I'm putting my cards down now."]];
-        case "discard": return [[entry.seat, "Does anyone want this?"], [(entry.seat + 1) % view.seats.length, "...thinking..."]];
-        // someone adding to your setruns gets a reaction
-        case "add": return (entry.seat === view.seat) ? [[entry.target.seat, "Woah, steady there!"]] : [];
-        default: return [];
-    }
+    return [...placed.map(id => byId.get(id)!), ...hand.filter(card => !isPlaced.has(card.id))];
 }
 
 // What each opponent is saying, by seat: a line for a moment after some
 // moves, and a grumble from one of them as each round is dealt. It listens to
 // the client, so it hears each new log entry as it arrives.
-function useSpeech(client) {
-    let [lines, setLines] = useState({});
+function useSpeech(client: GameClient): Record<number, string | null> {
+    let [lines, setLines] = useState<Record<number, string | null>>({});
 
     useEffect(() => {
-        let timers = {};
+        let timers: Record<number, ReturnType<typeof setTimeout>> = {};
         // the round and how much of its log has been heard
-        let heard = {round : null, count : 0};
+        let heard = {round : -1, count : 0};
         let current = client.getSnapshot().view;
         if (current) heard = {round : current.round, count : current.log.length};
 
@@ -55,7 +44,7 @@ function useSpeech(client) {
             let fresh = newRound ? log : log.slice(heard.count);
             heard = {round, count : log.length};
 
-            let said = fresh.flatMap(entry => linesFor(entry, view));
+            let said = fresh.flatMap(entry => speechFor(entry, view));
             if (newRound && log.length === 0) {
                 let opponents = opponentSeats(view);
                 said.push([opponents[Math.floor(Math.random() * opponents.length)], "Oh I've got a hand like a foot!"]);
@@ -78,7 +67,7 @@ function useSpeech(client) {
 }
 
 // Why the host refused your last move, for a few seconds after it did.
-function useNotice(refusal) {
+function useNotice(refusal: Refusal | null): string | null {
     let [expired, setExpired] = useState(0);
     useEffect(() => {
         if (!refusal) return;
@@ -91,10 +80,10 @@ function useNotice(refusal) {
 // A game in progress, as your seat sees it through the client. Everything
 // here besides the view is yours alone: the order of your hand, the card
 // you've selected, and the open dialogs. Moves go to the host as commands.
-function GameScreen({client, onNewGame}) {
+function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => void}) {
     let {view, refusal, send} = useGame(client);
-    let [order, setOrder] = useState([]);
-    let [selectedId, setSelectedId] = useState(null);
+    let [order, setOrder] = useState<string[]>([]);
+    let [selectedId, setSelectedId] = useState<string | null>(null);
     let [goingDown, setGoingDown] = useState(false);
     let speech = useSpeech(client);
     let notice = useNotice(refusal);
@@ -103,27 +92,27 @@ function GameScreen({client, onNewGame}) {
 
     let me = view.seats[view.seat];
     let hand = arrange(view.hand, order);
-    let playing = view.turn === view.seat && view.phase === "play";
     let selectedIndex = hand.findIndex(card => card.id === selectedId);
-    let selected = (playing && selectedIndex !== -1) ? selectedIndex : null;
+    let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex);
+    let selected = turn.selected?.card;
 
-    let actions = {
+    let actions: TableActions = {
         drawFromDeck : () => send({type : "draw", from : "deck"}),
         takeDiscard : () => send({type : "draw", from : "discard"}),
         claim : () => send({type : "claim"}),
         pass : () => send({type : "pass"}),
         discard : () => {
-            if (selected === null) return;
-            send({type : "discard", card : hand[selected].id});
+            if (!selected) return;
+            send({type : "discard", card : selected.id});
             setSelectedId(null);
         },
         addToMeld : (seat, index) => {
-            if (selected === null) return;
-            send({type : "addToSetrun", card : hand[selected].id, target : {seat, index}});
+            if (!selected) return;
+            send({type : "addToSetrun", card : selected.id, target : {seat, index}});
             setSelectedId(null);
         },
         select : (index) => {
-            if (playing) setSelectedId(hand[index].id);
+            if (turn.playing) setSelectedId(hand[index].id);
         },
         reorder : (from, to) => {
             let ids = hand.map(card => card.id);
@@ -138,8 +127,7 @@ function GameScreen({client, onNewGame}) {
         }
     };
 
-    // slots: [{type, indices}] from the go-down dialog, indices into `hand`
-    let goDown = (slots) => {
+    let goDown = (slots: GoDownSlot[]) => {
         send({type : "goDown", setruns : slots.map(slot => ({type : slot.type, cards : slot.indices.map(index => hand[index].id)}))});
         setGoingDown(false);
     };
@@ -149,14 +137,14 @@ function GameScreen({client, onNewGame}) {
             <GameTable
                 view={view}
                 hand={hand}
-                selected={selected}
+                turn={turn}
                 newCard={newCardTag(view)}
                 speech={speech}
                 notice={notice}
                 actions={actions}
             />
             <GoDownDialog
-                open={goingDown && playing && !me.isDown}
+                open={goingDown && turn.playing && !me.isDown}
                 hand={hand}
                 requirement={view.requirement}
                 onCancel={() => setGoingDown(false)}

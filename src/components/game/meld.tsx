@@ -1,12 +1,23 @@
-import {cn} from '@/lib/utils.js';
-import {setrunCaption, isStandIn} from '@/engine/card-names.ts';
-import {PlayingCard, MovingCard} from './playing-card.jsx';
+import type {CSSProperties, ReactNode} from 'react';
+import {cn} from '@/lib/utils.ts';
+import {isWild, type Setrun} from '@/engine/cards.ts';
+import {setrunCaption} from '@/engine/card-names.ts';
+import {PlayingCard, MovingCard} from './playing-card.tsx';
+import type {MeldTarget} from './your-turn.ts';
+
+interface MeldProps {
+    setrun: Setrun;
+    /** what the selected card would do here, if it can go here */
+    target: MeldTarget | null;
+    dimmed: boolean;
+    onClick: () => void;
+}
 
 // A setrun on the table. It is a button only while the selected card can be
-// added to it (target is then {label}, e.g. "Add 7♦" or "Swap for A♥").
-function Meld({setrun, target, dimmed, onClick}) {
+// added to it.
+function Meld({setrun, target, dimmed, onClick}: MeldProps) {
     let caption = setrunCaption(setrun);
-    let hasWild = setrun.cards.some(isStandIn);
+    let hasWild = setrun.cards.some(isWild);
     return (
         <button
             type="button"
@@ -43,11 +54,11 @@ function Meld({setrun, target, dimmed, onClick}) {
 // first adds 38% of a card width, see .meld-fan) plus a 2px border and
 // --meld-pad-x on each side; --meld-gap separates them. Wrapping is left on
 // only for when the cards hit their smallest size.
-function MeldRow({setruns, className, children}) {
+function MeldRow({setruns, className, children}: {setruns: Setrun[]; className?: string; children: ReactNode}) {
     let cardWidths = setruns.reduce((sum, setrun) => sum + 1 + 0.38 * (setrun.cards.length - 1), 0);
     let fixed = setruns.length + " * (2 * var(--meld-pad-x) + 4px) + " + Math.max(setruns.length - 1, 0) + " * var(--meld-gap) + 2px";
     let fit = setruns.length
-        ? {"--meld-w" : "max(26px, min(var(--meld-w-full), (100cqi - (" + fixed + ")) / " + cardWidths + "))"}
+        ? {"--meld-w" : "max(26px, min(var(--meld-w-full), (100cqi - (" + fixed + ")) / " + cardWidths + "))"} as CSSProperties
         : undefined;
     return (
         <div className={cn("@container flex w-full flex-wrap gap-(--meld-gap)", className)} style={fit}>

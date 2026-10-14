@@ -1,10 +1,17 @@
 import {Crown} from 'lucide-react';
-import {cn} from '@/lib/utils.js';
-import {Avatar, Chip} from './opponent-panel.jsx';
+import {cn} from '@/lib/utils.ts';
+import {Avatar, Chip} from './opponent-panel.tsx';
+import type {ScoreRow} from './scores.ts';
 
-// rows: [{key, name, color, label, isYou, points : [per round], total, wentOut}]
-// Ranked by total, lowest (best) first. highlightRound marks a round's column.
-function Scoreboard({rows, roundCount, highlightRound}) {
+interface ScoreboardProps {
+    rows: ScoreRow[];
+    roundCount: number;
+    /** a round (from 0) whose column to mark */
+    highlightRound?: number;
+}
+
+// Ranked by total, lowest (best) first.
+function Scoreboard({rows, roundCount, highlightRound}: ScoreboardProps) {
     let ranked = [...rows].sort((a, b) => a.total - b.total);
     let best = ranked[0].total;
     let rounds = Array.from({length : roundCount}, (_, round) => round);

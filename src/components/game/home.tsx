@@ -1,14 +1,14 @@
 import {useEffect, useState} from 'react';
 import {motion} from 'motion/react';
-import {Button} from '@/components/ui/button.jsx';
+import {Button} from '@/components/ui/button.tsx';
 import {createCard} from '@/engine/cards.ts';
-import {PlayingCard} from './playing-card.jsx';
-import {preloadCardImages} from './cards.js';
-import RulesDialog from './rules-dialog.jsx';
+import {PlayingCard} from './playing-card.tsx';
+import {preloadCardImages} from './cards.ts';
+import RulesDialog from './rules-dialog.tsx';
 
 const FAN = [createCard(10, "H", "10H"), createCard(11, "C", "11C"), createCard(12, "D", "12D"), createCard(13, "S", "13S"), createCard(1, "H", "1H")];
 
-function Home({onStartGame}) {
+function Home({onStartGame}: {onStartGame: () => void}) {
     let [showRules, setShowRules] = useState(false);
     // load the card faces while the player reads the home screen
     useEffect(preloadCardImages, []);
