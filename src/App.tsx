@@ -4,51 +4,86 @@ import {startLocalGame, type LocalGame} from './host/local-game.ts';
 import type {BotLevel} from './engine/bot.ts';
 import {createGameClient, type GameClient} from './client/game-client.ts';
 import Home from './components/game/home.tsx';
+import NewGame from './components/game/new-game.tsx';
 import GameScreen from './components/game/game-screen.tsx';
 
 interface Session {
-    /** counts up with each game, so a new game remounts the screen */
-    id: number;
     game: LocalGame;
     client: GameClient;
+    /** each seat's bot level, by seat (null for you) */
+    levels: (BotLevel | null)[];
 }
 
 // In development, ?seed=123 in the URL deals the same cards every game, to
-// reproduce a bug or set up a hand to test, and ?bots=hard,normal,hard sets
-// the opponents' levels.
-const devParam = (name: string): string | null =>
-    import.meta.env.DEV ? new URLSearchParams(window.location.search).get(name) : null;
-
+// reproduce a bug or set up a hand to test.
 const devSeed = (): number | undefined => {
-    let seed = devParam("seed");
+    let seed = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("seed") : null;
     return (seed === null || !Number.isInteger(Number(seed))) ? undefined : Number(seed);
 };
 
-const devLevels = (): BotLevel[] =>
-    (devParam("bots") ?? "").split(",").map((level): BotLevel => (level === "hard") ? "hard" : "normal");
+// The opponents' levels are remembered on this device for the next game.
+// Storage can be unavailable (private windows) or hold something stale.
+const LEVELS_KEY = "crafty-clara.levels";
+const OPPONENTS = 3;
 
-// The home screen, or a game against the bots. Each game has its own host
-// running in this page (src/host), and the screen sees the game only through
-// your seat's client, the way it would see a game online.
+const loadLevels = (): BotLevel[] => {
+    try {
+        let saved: unknown = JSON.parse(localStorage.getItem(LEVELS_KEY) ?? "null");
+        if (Array.isArray(saved) && saved.length === OPPONENTS && saved.every(level => level === "normal" || level === "hard")) {
+            return saved;
+        }
+    } catch {
+        // fall through to the default
+    }
+    return Array.from({length : OPPONENTS}, () => "normal");
+};
+
+const saveLevels = (levels: BotLevel[]): void => {
+    try {
+        localStorage.setItem(LEVELS_KEY, JSON.stringify(levels));
+    } catch {
+        // not remembered, which is fine
+    }
+};
+
+// The home screen, the choice of opponents, or a game against the bots. Each
+// game has its own host running in this page (src/host), and the screen sees
+// the game only through your seat's client, the way it would see a game online.
 function App() {
+    let [choosing, setChoosing] = useState(false);
+    let [levels, setLevels] = useState(loadLevels);
     let [session, setSession] = useState<Session | null>(null);
 
     // a game's host and bots run until it's stopped
     useEffect(() => () => session?.game.stop(), [session]);
 
-    let startGame = () => {
-        let game = startLocalGame({name : "You", seed : devSeed(), levels : devLevels()});
-        setSession({id : (session?.id ?? 0) + 1, game, client : createGameClient(game.port)});
+    let changeLevels = (next: BotLevel[]) => {
+        setLevels(next);
+        saveLevels(next);
     };
 
+    let deal = () => {
+        let game = startLocalGame({name : "You", seed : devSeed(), levels});
+        setSession({game, client : createGameClient(game.port), levels : [null, ...levels]});
+    };
+
+    // a finished game goes back to the choice of opponents
+    let newGame = () => {
+        setSession(null);
+        setChoosing(true);
+    };
+
+    let screen;
+    if (session) {
+        screen = <GameScreen client={session.client} levels={session.levels} onNewGame={newGame} />;
+    } else if (choosing) {
+        screen = <NewGame levels={levels} onLevelsChange={changeLevels} onDeal={deal} onBack={() => setChoosing(false)} />;
+    } else {
+        screen = <Home onStartGame={() => setChoosing(true)} />;
+    }
+
     // animations respect the "reduce motion" system setting
-    return (
-        <MotionConfig reducedMotion="user">
-            {session
-                ? <GameScreen key={session.id} client={session.client} onNewGame={startGame} />
-                : <Home onStartGame={startGame} />}
-        </MotionConfig>
-    );
+    return <MotionConfig reducedMotion="user">{screen}</MotionConfig>;
 }
 
 export default App;

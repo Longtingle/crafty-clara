@@ -1,5 +1,7 @@
-import {render, screen, fireEvent, within} from '@testing-library/react';
+import {render, screen, fireEvent, within, cleanup} from '@testing-library/react';
 import App from './App.tsx';
+
+beforeEach(() => localStorage.clear());
 
 it('shows the home screen before a game starts', () => {
     render(<App />);
@@ -10,10 +12,41 @@ it('shows the home screen before a game starts', () => {
 it('starts a game against three opponents, with you to play first', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    fireEvent.click(screen.getByRole('button', {name : 'Deal the cards'}));
     const hand = await screen.findByRole('group', {name : 'Your hand'});
     expect(within(hand).getAllByRole('button')).toHaveLength(12);
     const sort = screen.getByRole('group', {name : 'Sort hand'});
     expect(within(sort).getByRole('button', {pressed : true})).toHaveTextContent('By value');
     for (let name of ["Opponent 1", "Opponent 2", "Opponent 3"]) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     expect(screen.getByText(/You start this round/)).toBeInTheDocument();
+    // all normal: no opponent is tagged as hard
+    expect(screen.queryAllByText('Hard')).toHaveLength(0);
+});
+
+it('lets you choose each opponent’s level, and remembers it', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    const second = screen.getByRole('group', {name : 'Opponent 2'});
+    expect(within(second).getByRole('button', {name : 'Normal'})).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(second).getByRole('button', {name : 'Hard'}));
+    expect(within(second).getByRole('button', {name : 'Hard'})).toHaveAttribute('aria-pressed', 'true');
+
+    // the choice stays for the next visit
+    cleanup();
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    expect(within(screen.getByRole('group', {name : 'Opponent 2'})).getByRole('button', {name : 'Hard'})).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByRole('group', {name : 'Opponent 1'})).getByRole('button', {name : 'Normal'})).toHaveAttribute('aria-pressed', 'true');
+
+    // and the game shows who's hard
+    fireEvent.click(screen.getByRole('button', {name : 'Deal the cards'}));
+    await screen.findByRole('group', {name : 'Your hand'});
+    expect(screen.getAllByText('Hard').length).toBeGreaterThan(0);
+});
+
+it('goes back to the home screen from the choice of opponents', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    fireEvent.click(screen.getByRole('button', {name : 'Back'}));
+    expect(screen.getByRole('heading', {name : 'Crafty Clara'})).toBeInTheDocument();
 });

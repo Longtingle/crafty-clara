@@ -155,7 +155,7 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
 - **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
 - **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game; in development, `?bots=hard,normal,hard` in the URL sets the levels and `?seed=N` the deal.
+- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game. In development, `?seed=N` in the URL fixes the deal.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
 
 ### The client (`src/client/`)
@@ -166,7 +166,11 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 ### The UI
 
 Function components only; there is no global store.
-- **`App.tsx`** shows the home screen, or a game. Starting a game calls `startLocalGame` and `createGameClient`. An effect stops the game's host and bots when the game is replaced or App unmounts.
+- **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), or a game.
+  - The levels are remembered in `localStorage`. Every read and write is wrapped in try/catch, so the screen still works where storage is blocked.
+  - Dealing calls `startLocalGame` and `createGameClient`.
+  - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
+  - Each seat's level reaches `GameScreen` as `levels`, by seat. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
   - how your hand is laid out (`hand-order.ts`): kept sorted by value or by suit as cards come and go (by value to start), or in your own order once you drag a card. In your own order, arranged cards keep their places and new ones join on the right. A new deal is sorted again the way you last chose.
   - the selected card, by id

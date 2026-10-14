@@ -14,6 +14,8 @@ export interface OpponentChip {
     name: string;
     count: number;
     isDown: boolean;
+    /** whether they're a hard bot */
+    hard: boolean;
     active: boolean;
     /** their cards' ids, set only on short screens, where their cards fly to and from here */
     cards: string[] | null;
@@ -31,7 +33,8 @@ function RequirementChip({met, children}: {met: boolean; children: ReactNode}) {
 }
 
 // On short screens the opponent panels don't fit, so opponents show here as
-// chips, and their cards fly to and from the avatars.
+// chips, and their cards fly to and from the avatars. On narrower phones the
+// chips leave out the word "cards", so the buttons still fit.
 function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
     return (
         <ul aria-label="Opponents" className="hidden gap-1.5 short:flex">
@@ -39,7 +42,7 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                 <li
                     key={opponent.index}
                     className={cn(
-                        "inline-flex h-8 items-center gap-1.5 rounded-full border-2 bg-panel pr-2.5 pl-0.5 text-xs font-bold whitespace-nowrap",
+                        "inline-flex h-8 flex-none items-center gap-1.5 rounded-full border-2 bg-panel pr-2.5 pl-0.5 text-xs font-bold whitespace-nowrap",
                         opponent.active ? "border-gold" : "border-transparent"
                     )}
                 >
@@ -52,7 +55,10 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                         {opponent.cards && <HiddenHand ids={opponent.cards} className="top-0 left-1.5 w-3" />}
                     </span>
                     <span className="sr-only">{opponent.name}:</span>
-                    {opponent.count} cards{opponent.isDown && " · down"}
+                    {opponent.count}<span className="max-[820px]:sr-only"> cards</span>{opponent.isDown && " · down"}
+                    {opponent.hard && (
+                        <span className="rounded-full bg-cream px-1.5 text-[10px] tracking-wider text-[#12402a] uppercase">Hard</span>
+                    )}
                 </li>
             ))}
         </ul>
@@ -73,9 +79,9 @@ interface TopBarProps {
 // Round, what this round needs, and the scores and rules.
 function TopBar({round, roundCount, requirement, requirementMet, opponents, onShowScores, onShowRules}: TopBarProps) {
     return (
-        <header className="grid h-15 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-white/8 bg-black/34 px-6 short:flex short:h-11 short:gap-2 short:px-3">
+        <header className="grid h-15 min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-white/8 bg-black/34 px-6 short:flex short:h-11 short:gap-2 short:px-3">
             <div className="truncate font-heading text-2xl font-extrabold tracking-tight short:hidden">Crafty Clara</div>
-            <div className="flex items-center gap-3.5 short:gap-2">
+            <div className="flex items-center gap-3.5 short:flex-none short:gap-2">
                 <span className="font-bold whitespace-nowrap short:text-sm">Round {round + 1} of {roundCount}</span>
                 <span aria-hidden="true" className="h-5 w-px bg-white/25" />
                 <span className="text-sm text-muted-foreground short:hidden">Need</span>

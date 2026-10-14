@@ -29,11 +29,13 @@ function HiddenHand({ids, className}: {ids: string[]; className?: string}) {
     );
 }
 
-function Chip({gold, children}: {gold?: boolean; children: ReactNode}) {
+// A small tag by a name: gold for whose turn it is, cream for a hard bot,
+// and an outline for anything else.
+function Chip({tone = "outline", children}: {tone?: "gold" | "cream" | "outline"; children: ReactNode}) {
     return (
         <span className={cn(
             "rounded-full px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap uppercase",
-            gold ? "bg-gold text-gold-foreground" : "border border-white/40"
+            {gold : "bg-gold text-gold-foreground", cream : "bg-cream text-[#12402a]", outline : "border border-white/40"}[tone]
         )}>
             {children}
         </span>
@@ -56,6 +58,8 @@ interface OpponentPanelProps {
     player: SeatView;
     /** their opponent number, from 0 */
     index: number;
+    /** whether they're a hard bot */
+    hard: boolean;
     active: boolean;
     /** what they are saying, if anything */
     speech: string | null | undefined;
@@ -66,7 +70,7 @@ interface OpponentPanelProps {
 
 // An opponent's name, status and score, with their setruns below. The line
 // under the name shows what they are saying, or else their last move.
-function OpponentPanel({player, index, active, speech, lastAction, children}: OpponentPanelProps) {
+function OpponentPanel({player, index, hard, active, speech, lastAction, children}: OpponentPanelProps) {
     let status = speech ? "“" + speech + "”" : (lastAction ?? "Waiting for their turn");
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
@@ -78,7 +82,8 @@ function OpponentPanel({player, index, active, speech, lastAction, children}: Op
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                         <span className="truncate font-bold">{player.name}</span>
-                        {active && <Chip gold>Playing</Chip>}
+                        {hard && <Chip tone="cream">Hard</Chip>}
+                        {active && <Chip tone="gold">Playing</Chip>}
                         {player.isDown && <Chip>Down</Chip>}
                     </div>
                     <span className={cn("truncate text-[13px] text-muted-foreground short:hidden", speech && "italic")}>

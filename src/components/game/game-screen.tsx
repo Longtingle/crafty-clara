@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import type {BotLevel} from '@/engine/bot.ts';
 import type {GameClient, Refusal} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
 import GameTable, {type TableActions} from './game-table.tsx';
@@ -70,7 +71,14 @@ function useNotice(refusal: Refusal | null): string | null {
 // A game in progress, as your seat sees it through the client. Everything
 // here besides the view is yours alone: how your hand is sorted, the card
 // you've selected, and the open dialogs. Moves go to the host as commands.
-function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => void}) {
+interface GameScreenProps {
+    client: GameClient;
+    /** each seat's bot level, by seat (null for a person) */
+    levels: (BotLevel | null)[];
+    onNewGame: () => void;
+}
+
+function GameScreen({client, levels, onNewGame}: GameScreenProps) {
     let {view, refusal, send} = useGame(client);
     // The hand stays sorted the way you last chose until you arrange it
     // yourself. Your own order lasts until the next deal, which comes sorted.
@@ -135,6 +143,7 @@ function GameScreen({client, onNewGame}: {client: GameClient; onNewGame: () => v
                 view={view}
                 hand={hand}
                 sort={sort}
+                levels={levels}
                 turn={turn}
                 newCard={newCardTag(view)}
                 speech={speech}

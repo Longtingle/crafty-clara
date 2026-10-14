@@ -4,6 +4,7 @@ import {cn} from '@/lib/utils.ts';
 import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Card} from '@/engine/cards.ts';
+import type {BotLevel} from '@/engine/bot.ts';
 import type {GameView} from '@/engine/view.ts';
 import TopBar from './top-bar.tsx';
 import {OpponentPanel, CompactMelds} from './opponent-panel.tsx';
@@ -40,6 +41,8 @@ interface GameTableProps {
     /** your cards in the order you've arranged them */
     hand: Card[];
     sort: HandSort;
+    /** each seat's bot level, by seat (null for a person) */
+    levels: (BotLevel | null)[];
     /** what you can do now (yourTurn) */
     turn: YourTurn;
     newCard: NewCard | null;
@@ -92,7 +95,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom.
-function GameTable({view, hand, sort, turn, newCard, speech, notice, actions}: GameTableProps) {
+function GameTable({view, hand, sort, levels, turn, newCard, speech, notice, actions}: GameTableProps) {
     let [dialog, setDialog] = useState<"scores" | "rules" | null>(null);
     // The `short:` layout (see index.css) moves opponents into the top bar.
     // Opponents' cards are rendered for one layout only, because each card
@@ -133,6 +136,7 @@ function GameTable({view, hand, sort, turn, newCard, speech, notice, actions}: G
                     name : view.seats[seat].name,
                     count : view.seats[seat].cards.length,
                     isDown : view.seats[seat].isDown,
+                    hard : levels[seat] === "hard",
                     active : isInTurn(view, seat),
                     cards : short ? view.seats[seat].cards : null
                 }))}
@@ -151,6 +155,7 @@ function GameTable({view, hand, sort, turn, newCard, speech, notice, actions}: G
                             key={seat}
                             player={view.seats[seat]}
                             index={opponentIndex(view, seat)}
+                            hard={levels[seat] === "hard"}
                             active={isInTurn(view, seat)}
                             speech={speech[seat]}
                             lastAction={lastAction(view, seat)}

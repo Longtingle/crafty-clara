@@ -19,7 +19,7 @@ function PlayerPanel({active, isDown, score, cardCount}: PlayerPanelProps) {
             <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold">You</span>
-                    {active && <Chip gold>Playing</Chip>}
+                    {active && <Chip tone="gold">Playing</Chip>}
                     {isDown && <span className="short:hidden"><Chip>Down</Chip></span>}
                 </div>
                 <span className="text-[13px] text-muted-foreground">

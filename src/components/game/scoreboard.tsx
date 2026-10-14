@@ -51,7 +51,7 @@ function Scoreboard({rows, roundCount, highlightRound}: ScoreboardProps) {
                                         className={cn("size-7 text-[13px] short:size-7", row.isYou && "text-[10px] text-[#12402a]")}
                                     />
                                     <span className="font-bold">{row.name}</span>
-                                    {row.wentOut && <Chip gold>Went out</Chip>}
+                                    {row.wentOut && <Chip tone="gold">Went out</Chip>}
                                 </span>
                             </td>
                             {rounds.map(round => (
