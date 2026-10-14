@@ -3,7 +3,7 @@
 // heuristic that finds the best partial and complete setruns for the round's
 // requirement.
 
-import {RUN, SET, SUITS, asWild, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
+import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
 import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
 import type {Command, Target} from './game.ts';
 import type {GameView} from './view.ts';
@@ -19,8 +19,6 @@ interface Candidate<C extends Card> {
     /** cards near a run that could join it later */
     potentialCards: C[];
 }
-
-const withoutIndex = ({index: _index, ...card}: Indexed): Card => card;
 
 const makeRun = <C extends Card>(cards: C[]): Candidate<C> => ({
     type : RUN,
@@ -232,21 +230,123 @@ const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean):
     return candidates.reduce((highest, card) => (card.value > highest.value) ? card : highest).index;
 };
 
-/** The setruns to lay down and the cards left over, if the hand meets the requirement. */
-const planGoDown = (hand: Card[], requirement: Requirement): {table: Setrun[]; rest: Card[]} | null => {
-    let score = scoreHand(hand, requirement);
-    if (!score.readyToGoDown) return null;
-    let table: Setrun[] = [];
-    let usedCards: number[] = [];
-    for (let setrun of score.bestHand) {
-        // scoreHand only estimates, so make sure each setrun really is valid
-        let check = checkSetrun(setrun.cards.map(withoutIndex), setrun.type);
-        if (!check.valid) return null;
-        table.push(check.setrun);
-        usedCards.push(...setrun.cards.map(card => card.index));
+/** A setrun the bot could go down with: its natural cards, and how many wild aces it needs. */
+interface Option {
+    type: SetrunType;
+    naturals: Card[];
+    wilds: number;
+}
+
+// Every way of choosing `size` of the items, in their order.
+const combinations = <T>(items: T[], size: number): T[][] => (size === 0)
+    ? [[]]
+    : items.flatMap((item, i) => combinations(items.slice(i + 1), size - 1).map(rest => [item, ...rest]));
+
+// The runs the bot could make: in each suit, each stretch of 4 or more values
+// with at least 3 natural cards and wild aces in the gaps. A stretch starts
+// and ends on natural cards, unless it needs a wild at an end to be long enough.
+const runOptions = (naturals: Card[], wilds: number): Option[] => SUITS.flatMap(suit => {
+    let byValue = new Map<number, Card>();
+    for (let card of naturals) {
+        if (card.suit === suit && !byValue.has(card.value)) byValue.set(card.value, card);
     }
-    if (new Set(usedCards).size !== usedCards.length) return null;
-    return {table, rest : hand.filter((_card, index) => !usedCards.includes(index))};
+    let ace = byValue.get(1);
+    if (ace) byValue.set(14, ace);
+
+    let options: Option[] = [];
+    for (let low = 1; low <= 11; low++) {
+        for (let high = low + 3; high <= Math.min(14, low + 12); high++) {
+            let cards: Card[] = [];
+            for (let value = low; value <= high; value++) {
+                let card = byValue.get(value);
+                if (card) cards.push(card);
+            }
+            let missing = high - low + 1 - cards.length;
+            let naturalEnds = byValue.has(low) && byValue.has(high);
+            if (cards.length >= 3 && missing <= Math.min(wilds, cards.length) && (naturalEnds || high - low === 3)) {
+                options.push({type : RUN, naturals : cards, wilds : missing});
+            }
+        }
+    }
+    return options;
+});
+
+// The sets the bot could make: all its natural cards of a value, with a wild
+// ace if it has only two.
+const setOptions = (naturals: Card[], wilds: number): Option[] => {
+    let byValue = new Map<number, Card[]>();
+    for (let card of naturals) byValue.set(card.value, [...(byValue.get(card.value) ?? []), card]);
+    return [...byValue.values()]
+        .filter(group => group.length >= 3 || (group.length === 2 && wilds > 0))
+        .map(group => ({type : SET, naturals : group, wilds : (group.length >= 3) ? 0 : 1}));
+};
+
+// What a card left in hand costs, besides its points, when choosing how to go
+// down: each one is another card to get rid of before going out.
+const CARD_COST = 10;
+
+// The cards left in hand once the bot has added everything it can to the
+// setruns on the tables, the way botMove does once it is down.
+const afterAdding = (hand: Card[], tables: Setrun[][]): Card[] => {
+    let rest = hand;
+    let changed = tables.map(table => [...table]);
+    // each addition uses up a natural card, so this always ends; the limit is a safeguard
+    for (let step = 0; step < 50; step++) {
+        let addition = findAddition(rest, changed);
+        if (!addition) break;
+        let {card, target} = addition;
+        let result = addToSetrun(changed[target.seat][target.index], card);
+        if (!result.valid) break;
+        changed[target.seat][target.index] = result.setrun;
+        rest = rest.filter(other => other.id !== card.id);
+        if (result.returnedAce) rest = [...rest, result.returnedAce];
+    }
+    return rest;
+};
+
+/**
+ * The setruns to lay down and the cards left over, if the hand meets the
+ * requirement. Of all the ways to go down, the bot picks the one that leaves
+ * the fewest points in its hand (with CARD_COST for each card) after it adds
+ * what it can to the setruns on the tables (by seat), its own new ones included.
+ */
+const planGoDown = (hand: Card[], requirement: Requirement, tables: Setrun[][] = []): {table: Setrun[]; rest: Card[]} | null => {
+    let best: {table: Setrun[]; rest: Card[]; cost: number} | null = null;
+    let redAces = hand.filter(isRedAce);
+    let wildsIn = (options: Option[]): number => options.reduce((sum, option) => sum + option.wilds, 0);
+
+    // each red ace can play as itself or as a wild
+    for (let asAces of subsets(redAces)) {
+        let naturals = hand.filter(card => !isRedAce(card) || asAces.includes(card));
+        let wilds = redAces.filter(ace => !asAces.includes(ace));
+
+        for (let runs of combinations(runOptions(naturals, wilds.length), requirement.R)) {
+            let inRuns = new Set(runs.flatMap(run => run.naturals));
+            if (inRuns.size !== runs.reduce((sum, run) => sum + run.naturals.length, 0)) continue;
+            if (wildsIn(runs) > wilds.length) continue;
+            let left = naturals.filter(card => !inRuns.has(card));
+
+            for (let sets of combinations(setOptions(left, wilds.length - wildsIn(runs)), requirement.S)) {
+                if (wildsIn(runs) + wildsIn(sets) > wilds.length) continue;
+                let unused = [...wilds];
+                let table: Setrun[] = [];
+                for (let option of [...runs, ...sets]) {
+                    let check = checkSetrun([...option.naturals, ...unused.splice(0, option.wilds)], option.type);
+                    if (!check.valid) break;
+                    table.push(check.setrun);
+                }
+                if (table.length < runs.length + sets.length) continue;
+
+                let laid = new Set(table.flatMap(setrun => setrun.cards.map(card => card.id)));
+                let rest = hand.filter(card => !laid.has(card.id));
+                let kept = afterAdding(rest, [...tables, table]);
+                let cost = getPoints(kept) + CARD_COST * kept.length;
+                // on a tie, lay more down at once
+                if (!best || cost < best.cost || (cost === best.cost && rest.length < best.rest.length)) best = {table, rest, cost};
+            }
+        }
+    }
+    return best && {table : best.table, rest : best.rest};
 };
 
 /** A card from the hand that fits a setrun on the table (tables are by seat), and where it goes. */
@@ -302,7 +402,7 @@ const botMove = (view: GameView): Command | null => {
     if (view.phase !== "play" || view.claim) return null;
 
     if (!me.isDown) {
-        let plan = planGoDown(hand, requirement);
+        let plan = planGoDown(hand, requirement, tables);
         if (plan) {
             return {type : "goDown", setruns : plan.table.map(setrun => ({type : setrun.type, cards : setrun.cards.map(card => card.id)}))};
         }

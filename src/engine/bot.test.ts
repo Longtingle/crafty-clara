@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {RUN, SET, type Setrun} from './cards.ts';
+import {RUN, SET, type Card, type Setrun} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
 import {getRuns, getSets, scoreHand, wantsCard, chooseDiscard, planGoDown, findAddition, botMove} from './bot.ts';
 import {apply, createGame, type GameState} from './game.ts';
@@ -74,6 +74,26 @@ describe('planGoDown', () => {
 
     it('waits when the requirement is not met', () => {
         expect(planGoDown(cards("7C 7H 2S 2H 9D"), {S : 2, R : 0})).toBeNull();
+    });
+
+    it('lays down the setruns worth the most points', () => {
+        const plan = planGoDown(cards("2C 2D 2S 13C 13D 13S 9H"), {S : 1, R : 0});
+        expect(plan?.table.map(names)).toEqual([["13C", "13D", "13S"]]);
+    });
+
+    it('lays down the setruns that let it add the most to the tables', () => {
+        const plan = (hand: Card[], tables: Setrun[][]) => planGoDown(hand, {S : 2, R : 0}, tables)?.table.map(names);
+        const hand = cards("13C 13D 13H 2C 2D 2S 9C 9D 9S");
+        expect(plan(hand, [])).toEqual([["13C", "13D", "13H"], ["9C", "9D", "9S"]]);
+        // with someone's kings on the table, it keeps its kings back to add to them, and goes out
+        const kings = setrun("13S 13H 13C", SET);
+        expect(plan(hand, [[kings]])).toEqual([["2C", "2D", "2S"], ["9C", "9D", "9S"]]);
+    });
+
+    it('fills a gap in a run with a wild ace', () => {
+        const plan = planGoDown(cards("4S 5S 7S 8S 1D 9C"), {S : 0, R : 1});
+        expect(plan?.table.map(names)).toEqual([["4S", "5S", "1D", "7S", "8S"]]);
+        expect(plan?.rest.map(c => c.displayString)).toEqual(["9C"]);
     });
 });
 
@@ -158,8 +178,8 @@ describe('botMove', () => {
         state.seats[1].isDown = true;
         const goDown = botMove(viewFor(state, 0, 0));
         expect(goDown).toEqual({type : "goDown", setruns : [
-            {type : SET, cards : ["c3", "c4", "c5"]},
-            {type : SET, cards : ["c0", "c1", "c2"]}
+            {type : SET, cards : ["c0", "c1", "c2"]},
+            {type : SET, cards : ["c3", "c4", "c5"]}
         ]});
         state = play(state, 0, goDown!);
         const add = botMove(viewFor(state, 0, 0));

@@ -102,7 +102,8 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - `botMove(view)` returns a bot's next command, or null while it waits. A bot sees only its own view.
 - It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
-- `planGoDown` re-checks each setrun with `checkSetrun`, because `scoreHand` only estimates.
+- `planGoDown(hand, requirement, tables)` tries every way to go down with exactly the round's setruns: each red ace as itself or as a wild, with wilds filling gaps in runs. For each way, it plays out what it could then add to the tables, and keeps the one that leaves the fewest points in hand (plus `CARD_COST` a card). So it lays kings rather than 2s, and keeps back a set it can add to someone else's.
+- `scoreHand` still guides what to collect and discard, but it is greedy and misses some ways to go down, so don't use it to decide whether the bot can go down.
 - `worthTaking` stops the two take-and-throw-back loops the simulations found.
 
 **`simulate.ts`**
