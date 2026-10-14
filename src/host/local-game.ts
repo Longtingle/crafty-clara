@@ -47,10 +47,11 @@ export const startLocalGame = ({
         return seatEnd;
     };
     let port = seat(0);
-    // each bot's seed decides what it forgets, if it's a hard bot
+    // each bot's seed decides what it forgets and when it takes a risk, if
+    // it's a hard bot, and its risk is secret and lasts the game
     let seeded = {rng : seed ?? Math.floor(Math.random() * 2 ** 32)};
     let bots = opponents.map((_, i) => {
-        let profile = {level : levels[i] ?? "normal", seed : Math.floor(random(seeded) * 2 ** 32)};
+        let profile = {level : levels[i] ?? "normal", seed : Math.floor(random(seeded) * 2 ** 32), risk : random(seeded)};
         return startBot(seat(i + 1), {profile, clock, pace});
     });
     return {

@@ -12,17 +12,33 @@ import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requiremen
 import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
 import {readClues, type Clues, type Memory} from './clues.ts';
 import type {Command, Target} from './game.ts';
+import {random} from './random.ts';
 import type {GameView} from './view.ts';
 
 export type BotLevel = "normal" | "hard";
 
-/** Who a bot is: its level, and a seed for what it forgets. */
+/** Who a bot is: its level, a seed for what it forgets, and how much risk it takes. */
 export interface BotProfile {
     level: BotLevel;
     seed: number;
+    /**
+     * From 0 (cautious, the default) to 1 (a gambler): how readily a hard
+     * bot holds off going down, to keep its setruns hidden. Each bot's is
+     * secret and lasts the whole game.
+     */
+    risk?: number;
 }
 
 export const NORMAL_BOT: BotProfile = {level : "normal", seed : 0};
+
+/** The chance, at the most risk, that a hard bot holds off going down on a turn when it could. */
+const HOLD_CHANCE = 0.8;
+/**
+ * The most cards a round may need for a hard bot to hold off going down. In
+ * rounds 1 to 4 (6 to 9 cards), the first player down never went out in the
+ * same turn in tournaments; in rounds 6 and 7, 11% and 20% did.
+ */
+const MAX_HOLD_CARDS = 9;
 
 /** How well a hard bot remembers what it saw (see clues.ts). */
 const HARD_MEMORY: Omit<Memory, "seed"> = {fresh : 0.95, fade : 0.92};
@@ -420,6 +436,30 @@ const findAddition = (hand: Card[], tables: Setrun[][]): {card: Card; target: Ta
     return null;
 };
 
+/**
+ * Whether a hard bot holds off going down this turn. While nobody else is
+ * down it may wait, so the others can't see its setruns or add to them, with
+ * a chance that grows with its risk. The chance is drawn from its seed, so it
+ * decides the same way however often it's asked during a turn.
+ *
+ * It only waits in rounds that need few cards (MAX_HOLD_CARDS), where someone
+ * going down and out in one turn almost never happens, and never once anyone
+ * else is down, or when going down would let it go out. In tournaments,
+ * waiting like this neither helped nor hurt; waiting in the later rounds
+ * too cost about 5 points a game.
+ */
+const holdsOff = (view: GameView, plan: {table: Setrun[]; rest: Card[]}, profile: BotProfile): boolean => {
+    let risk = profile.risk ?? 0;
+    let {S, R} = view.requirement;
+    if (risk === 0 || 3 * S + 4 * R > MAX_HOLD_CARDS) return false;
+    if (view.seats.some((seat, index) => index !== view.seat && seat.isDown)) return false;
+    let tables = view.seats.map(seat => seat.table);
+    if (afterAdding(plan.rest, [...tables, plan.table]).length <= 1) return false;
+    let turn = view.log.filter(entry => entry.type === "discard").length;
+    let seeded = {rng : profile.seed ^ Math.imul(view.round + 1, 0x2545F491) ^ Math.imul(turn + 1, 0x9E3779B9)};
+    return random(seeded) < risk * HOLD_CHANCE;
+};
+
 // Whether to take the top discard instead of drawing from the deck. Two kinds
 // of take would only pass a card round the table for ever:
 // - once down, a card is only any use if it can go onto a setrun; taking one
@@ -468,7 +508,7 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
 
     if (!me.isDown) {
         let plan = planGoDown(hand, requirement, tables);
-        if (plan) {
+        if (plan && !(profile.level === "hard" && holdsOff(view, plan, profile))) {
             return {type : "goDown", setruns : plan.table.map(setrun => ({type : setrun.type, cards : setrun.cards.map(card => card.id)}))};
         }
     } else {

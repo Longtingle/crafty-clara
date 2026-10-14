@@ -12,7 +12,7 @@ import {playTournament} from '../src/engine/tournament.ts';
 
 const BOTS = {
     normal : view => botMove(view),
-    hard : view => botMove(view, {level : "hard", seed : 1})
+    hard : view => botMove(view, {level : "hard", seed : 1, risk : 0.5})
 };
 
 const {values} = parseArgs({options : {

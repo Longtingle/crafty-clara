@@ -161,6 +161,30 @@ describe('botMove', () => {
         expect(botMove(viewFor(state, 0, 0), {level : "hard", seed : 3})).toMatchObject({type : "discard", card : "11S"});
     });
 
+    it('at the hard level, may hold off going down early in the game, if it dares', () => {
+        const moves = (hand: string, risk: number, setUp: (state: GameState) => void = () => {}) => {
+            let state = play(newGame(), 0, {type : "draw", from : "discard"});
+            state.seats[0].hand = cards(hand);
+            setUp(state);
+            return Array.from({length : 30}, (_, seed) => botMove(viewFor(state, 0, 0), {level : "hard", seed, risk})?.type);
+        };
+        const sets = "7C 7D 7S 9C 9H 9S 2D 4H";
+        // a bold bot sometimes waits, and otherwise goes down
+        expect(new Set(moves(sets, 1))).toEqual(new Set(["goDown", "discard"]));
+        // a cautious one never waits
+        expect(new Set(moves(sets, 0))).toEqual(new Set(["goDown"]));
+        // nor does anyone once someone else is down, or when going down lets it go out
+        expect(new Set(moves(sets, 1, state => {
+            state.seats[2].isDown = true;
+            state.seats[2].table = [setrun("5C 5D 5H", SET)];
+        }))).toEqual(new Set(["goDown"]));
+        expect(new Set(moves("7C 7D 7S 9C 9H 9S 2D", 1))).toEqual(new Set(["goDown"]));
+        // nor in a round that needs more cards (round 5: 2 sets and a run)
+        expect(new Set(moves(sets + " 3H 5H 6H 13C", 1, state => {
+            state.round = 4;
+        }))).toEqual(new Set(["goDown"]));
+    });
+
     it('draws on its turn and waits otherwise', () => {
         const state = newGame();
         expect(botMove(viewFor(state, 0, 0))?.type).toBe("draw");

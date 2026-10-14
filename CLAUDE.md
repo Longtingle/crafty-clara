@@ -100,7 +100,7 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 
 **`bot.ts`**
 - `botMove(view, profile)` returns a bot's next command, or null while it waits. A bot sees only its own view.
-- A `BotProfile` is a level and a seed. There are two levels:
+- A `BotProfile` is a level, a seed and a risk tolerance (0 to 1). `startLocalGame` gives each bot a random, secret risk for the whole game. There are two levels:
   - **Normal** plays its own hand.
   - **Hard** discards by points rather than face value, so it throws away useless black aces (25 points). It also reads the table (`clues.ts`), as an `Insight` passed to `scoreHand`, `wantsCard` and `chooseDiscard`:
     - It marks down unfinished setruns short of outs (`rated`, `OUTS_WEIGHT`). So it collects what it can still finish, not runs whose cards are gone or that others are collecting.
@@ -109,6 +109,11 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
   - Tried and dropped:
     - Weighting danger more heavily, to hold high cards back from others, cost more points than it saved.
     - Choosing where to lay wild aces, so fewer cards could swap them out, made no difference.
+  - **Holding off going down** (`holdsOff`):
+    - A hard bot may wait to go down, to keep its setruns hidden, but only while nobody else is down, only in rounds that need 9 cards or fewer, and never when going down lets it go out. The chance grows with its risk.
+    - In tournaments this was neutral. Waiting in the later rounds too, where players often go down and out in one turn, cost about 5 points a game.
+    - So it's personality, not strength: it may matter more against people, who read the table more than bots do.
+    - Waiting for a better way to go down once someone else is down wasn't built. Once someone is down, a round ends within a few turns, and being caught costs about 100 points, so waiting rarely pays.
 - It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
 - `planGoDown(hand, requirement, tables)` tries every way to go down with exactly the round's setruns: each red ace as itself or as a wild, with wilds filling gaps in runs. For each way, it plays out what it could then add to the tables, and keeps the one that leaves the fewest points in hand (plus `CARD_COST` a card). So it lays kings rather than 2s, and keeps back a set it can add to someone else's.
