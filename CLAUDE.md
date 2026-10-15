@@ -93,6 +93,8 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - Every seat is the same. Whether a seat is a person or a bot is the host's business.
 - Commands name cards by id: `draw`, `claim`, `pass`, `goDown`, `addToSetrun`, `discard`, and `ready` (for the next round).
 - `apply` copies the state with `structuredClone` and changes the copy, so a state object is never changed once made.
+- The state is plain JSON-safe data, so a game can be saved and carried on.
+- Each seat keeps its points for each round played (`scores`) and whether it got down in each (`downs`). The game keeps who went out of each round (`outs`), so a finished game tells its whole story (for your history).
 
 **`view.ts`**
 - `viewFor(state, seat, now)` is what one seat may see: its own hand, other hands as card ids only, the deck as a count and the top card's id, the claim window, and a log in which other seats' deck draws hide the card.

@@ -33,6 +33,8 @@ export interface SeatState {
     isDown: boolean;
     /** points for each round played */
     scores: number[];
+    /** for each round played, whether they got down */
+    downs: boolean[];
     /** once the round is over: whether they are ready for the next */
     ready: boolean;
 }
@@ -112,6 +114,8 @@ export interface GameState {
     log: LogEntry[];
     /** who went out, once the round is over; null if the round ended because the deck ran out */
     wentOut: number | null;
+    /** who went out of each round played, as wentOut */
+    outs: (number | null)[];
 }
 
 export interface GameOptions {
@@ -136,14 +140,15 @@ export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): Ga
         round : 0,
         phase : "draw",
         turn : 0,
-        seats : names.map(name => ({name, hand : [], table : [], isDown : false, scores : [], ready : false})),
+        seats : names.map(name => ({name, hand : [], table : [], isDown : false, scores : [], downs : [], ready : false})),
         deck : [],
         discard : [],
         discardedBy : null,
         reshuffles : 0,
         claim : null,
         log : [],
-        wentOut : null
+        wentOut : null,
+        outs : []
     };
     state.idPrefix = Math.floor(random(state) * 36 ** 4).toString(36).padStart(4, "0");
     deal(state);
@@ -405,8 +410,12 @@ const endRoundIfOut = (state: GameState, seat: number): boolean => {
 
 // Everyone scores the cards left in their hand.
 const endRound = (state: GameState, wentOut: number | null): void => {
-    for (let player of state.seats) player.scores.push(getPoints(player.hand));
+    for (let player of state.seats) {
+        player.scores.push(getPoints(player.hand));
+        player.downs.push(player.isDown);
+    }
     state.wentOut = wentOut;
+    state.outs.push(wentOut);
     state.claim = null;
     state.phase = (state.round === ROUND_REQUIREMENTS.length - 1) ? "gameEnd" : "roundEnd";
 };

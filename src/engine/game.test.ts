@@ -336,6 +336,20 @@ describe('the end of a round', () => {
         expect(refusal(state, 1, {type : "ready"})).toBe("The game is over");
     });
 
+    it('keeps who went out and who was down, round by round', () => {
+        let state = lastCard();
+        state.seats[0].isDown = true;
+        state.seats[3].isDown = true;
+        state = play(state, 0, {type : "discard", card : "0.0"});
+        expect(state.outs).toEqual([0]);
+        expect(state.seats.map(seat => seat.downs)).toEqual([[true], [false], [false], [true]]);
+
+        // into the next round, as the scores are
+        for (let seat of [0, 1, 2, 3]) state = play(state, seat, {type : "ready"});
+        expect(state.outs).toEqual([0]);
+        expect(state.seats.map(seat => seat.downs)).toEqual([[true], [false], [false], [true]]);
+    });
+
     it('scores a hand with getPoints', () => {
         const state = play(lastCard(), 0, {type : "discard", card : "0.0"});
         expect(state.seats[3].scores[0]).toBe(getPoints(lastCard().seats[3].hand));
@@ -367,7 +381,7 @@ describe('an empty deck', () => {
         state = expireClaims(state, 6000);
         const hands = state.seats.map(seat => seat.hand);
         state = play(state, 0, {type : "discard", card : state.seats[0].hand[0].id}, 6000);
-        expect(state).toMatchObject({phase : "roundEnd", wentOut : null});
+        expect(state).toMatchObject({phase : "roundEnd", wentOut : null, outs : [null]});
         expect(state.log.at(-1)).toEqual({type : "deckOut", seat : 0});
         expect(state.seats.map(seat => seat.scores)).toEqual(state.seats.map(seat => [getPoints(seat.hand)]));
         expect(state.seats[0].hand).toHaveLength(hands[0].length - 1);

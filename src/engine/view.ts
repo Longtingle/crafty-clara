@@ -13,6 +13,8 @@ export interface SeatView {
     isDown: boolean;
     /** points for each round played */
     scores: number[];
+    /** for each round played, whether they got down */
+    downs: boolean[];
     total: number;
     /** once the round is over: whether they are ready for the next */
     ready: boolean;
@@ -48,7 +50,10 @@ export interface GameView {
     claim: ClaimView | null;
     /** this round, oldest first */
     log: LogEntry[];
+    /** who went out, once the round is over; null if the deck ran out */
     wentOut: number | null;
+    /** who went out of each round played, as wentOut */
+    outs: (number | null)[];
 }
 
 // Views share objects with the state, which is never changed once made, so
@@ -69,6 +74,7 @@ export const viewFor = (state: GameState, seat: number, now: number): GameView =
             table : player.table,
             isDown : player.isDown,
             scores : player.scores,
+            downs : player.downs,
             total : player.scores.reduce((sum, score) => sum + score, 0),
             ready : player.ready
         })),
@@ -84,6 +90,7 @@ export const viewFor = (state: GameState, seat: number, now: number): GameView =
         log : state.log.map(entry => (entry.type === "draw" && entry.from === "deck" && entry.seat !== seat)
             ? {...entry, card : null}
             : entry),
-        wentOut : state.wentOut
+        wentOut : state.wentOut,
+        outs : state.outs
     };
 };
