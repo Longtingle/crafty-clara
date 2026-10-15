@@ -1,12 +1,20 @@
-import {useEffect, useState} from 'react';
+import {lazy, Suspense, useEffect, useState} from 'react';
 import {MotionConfig} from 'motion/react';
-import {startLocalGame, type LocalGame} from './host/local-game.ts';
+import type {LocalGame} from './host/local-game.ts';
 import type {BotLevel} from './engine/bot.ts';
-import {createGameClient, type GameClient} from './client/game-client.ts';
+import type {GameClient} from './client/game-client.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
-import GameScreen from './components/game/game-screen.tsx';
 import {goFullscreen} from './lib/fullscreen.ts';
+
+// The game itself (its screen, the host and the bots) is a separate download,
+// fetched once the home screen is up, so the home screen comes first.
+const loadGame = () => Promise.all([
+    import('./host/local-game.ts'),
+    import('./client/game-client.ts'),
+    import('./components/game/game-screen.tsx')
+]);
+const GameScreen = lazy(() => import('./components/game/game-screen.tsx'));
 
 interface Session {
     game: LocalGame;
@@ -55,6 +63,11 @@ function App() {
     let [levels, setLevels] = useState(loadLevels);
     let [session, setSession] = useState<Session | null>(null);
 
+    useEffect(() => {
+        // a failure here is tried again when you deal
+        loadGame().catch(() => {});
+    }, []);
+
     // a game's host and bots run until it's stopped
     useEffect(() => () => session?.game.stop(), [session]);
 
@@ -72,8 +85,15 @@ function App() {
 
     let deal = () => {
         void goFullscreen();
-        let game = startLocalGame({name : "You", seed : devSeed(), levels});
-        setSession({game, client : createGameClient(game.port), levels : [null, ...levels]});
+        loadGame().then(
+            ([{startLocalGame}, {createGameClient}]) => {
+                let game = startLocalGame({name : "You", seed : devSeed(), levels});
+                setSession({game, client : createGameClient(game.port), levels : [null, ...levels]});
+            },
+            // Offline, or a new version of the site has replaced the files
+            // this page asks for: start again from the home screen.
+            () => window.location.reload()
+        );
     };
 
     // a finished game goes back to the choice of opponents
@@ -92,7 +112,11 @@ function App() {
     }
 
     // animations respect the "reduce motion" system setting
-    return <MotionConfig reducedMotion="user">{screen}</MotionConfig>;
+    return (
+        <MotionConfig reducedMotion="user">
+            <Suspense fallback={<div className="h-dvh bg-felt" />}>{screen}</Suspense>
+        </MotionConfig>
+    );
 }
 
 export default App;

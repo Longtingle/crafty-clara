@@ -189,7 +189,7 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 Function components only; there is no global store.
 - **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), or a game.
   - The levels are remembered in `localStorage`. Every read and write is wrapped in try/catch, so the screen still works where storage is blocked.
-  - Dealing calls `startLocalGame` and `createGameClient`.
+  - Dealing calls `startLocalGame` and `createGameClient`. The game (`GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline, or a new deploy has replaced the files), the page reloads.
   - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
   - Each seat's level reaches `GameScreen` as `levels`, by seat. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
