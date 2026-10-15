@@ -1,5 +1,5 @@
 // @vitest-environment node
-import {apply, createGame, expireClaims, type Command, type GameState} from '../engine/game.ts';
+import {apply, createGame, expire, type Command, type GameState} from '../engine/game.ts';
 import {viewFor} from '../engine/view.ts';
 import {startBot} from './bot-player.ts';
 import {createLocalPair} from './transport.ts';
@@ -65,7 +65,7 @@ describe('a bot player', () => {
         show(claimWindow());
         clock.advance(300);
         // the window has closed by the time the bot would answer
-        show(expireClaims(claimWindow(), 6000));
+        show(expire(claimWindow(), 6000));
         clock.advance(5000);
         expect(sent).toEqual([]);
     });

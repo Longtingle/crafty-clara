@@ -16,7 +16,8 @@ export interface DragActions {
     drag(index: number | null): void;
     reorder(from: number, to: number): void;
     discard(): void;
-    addToMeld(seat: number, index: number): void;
+    /** plays the card on a meld, and says whether it did (it may ask where on the meld first) */
+    addToMeld(seat: number, index: number): boolean;
 }
 
 // How long a card played by a drop waits where it was dropped for its move to
@@ -108,10 +109,12 @@ function TableDnd({view, hand, turn, actions, children}: TableDndProps) {
             onDragCancel={() => actions.drag(null)}
             onDragEnd={({active, over}) => {
                 let target = over && parseTarget(over.id);
-                if (target && (target.kind === "discard" || target.kind === "meld") && canDrop(target)) {
+                if (target && target.kind === "discard" && canDrop(target)) {
                     setPlayed(String(active.id));
-                    if (target.kind === "discard") actions.discard();
-                    else actions.addToMeld(target.seat, target.index);
+                    actions.discard();
+                } else if (target && target.kind === "meld" && canDrop(target)) {
+                    // a card asked where on the meld goes back to the hand meanwhile
+                    if (actions.addToMeld(target.seat, target.index)) setPlayed(String(active.id));
                 } else if (over && !target && active.id !== over.id) {
                     actions.reorder(position(active.id), position(over.id));
                 }

@@ -1,10 +1,11 @@
 // The host runs a game. It holds the one true state, applies the commands
-// that come from each seat, closes claim windows at their deadline, and sends
+// that come from each seat, closes claim windows and starts play at their
+// deadlines, and sends
 // every seat its view after each change. A seat is whatever is at the other
 // end of a port: the person at this screen, a bot, or later someone online.
 // The host doesn't know or mind which.
 
-import {apply, createGame, expireClaims, type GameState, type Result} from '../engine/game.ts';
+import {apply, createGame, expire, nextDeadline, type GameState, type Result} from '../engine/game.ts';
 import {viewFor} from '../engine/view.ts';
 import {systemClock, type Clock, type TimerId} from './clock.ts';
 import type {ClientMessage, HostPort} from './protocol.ts';
@@ -16,6 +17,8 @@ export interface HostOptions {
     seed?: number;
     /** how long the other players have to claim a discard (ms) */
     claimWindowMs?: number;
+    /** how long everyone has to look over their hand at the start of each round (ms) */
+    lookMs?: number;
     clock?: Clock;
     /** a game to carry on, in place of dealing a new one with the options above */
     state?: GameState;
@@ -28,7 +31,7 @@ export interface Host {
     connect(seat: number, port: HostPort): void;
     /** the current state, for tests and debugging */
     state(): GameState;
-    /** Ends the game: closes every port and cancels the claim deadline. */
+    /** Ends the game: closes every port and cancels any deadline. */
     close(): void;
 }
 
@@ -36,11 +39,12 @@ export const createHost = ({
     names = [],
     seed = Math.floor(Math.random() * 2 ** 32),
     claimWindowMs,
+    lookMs,
     clock = systemClock,
     state : from,
     onChange
 }: HostOptions): Host => {
-    let state = from ?? createGame({names, seed, claimWindowMs});
+    let state = from ?? createGame({names, seed, claimWindowMs, lookMs, now : clock.now()});
     let connections: ({port: HostPort; stop: () => void} | null)[] = state.seats.map(() => null);
     let deadline: TimerId | undefined;
 
@@ -55,20 +59,21 @@ export const createHost = ({
         connections.forEach((_, seat) => sendView(seat));
     };
 
-    // Closes the claim window when its deadline comes.
+    // Closes the claim window, or starts play, when its deadline comes.
     const watchDeadline = (): void => {
         if (deadline !== undefined) clock.clearTimeout(deadline);
         deadline = undefined;
-        if (!state.claim) return;
+        let when = nextDeadline(state);
+        if (when === null) return;
         deadline = clock.setTimeout(() => {
             deadline = undefined;
-            let next = expireClaims(state, clock.now());
+            let next = expire(state, clock.now());
             // a timer can fire a moment early, and then it waits again
             if (next === state) watchDeadline();
             else update(next);
-        }, state.claim.deadline - clock.now());
+        }, when - clock.now());
     };
-    // a game carried on may have a claim window open
+    // a game carried on may have a deadline to come
     watchDeadline();
 
     const receive = (seat: number, message: ClientMessage): void => {

@@ -1,11 +1,60 @@
-import type {CSSProperties, ReactNode} from 'react';
+import {useId, type CSSProperties, type ReactNode} from 'react';
 import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
-import {isWild, type Setrun} from '@/engine/cards.ts';
-import {setrunCaption} from '@/engine/card-names.ts';
+import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {Popover, PopoverAnchor, PopoverContent} from '@/components/ui/popover.tsx';
+import {RUN, isWild, type Card, type Setrun} from '@/engine/cards.ts';
+import type {RunEnd, RunPlace} from '@/engine/setruns.ts';
+import {setrunCaption, shortName, standInName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard} from './playing-card.tsx';
 import type {MeldTarget} from './your-turn.ts';
 import {meldTarget} from './drop-targets.ts';
+
+/** A card that could go at either end of a run, and the run it would make at each. */
+export interface EndChoice {
+    card: Card;
+    places: RunPlace[];
+}
+
+const RANK_WORDS: Record<number, string> = {1 : "Ace", 11 : "Jack", 12 : "Queen", 13 : "King", 14 : "Ace"};
+
+// Which end of a run a card goes: each end with the cards it would join
+// there, the card as what it would stand in for.
+function EndChooser({choice, titleId, onChoose}: {choice: EndChoice; titleId: string; onChoose: (end: RunEnd) => void}) {
+    return (
+        <div className="flex flex-col gap-2.5 short:gap-2">
+            <p id={titleId} className="pl-0.5 font-bold short:text-[15px]">Where should the {shortName(choice.card)} go?</p>
+            <div className="grid grid-cols-2 gap-2">
+                {choice.places.map(place => {
+                    let low = place.end === "low";
+                    let placed = low ? place.cards[0] : place.cards[place.cards.length - 1];
+                    let next = low ? place.cards[1] : place.cards[place.cards.length - 2];
+                    // the cards at that end, enough to see where it goes
+                    let shown = low ? place.cards.slice(0, 4) : place.cards.slice(-4);
+                    return (
+                        <button
+                            key={place.end}
+                            type="button"
+                            onClick={() => onChoose(place.end)}
+                            className={cn(
+                                "flex flex-col items-center gap-2 rounded-xl border-[1.5px] border-white/16 bg-white/6 px-3 pt-3.5 pb-2.5 outline-none hover:border-gold hover:bg-white/10",
+                                "focus-visible:border-gold focus-visible:shadow-[0_0_0_3px_rgb(245_184_61/0.35)] short:gap-1.5 short:pt-2.5 short:pb-2"
+                            )}
+                        >
+                            <span aria-hidden="true" className="meld-fan flex [--meld-strip:0.5] [--meld-w:36px] short:[--meld-w:32px]">
+                                {shown.map(card => <PlayingCard key={card.id} card={card} setrunType={RUN} alt="" className="w-(--meld-w)" />)}
+                            </span>
+                            <span className="font-bold whitespace-nowrap">As the {standInName(placed, RUN)}</span>
+                            <span className="text-[12.5px] whitespace-nowrap text-muted-foreground short:hidden">
+                                {low ? "Below" : "Above"} the {RANK_WORDS[next.value] ?? next.value}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 interface MeldProps {
     /** whose setrun it is, and which of theirs */
@@ -16,16 +65,24 @@ interface MeldProps {
     target: MeldTarget | null;
     dimmed: boolean;
     onClick: () => void;
+    /** the selected card, while it asks which end of this run the card goes */
+    choice: EndChoice | null;
+    onChoose: (end: RunEnd) => void;
+    onCancelChoice: () => void;
 }
 
 // A setrun on the table. It is a button only while the selected card can be
 // played on it, and a card dragged from your hand can be dropped on it then.
-// It lights up gold where the card fits, unless that hint is off.
-function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
+// It lights up gold where the card fits, unless that hint is off. A card that
+// could go at either end of a run asks which, over the run.
+function Meld({seat, index, setrun, target, dimmed, onClick, choice, onChoose, onCancelChoice}: MeldProps) {
     let caption = setrunCaption(setrun);
     let hasWild = setrun.cards.some(isWild);
     let {setNodeRef, isOver} = useDroppable({id : meldTarget(seat, index)});
-    return (
+    let titleId = useId();
+    // on a phone there's no room above a meld, but there is beside it
+    let short = useMediaQuery("(max-height: 560px)");
+    let meld = (
         <button
             ref={setNodeRef}
             type="button"
@@ -59,6 +116,16 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
                 </span>
             )}
         </button>
+    );
+    return (
+        <Popover open={choice !== null} onOpenChange={(open) => { if (!open) onCancelChoice(); }}>
+            <PopoverAnchor asChild>{meld}</PopoverAnchor>
+            {choice && (
+                <PopoverContent side={short ? "right" : "top"} aria-labelledby={titleId} className="short:p-3">
+                    <EndChooser choice={choice} titleId={titleId} onChoose={onChoose} />
+                </PopoverContent>
+            )}
+        </Popover>
     );
 }
 

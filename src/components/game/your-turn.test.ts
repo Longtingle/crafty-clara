@@ -2,7 +2,7 @@
 import {RUN, SET, type Card, type SetrunType} from '@/engine/cards.ts';
 import {checkSetrun} from '@/engine/setruns.ts';
 import {requirementText, shortName} from '@/engine/card-names.ts';
-import {apply, createGame, expireClaims, type Command, type GameState} from '@/engine/game.ts';
+import {apply, createGame, expire, type Command, type GameState} from '@/engine/game.ts';
 import {viewFor} from '@/engine/view.ts';
 import {cards} from '@/engine/testing.ts';
 import {yourTurn} from './your-turn.ts';
@@ -33,6 +33,27 @@ const building = (hand: Card[]): GameState => {
 };
 
 describe('yourTurn', () => {
+    it('gives you time to look over your hand before play starts, with nothing to do yet', () => {
+        let state = createGame({names : ["Ann", "Bob", "Cat", "Dan"], seed : 5, lookMs : 30000});
+        let view = viewFor(state, 0, 4000);
+        let turn = yourTurn(view, view.hand, 0);
+        expect(turn).toMatchObject({drawing : false, playing : false, deckLive : false, selected : null, discardPile : null, steps : null});
+        expect(turn.look).toEqual({starter : "You start", total : 30000, waitingFor : null});
+        expect(view.look?.startsIn).toBe(26000);
+        expect(turn.prompt).toBe("Look over your hand. You start the round.");
+        expect(turn.brief).toBe("Look over your hand · You start");
+        view = viewFor(state, 2, 4000);
+        expect(yourTurn(view, view.hand, null).brief).toBe("Look over your hand · Ann starts");
+
+        // in a game with other people, once you're ready it waits for them
+        state = play(state, 0, {type : "start"});
+        state = play(state, 2, {type : "start"});
+        view = viewFor(state, 0, 4000);
+        turn = yourTurn(view, view.hand, null);
+        expect(turn.look?.waitingFor).toEqual(["Bob", "Dan"]);
+        expect(turn.prompt).toBe("Waiting for Bob and Dan.");
+    });
+
     it('offers the deck and the discard pile before you draw', () => {
         const view = viewFor(newGame(), 0, 0);
         const turn = yourTurn(view, view.hand, null);
@@ -53,7 +74,7 @@ describe('yourTurn', () => {
         expect(turn.discardPile).toBeNull();
         expect(turn.prompt).toBe("Waiting to see if anyone claims the " + shortName(view.claim!.card) + ".");
 
-        state = expireClaims(state, state.claim!.deadline);
+        state = expire(state, state.claim!.deadline);
         view = viewFor(state, 0, 0);
         turn = yourTurn(view, view.hand, 0);
         expect(turn.discardPile).toMatchObject({move : "discard", chip : "Discard " + shortName(view.hand[0])});

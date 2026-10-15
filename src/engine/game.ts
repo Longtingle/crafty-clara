@@ -8,7 +8,7 @@
 // screen, someone online or a bot is up to the host that runs the game.
 
 import {RUN, SET, ROUND_REQUIREMENTS, SUITS, createCard, getPoints, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
-import {addToSetrun, checkSetrun, explainSetrun} from './setruns.ts';
+import {addToSetrun, checkSetrun, explainSetrun, type RunEnd} from './setruns.ts';
 import {requirementText} from './card-names.ts';
 import {random, shuffle} from './random.ts';
 
@@ -22,7 +22,8 @@ const MAX_SEATS = 6;
 // (after two reshuffles), the round ends at the end of that turn.
 const MAX_RESHUFFLES = 2;
 
-export type Phase = "draw" | "play" | "roundEnd" | "gameEnd";
+/** "look" is the start of a round, before play starts, while everyone looks over their hand. */
+export type Phase = "look" | "draw" | "play" | "roundEnd" | "gameEnd";
 export type Answer = "claim" | "pass";
 
 export interface SeatState {
@@ -56,6 +57,18 @@ export interface ClaimWindow {
     answers: (Answer | null)[];
 }
 
+/**
+ * At the start of a round, everyone gets a while to look over their hand
+ * before anyone moves. Play starts once every seat is ready, or at the
+ * deadline.
+ */
+export interface LookTime {
+    /** when play starts, on the host's clock (ms) */
+    deadline: number;
+    /** whether each seat is ready to start, by seat */
+    ready: boolean[];
+}
+
 /** A setrun on the table: whose it is and which of theirs. */
 export interface Target {
     seat: number;
@@ -80,9 +93,13 @@ export type Command =
     | {type: "draw"; from: "deck" | "discard"}
     | {type: "claim"}
     | {type: "pass"}
-    | {type: "goDown"; setruns: {type: SetrunType; cards: string[]}[]}
-    | {type: "addToSetrun"; card: string; target: Target}
+    /** a run that could be laid out more than one way (a red ace at either end) starts `from` that value */
+    | {type: "goDown"; setruns: {type: SetrunType; cards: string[]; from?: number}[]}
+    /** on a run, `end` says which end, where the card could go at either */
+    | {type: "addToSetrun"; card: string; target: Target; end?: RunEnd}
     | {type: "discard"; card: string}
+    /** ready to start play, having looked over your hand */
+    | {type: "start"}
     /** ready for the next round, which is dealt once every seat is ready */
     | {type: "ready"};
 
@@ -95,6 +112,8 @@ export interface GameState {
     idPrefix: string;
     nextId: number;
     claimWindowMs: number;
+    /** how long everyone has to look over their hand at the start of a round (ms); 0 for no time */
+    lookMs: number;
     /** 0 to ROUND_REQUIREMENTS.length - 1 */
     round: number;
     phase: Phase;
@@ -110,6 +129,8 @@ export interface GameState {
     /** how many times the discard pile has been shuffled into the deck this round */
     reshuffles: number;
     claim: ClaimWindow | null;
+    /** while the round is starting (phase "look") */
+    look: LookTime | null;
     /** this round, oldest first */
     log: LogEntry[];
     /** who went out, once the round is over; null if the round ended because the deck ran out */
@@ -124,11 +145,15 @@ export interface GameOptions {
     seed: number;
     /** how long the other players have to claim a discard (ms) */
     claimWindowMs?: number;
+    /** how long everyone has to look over their hand at the start of each round (ms); none by default */
+    lookMs?: number;
+    /** the time on the host's clock as the game starts, for the first round's look time */
+    now?: number;
 }
 
 export const requirementFor = (round: number): Requirement => ROUND_REQUIREMENTS[round];
 
-export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): GameState => {
+export const createGame = ({names, seed, claimWindowMs = 6000, lookMs = 0, now = 0}: GameOptions): GameState => {
     if (names.length < 2 || names.length > MAX_SEATS) {
         throw new Error("A game needs 2 to " + MAX_SEATS + " players");
     }
@@ -137,6 +162,7 @@ export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): Ga
         idPrefix : "",
         nextId : 1,
         claimWindowMs,
+        lookMs,
         round : 0,
         phase : "draw",
         turn : 0,
@@ -146,12 +172,13 @@ export const createGame = ({names, seed, claimWindowMs = 6000}: GameOptions): Ga
         discardedBy : null,
         reshuffles : 0,
         claim : null,
+        look : null,
         log : [],
         wentOut : null,
         outs : []
     };
     state.idPrefix = Math.floor(random(state) * 36 ** 4).toString(36).padStart(4, "0");
-    deal(state);
+    deal(state, now);
     return state;
 };
 
@@ -162,11 +189,16 @@ export const apply = (state: GameState, seat: number, command: Command, now: num
     return error ? {ok : false, error} : {ok : true, state : next};
 };
 
-/** Closes the claim window if its deadline has passed. The host calls this when the deadline comes. */
-export const expireClaims = (state: GameState, now: number): GameState => {
-    if (!state.claim || now < state.claim.deadline) return state;
+/** When the game next moves on by itself: the claim window closes, or play starts. Null if it waits for a player. */
+export const nextDeadline = (state: GameState): number | null =>
+    state.claim?.deadline ?? state.look?.deadline ?? null;
+
+/** Closes the claim window, or starts play, if its deadline has passed. The host calls this when the deadline comes. */
+export const expire = (state: GameState, now: number): GameState => {
+    let deadline = nextDeadline(state);
+    if (deadline === null || now < deadline) return state;
     let next = structuredClone(state);
-    settleClaims(next, true);
+    expireDeadlines(next, now);
     return next;
 };
 
@@ -177,8 +209,9 @@ export const canDrawFromDeck = (state: Pick<GameState, "deck" | "discard">): boo
 // The rest change `state` in place. They are only ever given apply's or
 // createGame's copy.
 
-// Deals a round. The first player moves one seat on each round.
-const deal = (state: GameState): void => {
+// Deals a round. The first player moves one seat on each round. Everyone then
+// has a while to look over their hand, if the game gives them one.
+const deal = (state: GameState, now: number): void => {
     let cards: Card[] = [];
     for (let value = 1; value <= 13; value++) {
         for (let suit of SUITS) {
@@ -200,7 +233,25 @@ const deal = (state: GameState): void => {
     state.log = [];
     state.wentOut = null;
     state.turn = state.round % state.seats.length;
+    if (state.lookMs > 0) {
+        state.phase = "look";
+        state.look = {deadline : now + state.lookMs, ready : state.seats.map(() => false)};
+    } else {
+        state.phase = "draw";
+        state.look = null;
+    }
+};
+
+const startPlay = (state: GameState): void => {
+    state.look = null;
     state.phase = "draw";
+};
+
+// A deadline that has passed: the claim window closes, with anyone who
+// hasn't answered passing, or play starts.
+const expireDeadlines = (state: GameState, now: number): void => {
+    if (state.claim && now >= state.claim.deadline) settleClaims(state, true);
+    if (state.look && now >= state.look.deadline) startPlay(state);
 };
 
 // Cards are numbered in their new order whenever they are shuffled, so an id
@@ -210,23 +261,25 @@ const withNewIds = (state: GameState, cards: Card[]): Card[] =>
 
 const run = (state: GameState, seat: number, command: Command, now: number): string | null => {
     if (!Number.isInteger(seat) || !state.seats[seat]) return "There's no seat " + seat;
-    // a command that arrives after the deadline finds the window closed
-    if (state.claim && now >= state.claim.deadline) settleClaims(state, true);
+    // a command that arrives after a deadline finds the window closed, or play started
+    expireDeadlines(state, now);
 
     switch (command.type) {
         case "draw": return draw(state, seat, command.from, now);
         case "claim":
         case "pass": return answerClaim(state, seat, command.type);
         case "goDown": return goDown(state, seat, command.setruns);
-        case "addToSetrun": return addCard(state, seat, command.card, command.target);
+        case "addToSetrun": return addCard(state, seat, command.card, command.target, command.end);
         case "discard": return discard(state, seat, command.card);
-        case "ready": return ready(state, seat);
+        case "start": return readyToStart(state, seat);
+        case "ready": return ready(state, seat, now);
         default: return "Unknown command";
     }
 };
 
 const checkTurn = (state: GameState, seat: number, phase: Phase): string | null => {
     if (state.phase === "roundEnd" || state.phase === "gameEnd") return "The round is over";
+    if (state.phase === "look") return "Play hasn't started yet";
     if (seat !== state.turn) return "It's not your turn";
     if (state.phase !== phase) return (phase === "draw") ? "You've already drawn" : "Draw a card first";
     return null;
@@ -312,7 +365,7 @@ const findCards = (hand: Card[], ids: string[]): Card[] | null => {
     return cards.every((card): card is Card => card !== undefined) ? cards : null;
 };
 
-const goDown = (state: GameState, seat: number, setruns: {type: SetrunType; cards: string[]}[]): string | null => {
+const goDown = (state: GameState, seat: number, setruns: {type: SetrunType; cards: string[]; from?: number}[]): string | null => {
     let error = checkTurn(state, seat, "play");
     if (error) return error;
     let player = state.seats[seat];
@@ -331,8 +384,8 @@ const goDown = (state: GameState, seat: number, setruns: {type: SetrunType; card
     for (let setrun of setruns) {
         let cards = findCards(player.hand, setrun.cards);
         if (!cards) return "That card isn't in your hand";
-        let result = checkSetrun(cards, setrun.type);
-        if (!result.valid) return explainSetrun(cards, setrun.type) ?? "Those cards don't make a " + setrun.type.toLowerCase();
+        let result = checkSetrun(cards, setrun.type, setrun.from);
+        if (!result.valid) return explainSetrun(cards, setrun.type) ?? "Those cards can't be laid out that way";
         table.push(result.setrun);
     }
     player.table = table;
@@ -343,7 +396,7 @@ const goDown = (state: GameState, seat: number, setruns: {type: SetrunType; card
     return null;
 };
 
-const addCard = (state: GameState, seat: number, cardId: string, target: Target): string | null => {
+const addCard = (state: GameState, seat: number, cardId: string, target: Target, end?: RunEnd): string | null => {
     let error = checkTurn(state, seat, "play");
     if (error) return error;
     let player = state.seats[seat];
@@ -353,7 +406,7 @@ const addCard = (state: GameState, seat: number, cardId: string, target: Target)
     let owner = state.seats[target.seat];
     let setrun = owner?.table[target.index];
     if (!setrun) return "There's no setrun there";
-    let result = addToSetrun(setrun, card);
+    let result = addToSetrun(setrun, card, end);
     if (!result.valid) return "That card doesn't fit there";
 
     owner.table[target.index] = result.setrun;
@@ -388,14 +441,23 @@ const discard = (state: GameState, seat: number, cardId: string): string | null 
     return null;
 };
 
-const ready = (state: GameState, seat: number): string | null => {
+const readyToStart = (state: GameState, seat: number): string | null => {
+    let look = state.look;
+    if (!look) return "Play has already started";
+    if (look.ready[seat]) return "Waiting for the other players";
+    look.ready[seat] = true;
+    if (look.ready.every(Boolean)) startPlay(state);
+    return null;
+};
+
+const ready = (state: GameState, seat: number, now: number): string | null => {
     if (state.phase === "gameEnd") return "The game is over";
     if (state.phase !== "roundEnd") return "The round isn't over";
     if (state.seats[seat].ready) return "Waiting for the other players";
     state.seats[seat].ready = true;
     if (state.seats.every(player => player.ready)) {
         state.round++;
-        deal(state);
+        deal(state, now);
     }
     return null;
 };

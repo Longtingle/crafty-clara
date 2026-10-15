@@ -32,6 +32,15 @@ export interface ClaimView {
     answer: Answer | null;
 }
 
+export interface LookView {
+    /** ms until play starts, when the view was made */
+    startsIn: number;
+    /** ms everyone has to look, in all */
+    total: number;
+    /** whether each seat is ready to start, by seat */
+    ready: boolean[];
+}
+
 export interface GameView {
     /** whose view this is */
     seat: number;
@@ -48,6 +57,8 @@ export interface GameView {
     /** top card first */
     discard: Card[];
     claim: ClaimView | null;
+    /** while everyone looks over their hand, before play starts */
+    look: LookView | null;
     /** this round, oldest first */
     log: LogEntry[];
     /** who went out, once the round is over; null if the deck ran out */
@@ -87,6 +98,7 @@ export const viewFor = (state: GameState, seat: number, now: number): GameView =
             canAnswer : claim.seats.includes(seat) && claim.answers[seat] === null,
             answer : claim.answers[seat]
         },
+        look : state.look && {startsIn : Math.max(0, state.look.deadline - now), total : state.lookMs, ready : state.look.ready},
         log : state.log.map(entry => (entry.type === "draw" && entry.from === "deck" && entry.seat !== seat)
             ? {...entry, card : null}
             : entry),

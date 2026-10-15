@@ -1,8 +1,8 @@
 // Plays whole games between bots with no timers, for tests and for trying
 // out rule or bot changes. Time stands still until every seat is waiting on
-// a claim window; then the clock jumps to its deadline.
+// a deadline; then the clock jumps to it.
 
-import {apply, createGame, expireClaims, type Command, type GameState, type Result} from './game.ts';
+import {apply, createGame, expire, nextDeadline, type Command, type GameState, type Result} from './game.ts';
 import {viewFor, type GameView} from './view.ts';
 import {botMove} from './bot.ts';
 
@@ -13,10 +13,12 @@ export interface SimulationOptions {
     seats?: number;
     /** who plays each seat; botMove by default */
     players?: Player[];
-    /** seats that never answer a claim, like a player who has stepped away */
+    /** seats that never answer a claim or say they're ready to start, like a player who has stepped away */
     silent?: number[];
     /** a round that runs longer than this many turns counts as stalled */
     maxTurns?: number;
+    /** time to look over your hand at the start of each round (ms); none by default */
+    lookMs?: number;
     /** called with every state the game passes through */
     onState?: (state: GameState) => void;
 }
@@ -38,8 +40,8 @@ const unwrap = (result: Result): GameState => {
     return result.state;
 };
 
-export const simulateGame = (seed: number, {seats = 4, players = [], silent = [], maxTurns = 1000, onState}: SimulationOptions = {}): SimulationResult => {
-    let state = createGame({names : Array.from({length : seats}, (_, i) => "Bot " + (i + 1)), seed});
+export const simulateGame = (seed: number, {seats = 4, players = [], silent = [], maxTurns = 1000, lookMs, onState}: SimulationOptions = {}): SimulationResult => {
+    let state = createGame({names : Array.from({length : seats}, (_, i) => "Bot " + (i + 1)), seed, lookMs});
     let now = 0;
     let turns = [0];
     let wentOut: (number | null)[] = [];
@@ -52,15 +54,16 @@ export const simulateGame = (seed: number, {seats = 4, players = [], silent = []
         for (let seat = 0; seat < seats && !moved; seat++) {
             let command = (players[seat] ?? botMove)(viewFor(state, seat, now));
             if (!command) continue;
-            if (silent.includes(seat) && (command.type === "claim" || command.type === "pass")) continue;
+            if (silent.includes(seat) && ["claim", "pass", "start"].includes(command.type)) continue;
             state = unwrap(apply(state, seat, command, now));
             if (command.type === "discard") turns[turns.length - 1]++;
             moved = true;
         }
         if (!moved) {
-            if (!state.claim) throw new Error("Nobody can move");
-            now = state.claim.deadline;
-            state = expireClaims(state, now);
+            let deadline = nextDeadline(state);
+            if (deadline === null) throw new Error("Nobody can move");
+            now = deadline;
+            state = expire(state, now);
         }
         if (phase === "play" && (state.phase === "roundEnd" || state.phase === "gameEnd")) {
             wentOut.push(state.wentOut);

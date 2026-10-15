@@ -3,7 +3,7 @@ import {ROUND_REQUIREMENTS} from '../engine/cards.ts';
 import type {Command} from '../engine/game.ts';
 import type {GameView} from '../engine/view.ts';
 import {startBot} from './bot-player.ts';
-import {startLocalGame, type LocalGameSave} from './local-game.ts';
+import {LOOK_MS, startLocalGame, type LocalGameSave} from './local-game.ts';
 import {createTestClock, type TestClock} from './testing.ts';
 import type {SeatPort} from './protocol.ts';
 
@@ -57,7 +57,26 @@ describe('a local game', () => {
 
         game.port.send({type : "command", command : {type : "ready"}});
         clock.advance(0);
+        // everyone, you included, was ready to start play at once
         expect(game.host.state()).toMatchObject({round : 1, phase : "draw", turn : 1});
+    });
+
+    it('gives you time to look over your hand, until you are ready or the time is up', () => {
+        const clock = createTestClock();
+        const game = startLocalGame({name : "You", seed : 7, clock});
+        playAsYou(game.port, clock, ["start"]);
+        clock.advance(0);
+        // the bots are ready at once
+        expect(game.host.state()).toMatchObject({phase : "look", look : {ready : [false, true, true, true]}});
+        clock.advance(LOOK_MS - 1);
+        expect(game.host.state().phase).toBe("look");
+        clock.advance(1);
+        expect(game.host.state()).toMatchObject({phase : "draw", look : null});
+
+        const again = startLocalGame({name : "You", seed : 7, clock});
+        again.port.send({type : "command", command : {type : "start"}});
+        clock.advance(0);
+        expect(again.host.state()).toMatchObject({phase : "draw", look : null});
     });
 
     it('replays exactly from the same seed', () => {
@@ -144,6 +163,24 @@ describe('a local game', () => {
         expect(game.host.state().claim).not.toBeNull();
         clock.advance(1);
         expect(game.host.state().claim).toBeNull();
+    });
+
+    it('gives a saved look at your hand the time it had left', () => {
+        const saves: LocalGameSave[] = [];
+        const first = createTestClock();
+        const before = startLocalGame({name : "You", seed : 7, clock : first, onChange : save => saves.push(save)});
+        first.advance(10_000);
+        before.stop();
+        const saved = saves.at(-1)!;
+        expect(saved.state.phase).toBe("look");
+        const left = saved.state.look!.deadline - saved.savedAt;
+
+        const clock = createTestClock(1_000_000);
+        const game = startLocalGame({name : "You", clock, from : saved});
+        clock.advance(left - 1);
+        expect(game.host.state().phase).toBe("look");
+        clock.advance(1);
+        expect(game.host.state().phase).toBe("draw");
     });
 
     it('stops where it stands', () => {

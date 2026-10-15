@@ -35,6 +35,7 @@ const problems = (state: GameState): string[] => {
     });
     if (state.claim && state.claim.card !== state.discard[0]?.id) found.push("the claim window offers a card that isn't on top");
     if (state.claim && state.phase !== "play") found.push("a claim window is open in the " + state.phase + " phase");
+    if ((state.look !== null) !== (state.phase === "look")) found.push("the look time doesn't match the " + state.phase + " phase");
     return found;
 };
 
@@ -72,6 +73,16 @@ describe('bot games', {timeout : 30_000}, () => {
         for (let seed = 1; seed <= 10; seed++) {
             const game = play(seed, {silent : [0, 2]});
             expect({seed, problems : game.problems, stalled : game.stalled}).toEqual({seed, problems : [], stalled : false});
+        }
+    });
+
+    it('start each round once everyone has looked over their hand, or the time is up', () => {
+        for (let seed = 1; seed <= 5; seed++) {
+            for (let silent of [[], [1]]) {
+                const game = play(seed, {lookMs : 30_000, silent});
+                expect({seed, problems : game.problems, stalled : game.stalled}).toEqual({seed, problems : [], stalled : false});
+                expect(game.state.phase).toBe("gameEnd");
+            }
         }
     });
 

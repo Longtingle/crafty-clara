@@ -9,7 +9,7 @@
 // would help them, and collects the setruns it can still finish.
 
 import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
-import {addToSetrun, checkSetrun, sortHand, subsets} from './setruns.ts';
+import {addToSetrun, checkSetrun, runEnds, runLayouts, sortHand, subsets, type RunEnd} from './setruns.ts';
 import {readClues, type Clues, type Memory} from './clues.ts';
 import type {Command, Target} from './game.ts';
 import {random} from './random.ts';
@@ -436,6 +436,61 @@ const findAddition = (hand: Card[], tables: Setrun[][]): {card: Card; target: Ta
     return null;
 };
 
+// How many ends of a run another card could still go on: none past an ace,
+// and none, as far as the bot knows (`known`), where both copies of the card
+// are gone.
+const openEnds = (run: Setrun, known?: Pick<Clues, "gone">): number => {
+    let first = run.cards[0];
+    let last = run.cards[run.cards.length - 1];
+    let open = (value: number) => !known || known.gone((value === 14) ? 1 : value, first.suit) < 2;
+    return Number(first.value > 1 && open(first.value - 1)) + Number(last.value < 14 && open(last.value + 1));
+};
+
+// Of the ways a run could go down or take a red ace (a wild at one end or the
+// other), the one a hard bot likes best. First, the one that lets it add the
+// most from its hand (`rest`) to the tables afterwards: holding the 7♥, it
+// plays the A♦ on 9–K♥ as the 8♥. Then the one that leaves the others least
+// to add: with no hearts to follow, the A♦ goes on top as the A♥, and nothing
+// can go above it.
+const likedBest = (options: Setrun[], tablesWith: (option: Setrun) => Setrun[][], rest: Card[], known?: Pick<Clues, "gone">): Setrun => {
+    let score = (option: Setrun) => {
+        let kept = afterAdding(rest, tablesWith(option));
+        return {cost : getPoints(kept) + CARD_COST * kept.length, open : openEnds(option, known)};
+    };
+    let best = {option : options[0], ...score(options[0])};
+    for (let option of options.slice(1)) {
+        let next = {option, ...score(option)};
+        if (next.cost < best.cost || (next.cost === best.cost && next.open < best.open)) best = next;
+    }
+    return best.option;
+};
+
+// A hard bot lays out each run it goes down with that could go more than one way as it likes best.
+const layOutRuns = (plan: {table: Setrun[]; rest: Card[]}, tables: Setrun[][], known?: Pick<Clues, "gone">): Setrun[] => {
+    let table = [...plan.table];
+    table.forEach((setrun, i) => {
+        if (setrun.type !== RUN) return;
+        let options = runLayouts(setrun.cards);
+        if (options.length > 1) {
+            table[i] = likedBest(options, option => [...tables, table.map((other, j) => (j === i) ? option : other)], plan.rest, known);
+        }
+    });
+    return table;
+};
+
+// Which end of a run a hard bot adds a card to, where it could go at either.
+const chooseEnd = (hand: Card[], {card, target}: {card: Card; target: Target}, tables: Setrun[][], known?: Pick<Clues, "gone">): RunEnd | undefined => {
+    let setrun = tables[target.seat][target.index];
+    let places = runEnds(setrun, card);
+    if (places.length < 2) return undefined;
+    let options = places.map(place => ({...setrun, cards : place.cards}));
+    let tablesWith = (option: Setrun) => tables.map((table, seat) => (seat !== target.seat)
+        ? table
+        : table.map((other, index) => (index === target.index) ? option : other));
+    let best = likedBest(options, tablesWith, hand.filter(other => other.id !== card.id), known);
+    return places[options.indexOf(best)].end;
+};
+
 /**
  * Whether a hard bot holds off going down this turn. While nobody else is
  * down it may wait, so the others can't see its setruns or add to them, with
@@ -475,10 +530,11 @@ const worthTaking = (view: GameView, card: Card, insight?: Insight): boolean => 
 };
 
 /**
- * The bot's next command, or null while it has nothing to do. It answers a
- * claim window as soon as one opens; on its own turn it draws, goes down when
- * it can, then adds cards to setruns one at a time, and discards last. It is
- * ready for the next round as soon as a round ends.
+ * The bot's next command, or null while it has nothing to do. It's ready to
+ * start as soon as a round is dealt, and answers a claim window as soon as one
+ * opens; on its own turn it draws, goes down when it can, then adds cards to
+ * setruns one at a time, and discards last. It is ready for the next round as
+ * soon as a round ends.
  */
 const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | null => {
     let {hand, requirement} = view;
@@ -486,10 +542,11 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
     let tables = view.seats.map(seat => seat.table);
 
     // a hard bot reads the table when it has something to decide
-    let read: Insight | undefined;
-    const insight = (): Insight | undefined =>
+    let read: Clues | undefined;
+    const insight = (): Clues | undefined =>
         (profile.level === "hard") ? (read ??= readClues(view, {seed : profile.seed, ...HARD_MEMORY})) : undefined;
 
+    if (view.look) return view.look.ready[view.seat] ? null : {type : "start"};
     if (view.phase === "roundEnd") return me.ready ? null : {type : "ready"};
     if (view.claim?.canAnswer) {
         // a bot that is down only takes cards on its own turn
@@ -509,11 +566,23 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
     if (!me.isDown) {
         let plan = planGoDown(hand, requirement, tables);
         if (plan && !(profile.level === "hard" && holdsOff(view, plan, profile))) {
-            return {type : "goDown", setruns : plan.table.map(setrun => ({type : setrun.type, cards : setrun.cards.map(card => card.id)}))};
+            if (profile.level !== "hard") {
+                return {type : "goDown", setruns : plan.table.map(setrun => ({type : setrun.type, cards : setrun.cards.map(card => card.id)}))};
+            }
+            // a hard bot chooses which end of a run a spare wild goes
+            return {type : "goDown", setruns : layOutRuns(plan, tables, insight()).map(setrun => ({
+                type : setrun.type,
+                cards : setrun.cards.map(card => card.id),
+                ...((setrun.type === RUN) ? {from : setrun.cards[0].value} : {})
+            }))};
         }
     } else {
         let addition = findAddition(hand, tables);
-        if (addition) return {type : "addToSetrun", card : addition.card.id, target : addition.target};
+        if (addition) {
+            // a hard bot chooses which end of a run a red ace goes
+            let end = (profile.level === "hard") ? chooseEnd(hand, addition, tables, insight()) : undefined;
+            return {type : "addToSetrun", card : addition.card.id, target : addition.target, ...(end ? {end} : {})};
+        }
     }
     return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, insight())].id};
 };

@@ -1,5 +1,7 @@
 import {useEffect, useState} from 'react';
 import type {BotLevel} from '@/engine/bot.ts';
+import type {LookView} from '@/engine/view.ts';
+import {runEnds} from '@/engine/setruns.ts';
 import type {GameClient, Refusal} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
 import type {Hints} from '@/storage/settings.ts';
@@ -59,6 +61,25 @@ function useSpeech(client: GameClient): Record<number, string | null> {
         };
     }, [client]);
     return lines;
+}
+
+// How long until play starts (ms), while everyone looks over their hand:
+// what each view says, counted down a second at a time between views, and
+// standing still while the game is held. It's kept here, not in the prompt,
+// so a prompt mounted afresh (the layout changing) doesn't start it again.
+function useLookTime(look: LookView | null, held: boolean): number {
+    let [left, setLeft] = useState({look, ms : look?.startsIn ?? 0});
+    // a new view says afresh
+    if (left.look !== look) setLeft({look, ms : look?.startsIn ?? 0});
+    let ms = (left.look === look) ? left.ms : (look?.startsIn ?? 0);
+    useEffect(() => {
+        if (!look || held || ms <= 0) return;
+        let start = performance.now();
+        // tick as the seconds shown change
+        let timer = setTimeout(() => setLeft({look, ms : Math.max(0, ms - (performance.now() - start))}), ms % 1000 || 1000);
+        return () => clearTimeout(timer);
+    }, [look, held, ms]);
+    return ms;
 }
 
 // Your finished games, once this one has ended and been added to them.
@@ -124,6 +145,8 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
     // a card being dragged counts as the selected one, so the table shows where it can go
     let [draggingId, setDraggingId] = useState<string | null>(null);
     let [goingDown, setGoingDown] = useState(false);
+    // the run a card could go at either end of, while it asks which
+    let [choosing, setChoosing] = useState<{seat: number; index: number; card: string} | null>(null);
     let [paused, setPaused] = useState(false);
     let [dialog, setDialog] = useState<TableDialog | null>(null);
     let speech = useSpeech(client);
@@ -131,13 +154,14 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
     let record = useRecord(view?.phase === "gameEnd", games);
 
     let held = paused || dialog !== null;
+    let lookLeft = useLookTime(view?.look ?? null, held);
     useEffect(() => {
         if (held) pausing.pause();
         else pausing.resume();
     }, [held, pausing]);
 
     // between rounds there's nothing to pause
-    let playing = view?.phase === "draw" || view?.phase === "play";
+    let playing = view?.phase === "look" || view?.phase === "draw" || view?.phase === "play";
     useEffect(() => {
         // already held by an open dialog, which is still there when you come back
         if (!playing || dialog !== null) return;
@@ -156,8 +180,14 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
     let selectedIndex = hand.findIndex(card => card.id === (draggingId ?? selectedId));
     let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex, hints);
     let selected = turn.selected?.card;
+    let endChoice = null;
+    if (choosing && selected?.id === choosing.card) {
+        let places = runEnds(view.seats[choosing.seat].table[choosing.index], selected);
+        if (places.length > 1) endChoice = {seat : choosing.seat, index : choosing.index, choice : {card : selected, places}};
+    }
 
     let actions: TableActions = {
+        start : () => send({type : "start"}),
         drawFromDeck : () => send({type : "draw", from : "deck"}),
         takeDiscard : () => send({type : "draw", from : "discard"}),
         claim : () => send({type : "claim"}),
@@ -168,12 +198,29 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
             setSelectedId(null);
         },
         addToMeld : (seat, index) => {
-            if (!selected) return;
+            if (!selected) return false;
+            // a card that could go at either end of a run asks which first
+            let setrun = view.seats[seat].table[index];
+            if (setrun && runEnds(setrun, selected).length > 1) {
+                setSelectedId(selected.id);
+                setChoosing({seat, index, card : selected.id});
+                return false;
+            }
             send({type : "addToSetrun", card : selected.id, target : {seat, index}});
             setSelectedId(null);
+            return true;
         },
+        chooseEnd : (end) => {
+            if (!endChoice) return;
+            send({type : "addToSetrun", card : endChoice.choice.card.id, target : {seat : endChoice.seat, index : endChoice.index}, end});
+            setSelectedId(null);
+            setChoosing(null);
+        },
+        cancelChoice : () => setChoosing(null),
         select : (index) => {
-            if (turn.playing) setSelectedId(hand[index].id);
+            if (!turn.playing) return;
+            setSelectedId(hand[index].id);
+            setChoosing(null);
         },
         drag : (index) => setDraggingId((index === null) ? null : hand[index].id),
         reorder : (from, to) => setOwn({round : view.round, order : moveCard(hand, from, to)}),
@@ -195,7 +242,11 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
     };
 
     let goDown = (slots: GoDownSlot[]) => {
-        send({type : "goDown", setruns : slots.map(slot => ({type : slot.type, cards : slot.indices.map(index => hand[index].id)}))});
+        send({type : "goDown", setruns : slots.map(slot => ({
+            type : slot.type,
+            cards : slot.indices.map(index => hand[index].id),
+            ...((slot.from === undefined) ? {} : {from : slot.from})
+        }))});
         setGoingDown(false);
     };
 
@@ -209,6 +260,8 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
                 paused={held}
                 dialog={dialog}
                 turn={turn}
+                lookLeft={lookLeft}
+                endChoice={endChoice}
                 newCard={newCardTag(view)}
                 speech={speech}
                 notice={notice}

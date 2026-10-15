@@ -11,6 +11,7 @@ import Piles from './piles.tsx';
 import ActivityLog from './activity-log.tsx';
 import PlayerPanel from './player-panel.tsx';
 import TurnPrompt from './turn-prompt.tsx';
+import LookPrompt from './look-prompt.tsx';
 import Hand from './hand.tsx';
 import TableDnd, {type DragActions} from './table-dnd.tsx';
 import ScoresDialog from './scores-dialog.tsx';
@@ -20,6 +21,8 @@ import PhoneTable from './phone-table.tsx';
 import {opponentSeats, opponentIndex} from './players.ts';
 import {activityEntries, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
+import type {RunEnd} from '@/engine/setruns.ts';
+import type {EndChoice} from './meld.tsx';
 import type {HandSort} from './hand-order.ts';
 
 /** A dialog you can open from the top bar while you play. GameScreen shows the settings. */
@@ -27,6 +30,11 @@ export type TableDialog = "scores" | "rules" | "settings";
 
 /** Everything you can do at the table. GameScreen turns each into a command or a change to your hand. */
 export interface TableActions extends DragActions {
+    /** ready to start play, at the start of a round */
+    start(): void;
+    /** plays the selected card at this end of the run it asked about */
+    chooseEnd(end: RunEnd): void;
+    cancelChoice(): void;
     drawFromDeck(): void;
     takeDiscard(): void;
     claim(): void;
@@ -51,6 +59,10 @@ interface GameTableProps {
     dialog: TableDialog | null;
     /** what you can do now (yourTurn) */
     turn: YourTurn;
+    /** ms until play starts, while everyone looks over their hand */
+    lookLeft: number;
+    /** the run the selected card asks which end of, by seat and setrun */
+    endChoice: {seat: number; index: number; choice: EndChoice} | null;
     newCard: NewCard | null;
     /** what each opponent is saying, by seat */
     speech: Record<number, string | null>;
@@ -97,7 +109,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom. Short screens (phones held sideways) get their own layout
 // (PhoneTable), with the opponents in the top bar.
-function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, speech, notice, actions}: GameTableProps) {
+function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, endChoice, newCard, speech, notice, actions}: GameTableProps) {
     // Each card is rendered for one layout only, because each card must
     // appear once for its animations to work.
     let short = useMediaQuery("(max-height: 560px)");
@@ -113,6 +125,9 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
             target={turn.targets[seat][setrunIndex]}
             dimmed={turn.selected !== null && me.isDown && !turn.targets[seat][setrunIndex]}
             onClick={() => actions.addToMeld(seat, setrunIndex)}
+            choice={(endChoice?.seat === seat && endChoice.index === setrunIndex) ? endChoice.choice : null}
+            onChoose={actions.chooseEnd}
+            onCancelChoice={actions.cancelChoice}
         />
     ));
 
@@ -177,6 +192,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
                     hand={hand}
                     sort={sort}
                     turn={turn}
+                    lookLeft={lookLeft}
                     newCard={newCard}
                     speech={speech}
                     notice={notice}
@@ -208,7 +224,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
                             hard={levels[seat] === "hard"}
                             active={isInTurn(view, seat)}
                             speech={speech[seat]}
-                            lastAction={lastAction(view, seat)}
+                            lastAction={view.look ? (view.look.ready[seat] ? "Ready" : "Looking at their hand") : lastAction(view, seat)}
                         >
                             {melds(seat)}
                         </OpponentPanel>
@@ -242,7 +258,17 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
                     </div>
 
                     <div className="flex min-w-0 flex-col items-center gap-2.5">
-                        <TurnPrompt steps={turn.steps} text={turn.prompt} notice={notice} />
+                        {turn.look
+                            ? (
+                                <LookPrompt
+                                    starter={turn.look.starter}
+                                    left={lookLeft}
+                                    total={turn.look.total}
+                                    waitingFor={turn.look.waitingFor}
+                                    onReady={actions.start}
+                                />
+                            )
+                            : <TurnPrompt steps={turn.steps} text={turn.prompt} notice={notice} />}
                         <Hand
                             key={view.round}
                             cards={hand}

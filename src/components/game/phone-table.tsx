@@ -9,6 +9,7 @@ import {MeldRow} from './meld.tsx';
 import {Avatar} from './opponent-panel.tsx';
 import {opponentIndex, opponentSeats, seatColor, seatName, seatPlaces} from './players.ts';
 import {activityEntries, type NewCard} from './log-text.ts';
+import LookPrompt from './look-prompt.tsx';
 import type {TableActions} from './game-table.tsx';
 import type {YourTurn} from './your-turn.ts';
 import type {HandSort} from './hand-order.ts';
@@ -154,6 +155,8 @@ interface PhoneTableProps {
     hand: Card[];
     sort: HandSort;
     turn: YourTurn;
+    /** ms until play starts, while everyone looks over their hand */
+    lookLeft: number;
     newCard: NewCard | null;
     speech: Record<number, string | null>;
     notice: string | null;
@@ -163,7 +166,7 @@ interface PhoneTableProps {
     melds: (seat: number) => ReactNode;
 }
 
-function PhoneTable({view, hand, sort, turn, newCard, speech, notice, actions, topBar, piles, melds}: PhoneTableProps) {
+function PhoneTable({view, hand, sort, turn, lookLeft, newCard, speech, notice, actions, topBar, piles, melds}: PhoneTableProps) {
     // The hand hangs off the bottom edge and the piles off the right. Clipped
     // rather than hidden, the overflow can't be scrolled into view, which
     // the browser would otherwise do for a card you tap.
@@ -172,6 +175,21 @@ function PhoneTable({view, hand, sort, turn, newCard, speech, notice, actions, t
             {topBar}
             <StatusLine view={view} speech={speech} prompt={turn.brief} notice={notice} />
             <SeatGrid view={view} melds={melds} onGoDown={turn.goDown.enabled ? actions.openGoDown : null} ready={turn.goDown.ready} />
+            {turn.look && (
+                // over the melds, which are all still to come
+                <div className="pointer-events-none absolute top-19 right-[calc(var(--pile-w)*0.8+8px)] bottom-[calc(var(--hand-show)+var(--hand-w)*0.15+8px)] left-2 z-10 grid place-items-center">
+                    <div className="pointer-events-auto">
+                        <LookPrompt
+                            floating
+                            starter={turn.look.starter}
+                            left={lookLeft}
+                            total={turn.look.total}
+                            waitingFor={turn.look.waitingFor}
+                            onReady={actions.start}
+                        />
+                    </div>
+                </div>
+            )}
             {/* the hand starts right of the sort button and stops short of the piles */}
             <div className="absolute right-[calc(var(--pile-w)*0.8+10px)] bottom-0 left-[58px] h-(--hand-show)">
                 <Hand

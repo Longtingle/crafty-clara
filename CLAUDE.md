@@ -31,7 +31,7 @@ npx vitest run -t "checkSetrun"                # tests matching a name
 npm run tournament -- --deals 200 --lineup normal,normal,normal,normal   # bots against each other (Node 22.12+)
 ```
 
-- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.ts`. Tests that need no browser (the engine, host and client, and the UI's pure modules) start with `// @vitest-environment node`.
+- Vitest runs with `globals: true` and jsdom (set in `vite.config.js`), so tests use Jest-style `describe`/`it`/`expect` without importing them. jest-dom matchers are loaded in `src/setupTests.ts`, which also stubs `ResizeObserver` for Radix popovers. Tests that need no browser (the engine, host and client, and the UI's pure modules) start with `// @vitest-environment node`.
 - `.oxlintrc.json` turns on `no-undef`. Undefined identifiers were the main source of runtime crashes in this codebase, so treat lint errors as real bugs.
 - Everything in `src/` is TypeScript: `.ts`, or `.tsx` for files with JSX. `tsconfig.json`:
   - It is strict. The view and the commands are typed in the engine, so the components are checked against exactly what the host sends.
@@ -54,6 +54,10 @@ These are the engine's rules (`src/engine/game.ts`).
 - **Red aces (1H, 1D) are wild**, but there can't be more wilds than naturals.
 - A red ace playing as itself is a natural card, not a wild: in a set of aces, or as the ace (low or high) of a run in its own suit. So A♠ A♥ A♦ is a set, and A♥ 2♥ 3♥ 4♥ has no wilds.
 - If someone adds the natural card that a wild stands in for, the natural card replaces it and the ace goes back to that player's hand. A red ace playing as itself is never swapped out.
+- A red ace added to a run, or laid down with one, can often go at either end, and the player chooses which: on 9–K♥, as the 8♥ or as the A♥.
+
+**The start of a round**
+- Before anyone moves, everyone gets 30 seconds to look over their hand (`lookMs`). Play starts once every player has said they're ready, or when the time is up. Bots are ready at once.
 
 **A turn**
 - Draw from the deck or take the top discard.
@@ -87,17 +91,18 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - A game replays exactly from its seed and its commands.
 
 **`game.ts`**
-- `createGame({names, seed})` deals round 1.
+- `createGame({names, seed, lookMs, now})` deals round 1.
 - `apply(state, seat, command, now)` returns `{ok, state}` or `{ok: false, error}` with a message fit to show a player.
-- `expireClaims(state, now)` closes a claim window whose deadline has passed; the host calls it when the deadline comes.
+- **Deadlines:** a claim window closes at its deadline, and so does the time to look over your hand (`look`, phase `"look"`). `nextDeadline(state)` says when the next one is, and `expire(state, now)` closes whichever has passed; the host calls it when the deadline comes. A command that arrives after a deadline finds it already passed.
+- **Look time:** with `lookMs` (none by default, so tests and simulations go straight to play), each deal starts in phase `"look"`. Nobody can move until play starts: when every seat has sent `start`, or at the deadline.
 - Every seat is the same. Whether a seat is a person or a bot is the host's business.
-- Commands name cards by id: `draw`, `claim`, `pass`, `goDown`, `addToSetrun`, `discard`, and `ready` (for the next round).
+- Commands name cards by id: `start` (ready to play, at the start of a round), `draw`, `claim`, `pass`, `goDown` (each run with an optional `from`: the value it starts at, for a run that could be laid out more than one way), `addToSetrun` (with `end`, `"low"` or `"high"`, for a card that could go at either end of a run), `discard`, and `ready` (for the next round).
 - `apply` copies the state with `structuredClone` and changes the copy, so a state object is never changed once made.
 - The state is plain JSON-safe data, so a game can be saved and carried on.
 - Each seat keeps its points for each round played (`scores`) and whether it got down in each (`downs`). The game keeps who went out of each round (`outs`), so a finished game tells its whole story (for your history).
 
 **`view.ts`**
-- `viewFor(state, seat, now)` is what one seat may see: its own hand, other hands as card ids only, the deck as a count and the top card's id, the claim window, and a log in which other seats' deck draws hide the card.
+- `viewFor(state, seat, now)` is what one seat may see: its own hand, other hands as card ids only, the deck as a count and the top card's id, the claim window, the look time (`startsIn`, `total` and who's ready), and a log in which other seats' deck draws hide the card.
 - A view is JSON-safe, ready to send over a socket.
 
 **`bot.ts`**
@@ -111,12 +116,13 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
   - Tried and dropped:
     - Weighting danger more heavily, to hold high cards back from others, cost more points than it saved.
     - Choosing where to lay wild aces, so fewer cards could swap them out, made no difference.
+  - **Where a red ace goes** (`likedBest`): adding one to a run (`chooseEnd`), or going down with a run that could be laid out more than one way (`layOutRuns`), a hard bot picks the end that lets it add more of its own hand afterwards (holding the 7♥, the A♦ goes on 9–K♥ as the 8♥). Otherwise it picks the end that leaves the others fewer places to add (`openEnds`): nothing goes past an ace, nor where the bot knows both copies are gone. In tournaments this made no difference (+0.06 ± 0.45 points a game), but it's how a careful player lays an ace.
   - **Holding off going down** (`holdsOff`):
     - A hard bot may wait to go down, to keep its setruns hidden, but only while nobody else is down, only in rounds that need 9 cards or fewer, and never when going down lets it go out. The chance grows with its risk.
     - In tournaments this was neutral. Waiting in the later rounds too, where players often go down and out in one turn, cost about 5 points a game.
     - So it's personality, not strength: it may matter more against people, who read the table more than bots do.
     - Waiting for a better way to go down once someone else is down wasn't built. Once someone is down, a round ends within a few turns, and being caught costs about 100 points, so waiting rarely pays.
-- It answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away.
+- It's ready to start as soon as a round is dealt, and answers claim windows at once. On its turn it waits for any claim window to close, goes down when it can, adds one card per command, then discards. When a round ends it is ready for the next straight away. A red ace it adds goes where `addToSetrun` puts it by default.
 - `scoreHand` is its heuristic. It picks the best partial and complete runs and sets for a requirement (20 points per card, plus 5 per nearby card that could extend a run). It tries each red ace both as a wild and as itself, and keeps the best reading.
 - `planGoDown(hand, requirement, tables)` tries every way to go down with exactly the round's setruns: each red ace as itself or as a wild, with wilds filling gaps in runs. For each way, it plays out what it could then add to the tables, and keeps the one that leaves the fewest points in hand (plus `CARD_COST` a card). So it lays kings rather than 2s, and keeps back a set it can add to someone else's.
 - `scoreHand` still guides what to collect and discard, but it is greedy and misses some ways to go down, so don't use it to decide whether the bot can go down.
@@ -138,7 +144,7 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
   - In tournaments, perfect memory was barely better than Hard's.
 
 **`simulate.ts`**
-- `simulateGame(seed, options)` plays a whole bot game with no timers.
+- `simulateGame(seed, options)` plays a whole bot game with no timers. Time jumps to the next deadline when every seat is waiting. `lookMs` gives each round its look time, and `silent` seats never answer a claim or start.
 - `simulate.test.ts` plays dozens of games for 2 to 6 players and checks every state against the rules: all 104 cards present once, valid setruns, scores and claim windows. Run it after changing rules or bots.
 - Each seat is played by a `Player`, a function from a view to a command (`botMove` by default), so different bots can play each other.
 
@@ -154,7 +160,9 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - `npm run tournament` runs it from `scripts/tournament.js`, which lists the bots by name. The script is plain JavaScript that Node runs with the engine's types stripped, so it needs Node 22.12+. `.oxlintrc.json` gives `scripts/` Node's globals.
 
 **`setruns.ts`**
-- `checkSetrun(cards, type)` and `addToSetrun(setrun, card)` are the single source of truth for setrun validity.
+- `checkSetrun(cards, type, from?)` and `addToSetrun(setrun, card, end?)` are the single source of truth for setrun validity.
+- `runLayouts(cards)` lists every way to lay out cards as a run, by the value each starts at. A spare wild can go below or above, and a red ace of the run's suit can be itself at one end or a wild at the other. The first is the one `checkSetrun` picks, and `from` picks another.
+- `runEnds(setrun, card)` lists the ends of a run a card can go on, with the run it makes at each. A red ace can often go at either end, as itself at one and a wild at the other, or a wild at both. Without `end`, `addToSetrun` plays a card as itself if it can, and otherwise at the low end.
 - Both go through the ways a group of cards can be read (`readings`): which red aces play as themselves and which are wilds.
 - `explainSetrun(cards, type)` says in plain words why cards aren't a valid setrun yet, and returns `null` exactly when `checkSetrun` accepts them. The go-down dialog shows it.
 - `sortHand` sorts by value (then suit) or by suit (then value). Suits go ♥ ♣ ♦ ♠, so the colours alternate.
@@ -174,10 +182,10 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 
 - **`transport.ts`:** a `Port` is one end of a connection (`send`, `listen`, `close`). `createLocalPair` connects two ends in the page. Each message arrives a moment after it is sent, never during `send`, and as a copy made through JSON, as over a socket. A WebSocket can later be wrapped as a `Port`.
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
-- **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need. Given a `state`, it carries on that game instead of dealing one, and `onChange` hears of every change, to save the game.
-- **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. A game starts through `src/session.ts`, one per game. In development, `?seed=N` in the URL fixes the deal.
-  - **Saving:** `onChange` is given a `LocalGameSave` as the game starts and after every change: the state, the bots' profiles (with their secret risks), and the game's time (`savedAt`). `from` carries on a save. A claim window's deadline is a time on the clock of the game that saved it, so `carryOn` gives it the time it had left.
+- **`host.ts`:** `createHost({names, seed, clock, lookMs})` holds the one true state and applies each seat's commands. It closes claim windows and starts play at their deadlines with a timer (`nextDeadline`), and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need. Given a `state`, it carries on that game instead of dealing one, and `onChange` hears of every change, to save the game.
+- **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first, or a start because play already had, is a normal race, not a bot bug.
+- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). Each round starts with `LOOK_MS` (30 seconds) to look over your hand. The bots' seeds come from the game's seed, so a seeded game replays exactly. A game starts through `src/session.ts`, one per game. In development, `?seed=N` in the URL fixes the deal.
+  - **Saving:** `onChange` is given a `LocalGameSave` as the game starts and after every change: the state, the bots' profiles (with their secret risks), and the game's time (`savedAt`). `from` carries on a save. A deadline (a claim window's, or play starting) is a time on the clock of the game that saved it, so `carryOn` gives it the time it had left. A save from before look time (no `look` or `lookMs`) carries on without it.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default.
   - A local game wraps its clock in `createPausableClock`, so pausing stops everything at once. Timers wait, and time spent paused doesn't count, so a claim window keeps the time it had left.
   - Pausing a game with other people will need a host command and their say. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
@@ -213,6 +221,8 @@ Function components only; there is no global store.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
   - how your hand is laid out (`hand-order.ts`): kept sorted by value or by suit as cards come and go (by value to start), or in your own order once you drag a card. In your own order, arranged cards keep their places and new ones join on the right. A new deal is sorted again the way you last chose.
   - the selected card, by id
+  - the run the selected card asks which end of (`choosing`): a card that could go at either end of a run asks first (`runEnds`), in a popover over the run (`EndChooser` in `meld.tsx`), whether it was clicked onto the run or dropped there. On a phone it opens beside the run, where there's room.
+  - the countdown to play starting (`useLookTime`): what each view says, counted down a second at a time between views, and standing still while the game is held. It's kept here so a prompt mounted afresh, when the layout changes, carries on from the same time.
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
@@ -232,6 +242,7 @@ Function components only; there is no global store.
     - **Where a card can go** (on by default): the setruns the selected (or dragged) card fits light up gold (`lit`, via `addToSetrun`), the rest are dimmed, and the prompt says what the card would do there. With it off, every setrun takes the card, unlit, and the prompt doesn't say where it fits: the host refuses a card that doesn't fit ("That card doesn't fit there").
     - **When you can go down** (off by default): Go down glows gold (`pulse-gold`) and the prompt says so, once your hand has what the round needs (`goDown.ready`, from `planGoDown`). Spotting that is part of the game, so it's off unless you turn it on.
   - the turn prompt and its steps, and a brief prompt for the status line on a phone
+  - at the start of a round (`look`), who starts it and who you're waiting for. `LookPrompt` (`look-prompt.tsx`) shows it with a ring counting down and a Ready button: in place of the turn prompt, or on a phone as a panel over the empty meld places. The opponents' panels say "Ready" or "Looking at their hand".
 - **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic. Short screens (560px high or less: a phone held sideways) get **`phone-table.tsx`** instead:
   - The top bar holds everyone as chips, with your points in a "You" chip. Pause, Scores, Rules, Settings and Full screen go in a ☰ menu.
   - A status line under it says what an opponent last did or said, and what you can do (`brief`).
@@ -240,12 +251,13 @@ Function components only; there is no global store.
   - Your hand is an arch along the bottom edge, showing only the top of each card (`arch.ts`, `--hand-show`). However many cards you hold, each card's corner (value and suit) stays on the screen.
   - Its root is `overflow: clip`, not `hidden`: the browser can scroll a `hidden` box to show a card you tap, and the hand and piles hang off the edges.
 - **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
-- `go-down-dialog.tsx` keeps its slot picks in local state (`useSlots`) and only hands back the finished setruns, as indices into your hand. On a phone it's a sheet that fills the screen: the slots across the top, your hand in the arch along the bottom.
+- `go-down-dialog.tsx` keeps its slot picks in local state (`useSlots`) and only hands back the finished setruns, as indices into your hand. A run that could be laid out more than one way (`runLayouts`) shows each, by the values it would go between ("10–K ♥", "J–A ♥"), and the chosen one goes down (`from`). On a phone it's a sheet that fills the screen: the slots across the top, your hand in the arch along the bottom.
 - The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people. On a phone it fills the screen, with the result on the left and a compact `Scoreboard` on the right. At the end of the game it shows your record (wins, games, and where you finished in the last ten, this game ringed) once `GameScreen` has your history, and offers Your stats beside New game.
 - `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`, which writes `.tsx`). They are copied into the repo to be edited: `button.tsx` sizes were raised so every button is at least 44px.
 - **Animation** uses Motion (`motion/react`):
   - Every element that shows a card on the table is a `MovingCard` (`playing-card.tsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.
-  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the table is rendered for the current layout only (`useMediaQuery` in `game-table.tsx` picks the wide layout or `PhoneTable`), and the go-down dialog uses plain `PlayingCard`s.
+  - Render each card id in one place only, because Motion hides all but the newest element with a given `layoutId`. So the table is rendered for the current layout only (`useMediaQuery` in `game-table.tsx` picks the wide layout or `PhoneTable`).
+  - The go-down dialog's cards fly between your hand and the slots too. Each opening wraps them in a `LayoutGroup` with an id of its own, which keeps their `layoutId`s apart from the table's. A card in a slot leaves its place in the hand empty (an invisible card), so the rest of the hand doesn't close up.
   - Opponents' hands are hidden: the view gives only their cards' ids. `HiddenHand` (`opponent-panel.tsx`) renders each id as a tiny card back over their panel's card fan, or over their top-bar chip on short screens. Cards they draw fly in there and then fade out; cards they play fly out from there.
   - The deck's top card (by the id in `view.deck.top`) and the top two discards sit in `AnimatePresence`, so a card that leaves cross-fades into what it becomes (a face in your hand, a back in an opponent's).
   - dnd-kit does the dragging, for mouse and touch. `TableDnd` (`table-dnd.tsx`) wraps the whole table:

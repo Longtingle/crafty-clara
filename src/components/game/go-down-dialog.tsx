@@ -1,19 +1,22 @@
-import {useState, type CSSProperties} from 'react';
+import {useState, type CSSProperties, type ReactNode} from 'react';
+import {LayoutGroup} from 'motion/react';
 import {Check, CircleAlert} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
 import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
-import {SET, RUN, type Card, type Requirement, type SetrunType} from '@/engine/cards.ts';
-import {checkSetrun, explainSetrun} from '@/engine/setruns.ts';
+import {SET, RUN, type Card, type Requirement, type Setrun, type SetrunType} from '@/engine/cards.ts';
+import {checkSetrun, explainSetrun, runLayouts} from '@/engine/setruns.ts';
 import {longName, setrunCaption, requirementText} from '@/engine/card-names.ts';
-import {PlayingCard, CardTag} from './playing-card.tsx';
+import {PlayingCard, MovingCard, CardTag} from './playing-card.tsx';
 import {archPlace} from './arch.ts';
 
 /** A finished setrun from the dialog: its type and its cards, as indices into your hand. */
 export interface GoDownSlot {
     type: SetrunType;
     indices: number[];
+    /** for a run that could be laid out more than one way, the value it starts from */
+    from?: number;
 }
 
 interface SlotSpec {
@@ -39,6 +42,44 @@ const slotCards = (hand: Card[], indices: number[], check: SetrunCheck): {card: 
     return check.setrun.cards.map(card => ({card, index : indices.find(index => hand[index].id === card.id)!}));
 }
 
+// "8–K ♥": the values a run goes between
+const span = (run: Setrun): string => setrunCaption(run).replace(/^Run /, "");
+
+interface LayoutChoiceProps {
+    /** the ways the run could go, more than one */
+    layouts: Setrun[];
+    check: SetrunCheck;
+    onChange: (from: number) => void;
+    className?: string;
+}
+
+// A run that could be laid out more than one way, with a red ace at one end
+// or the other: which, by the values it would go between.
+function LayoutChoice({layouts, check, onChange, className}: LayoutChoiceProps) {
+    let from = check.valid ? check.setrun.cards[0].value : null;
+    return (
+        <div role="group" aria-label="Lay the run out as" className={cn("flex flex-none rounded-full bg-black/25 p-0.5", className)}>
+            {layouts.map(layout => {
+                let start = layout.cards[0].value;
+                return (
+                    <button
+                        key={start}
+                        type="button"
+                        aria-pressed={start === from}
+                        onClick={() => onChange(start)}
+                        className={cn(
+                            "h-8 rounded-full px-3 text-[13px] font-bold whitespace-nowrap",
+                            (start === from) ? "bg-cream text-[#12402a]" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        {span(layout)}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 interface SlotProps {
     slot: SlotSpec;
     active: boolean;
@@ -46,14 +87,17 @@ interface SlotProps {
     check: SetrunCheck;
     /** why the cards aren't a valid setrun yet */
     problem: string | null;
+    /** the ways a run could be laid out, when there's more than one */
+    layouts: Setrun[];
     onActivate: () => void;
     onClear: () => void;
     onRemove: (index: number) => void;
+    onLayout: (from: number) => void;
 }
 
 // A click anywhere in the box picks the slot, except on its cards and buttons,
 // which do their own thing. The title button is the way in for the keyboard.
-function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemove}: SlotProps) {
+function Slot({slot, active, cards, check, problem, layouts, onActivate, onClear, onRemove, onLayout}: SlotProps) {
     return (
         <div
             onClick={(event) => {
@@ -92,16 +136,21 @@ function Slot({slot, active, cards, check, problem, onActivate, onClear, onRemov
                             aria-label={"Take " + longName(card) + " out of the " + slot.title.toLowerCase()}
                             className="relative w-(--meld-w) flex-none transition-transform hover:-translate-y-1.5"
                         >
-                            <PlayingCard card={card} setrunType={check.valid ? slot.type : undefined} alt="" className="w-full" />
+                            <MovingCard id={card.id}>
+                                <PlayingCard card={card} setrunType={check.valid ? slot.type : undefined} alt="" className="w-full" />
+                            </MovingCard>
                         </button>
                     ))}
             </div>
-            <p className={cn("flex items-start gap-2 text-sm leading-snug", check.valid ? "text-ok" : "text-warn")}>
-                {check.valid
-                    ? <Check className="mt-px size-4.5 flex-none" strokeWidth={3} aria-hidden="true" />
-                    : <CircleAlert className="mt-px size-4.5 flex-none" aria-hidden="true" />}
-                {check.valid ? setrunCaption(check.setrun) + " is ready." : problem}
-            </p>
+            <div className="flex items-center gap-3">
+                <p className={cn("flex flex-1 items-start gap-2 text-sm leading-snug", check.valid ? "text-ok" : "text-warn")}>
+                    {check.valid
+                        ? <Check className="mt-px size-4.5 flex-none" strokeWidth={3} aria-hidden="true" />
+                        : <CircleAlert className="mt-px size-4.5 flex-none" aria-hidden="true" />}
+                    {check.valid ? setrunCaption(check.setrun) + " is ready." : problem}
+                </p>
+                {layouts.length > 1 && <LayoutChoice layouts={layouts} check={check} onChange={onLayout} />}
+            </div>
         </div>
     );
 }
@@ -113,19 +162,29 @@ interface GoDownBodyProps {
     onSubmit: (slots: GoDownSlot[]) => void;
 }
 
-// The slots, the cards picked for each, and whether each is a valid setrun yet.
+// The slots, the cards picked for each, and whether each is a valid setrun
+// yet. A run that could be laid out more than one way (a red ace at either
+// end) goes the way chosen for it (`froms`), or else the way checkSetrun
+// lays it out.
 function useSlots(hand: Card[], requirement: Requirement) {
     let slots = makeSlots(requirement);
     let [picks, setPicks] = useState<number[][]>(() => slots.map(() => []));
+    let [froms, setFroms] = useState<(number | null)[]>(() => slots.map(() => null));
     let [active, setActive] = useState(0);
 
     let results = picks.map((indices, slotIndex) => {
         let cards = indices.map(index => hand[index]);
-        let check = checkSetrun(cards, slots[slotIndex].type);
+        let type = slots[slotIndex].type;
+        let layouts = (type === RUN) ? runLayouts(cards) : [];
+        let chosen = layouts.find(layout => layout.cards[0].value === froms[slotIndex]) ?? layouts[0];
+        let check: SetrunCheck = (type === RUN)
+            ? (chosen ? {valid : true, setrun : chosen} : {valid : false})
+            : checkSetrun(cards, type);
         return {
             check,
-            problem : explainSetrun(cards, slots[slotIndex].type),
-            cards : slotCards(hand, indices, check)
+            problem : explainSetrun(cards, type),
+            cards : slotCards(hand, indices, check),
+            layouts : (layouts.length > 1) ? layouts : []
         };
     });
     let usedIn = new Map<number, number>();
@@ -144,12 +203,19 @@ function useSlots(hand: Card[], requirement: Requirement) {
         allReady : readyCount === slots.length,
         /** puts a card from your hand into the slot being filled */
         pick : (index: number) => setSlot(active, [...picks[active], index]),
-        finished : (): GoDownSlot[] => picks.map((indices, i) => ({type : slots[i].type, indices}))
+        /** lays a run out the way that starts from this value */
+        setLayout : (slotIndex: number, from: number) => setFroms(froms.map((old, i) => (i === slotIndex) ? from : old)),
+        finished : (): GoDownSlot[] => picks.map((indices, i) => {
+            let {check, layouts} = results[i];
+            return (check.valid && layouts.length > 1)
+                ? {type : slots[i].type, indices, from : check.setrun.cards[0].value}
+                : {type : slots[i].type, indices};
+        })
     };
 }
 
 function GoDownBody({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
-    let {slots, picks, results, usedIn, readyCount, allReady, fits, setSlot, active, setActive, pick, finished} = useSlots(hand, requirement);
+    let {slots, picks, results, usedIn, readyCount, allReady, fits, setSlot, active, setActive, pick, setLayout, finished} = useSlots(hand, requirement);
 
     return (
         <>
@@ -169,9 +235,11 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                         cards={results[slotIndex].cards}
                         check={results[slotIndex].check}
                         problem={results[slotIndex].problem}
+                        layouts={results[slotIndex].layouts}
                         onActivate={() => setActive(slotIndex)}
                         onClear={() => setSlot(slotIndex, [])}
                         onRemove={(index) => setSlot(slotIndex, picks[slotIndex].filter(i => i !== index))}
+                        onLayout={(from) => setLayout(slotIndex, from)}
                     />
                 ))}
             </div>
@@ -180,26 +248,29 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                 <h3 className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">Your hand</h3>
                 <div className="flex flex-wrap gap-1 pt-3">
                     {hand.map((card, index) => {
-                        let slotIndex = usedIn.get(index);
+                        if (usedIn.has(index)) {
+                            // a card in a slot leaves its place empty, so the rest stay put
+                            return <PlayingCard key={index} card={card} alt="" className="invisible w-[clamp(44px,5vw,64px)] flex-none" />;
+                        }
                         let fitsHere = fits(index);
                         return (
                             <button
                                 key={index}
                                 type="button"
-                                disabled={slotIndex !== undefined}
                                 onClick={() => pick(index)}
-                                aria-label={longName(card) + ((slotIndex !== undefined)
-                                    ? ", in " + slots[slotIndex].title.toLowerCase()
-                                    : (fitsHere ? ", completes the " + slots[active].title.toLowerCase() : ""))}
-                                className={cn(
-                                    "relative w-[clamp(44px,5vw,64px)] flex-none rounded-[5%/3.3%] transition-transform enabled:hover:-translate-y-1.5",
-                                    slotIndex !== undefined && "opacity-35",
-                                    fitsHere ? "shadow-[0_0_0_3px_var(--gold),0_6px_14px_rgb(0_0_0/0.4)]" : "shadow-[0_4px_10px_rgb(0_0_0/0.35)]"
-                                )}
+                                aria-label={longName(card) + (fitsHere ? ", completes the " + slots[active].title.toLowerCase() : "")}
+                                className="relative w-[clamp(44px,5vw,64px)] flex-none rounded-[5%/3.3%] transition-transform hover:-translate-y-1.5"
                             >
-                                <PlayingCard card={card} alt="" className="w-full" />
-                                {slotIndex !== undefined && <CardTag className="left-0.5 bg-white/85 px-1.5 normal-case tracking-normal">{slots[slotIndex].title}</CardTag>}
-                                {fitsHere && <CardTag className="left-0.5 bg-gold px-1.5 text-gold-foreground normal-case tracking-normal">Fits</CardTag>}
+                                <MovingCard
+                                    id={card.id}
+                                    className={cn(
+                                        "rounded-[5%/3.3%]",
+                                        fitsHere ? "shadow-[0_0_0_3px_var(--gold),0_6px_14px_rgb(0_0_0/0.4)]" : "shadow-[0_4px_10px_rgb(0_0_0/0.35)]"
+                                    )}
+                                >
+                                    <PlayingCard card={card} alt="" className="w-full" />
+                                    {fitsHere && <CardTag className="left-0.5 bg-gold px-1.5 text-gold-foreground normal-case tracking-normal">Fits</CardTag>}
+                                </MovingCard>
                             </button>
                         );
                     })}
@@ -223,7 +294,7 @@ function GoDownBody({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
 // your hand along the bottom, in the same arch as at the table. Tap a slot,
 // then tap cards to fill it; tap a card in a slot to take it out.
 function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
-    let {slots, picks, results, usedIn, allReady, fits, setSlot, active, setActive, pick, finished} = useSlots(hand, requirement);
+    let {slots, picks, results, usedIn, allReady, fits, setSlot, active, setActive, pick, setLayout, finished} = useSlots(hand, requirement);
 
     return (
         <div className="flex h-full flex-col">
@@ -242,7 +313,7 @@ function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                 style={{gridTemplateColumns : `repeat(${slots.length}, minmax(0, 1fr))`}}
             >
                 {slots.map((slot, slotIndex) => {
-                    let {check, problem, cards} = results[slotIndex];
+                    let {check, problem, cards, layouts} = results[slotIndex];
                     let isActive = slotIndex === active;
                     return (
                         <div
@@ -268,11 +339,12 @@ function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                                 >
                                     {slot.title}
                                 </button>
-                                <span className={cn("truncate text-[12.5px] font-bold", check.valid ? "text-ok" : (cards.length > 0 ? "text-warn" : "text-muted-foreground"))}>
+                                <span className={cn("min-w-0 flex-1 truncate text-[12.5px] font-bold", check.valid ? "text-ok" : (cards.length > 0 ? "text-warn" : "text-muted-foreground"))}>
                                     {check.valid
                                         ? "✓ " + setrunCaption(check.setrun) + " is ready"
                                         : (cards.length > 0 ? problem : "Tap cards in your hand to add them")}
                                 </span>
+                                {layouts.length > 1 && <LayoutChoice layouts={layouts} check={check} onChange={(from) => setLayout(slotIndex, from)} />}
                             </div>
                             {/* the cards are as tall as the slot allows */}
                             <div
@@ -289,7 +361,9 @@ function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                                             aria-label={"Take " + longName(card) + " out of " + slot.title.toLowerCase()}
                                             className="relative w-(--meld-w) flex-none"
                                         >
-                                            <PlayingCard card={card} setrunType={check.valid ? slot.type : undefined} alt="" className="w-full" />
+                                            <MovingCard id={card.id}>
+                                                <PlayingCard card={card} setrunType={check.valid ? slot.type : undefined} alt="" className="w-full" />
+                                            </MovingCard>
                                         </button>
                                     ))}
                             </div>
@@ -305,32 +379,34 @@ function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
                 style={{"--n" : hand.length} as CSSProperties}
             >
                 {hand.map((card, index) => {
-                    let slotIndex = usedIn.get(index);
+                    if (usedIn.has(index)) {
+                        // a card in a slot leaves its place empty, so the rest stay put
+                        return <PlayingCard key={index} card={card} alt="" className="invisible w-(--hand-w) flex-none" />;
+                    }
                     let fitsHere = fits(index);
                     let place = archPlace(index, hand.length);
                     return (
                         <button
                             key={index}
                             type="button"
-                            disabled={slotIndex !== undefined}
                             onClick={() => pick(index)}
-                            aria-label={longName(card) + ((slotIndex !== undefined)
-                                ? ", in " + slots[slotIndex].title.toLowerCase()
-                                : (fitsHere ? ", completes " + slots[active].title.toLowerCase() : ""))}
-                            style={{marginTop : place.drop, transform : `rotate(${place.angle}deg)`}}
-                            className="relative w-(--hand-w) flex-none origin-bottom"
+                            aria-label={longName(card) + (fitsHere ? ", completes " + slots[active].title.toLowerCase() : "")}
+                            style={{marginTop : place.drop}}
+                            className="relative w-(--hand-w) flex-none"
                         >
-                            <PlayingCard
-                                card={card}
-                                alt=""
+                            {/* it leans from its bottom edge, which is off the screen; Motion
+                                straightens it as it flies to a slot, and leans it as it comes back */}
+                            <MovingCard
+                                id={card.id}
+                                style={{rotate : place.angle}}
                                 className={cn(
-                                    "w-full rounded-[5%/3.3%]",
-                                    slotIndex !== undefined && "opacity-35",
+                                    "origin-bottom rounded-[5%/3.3%]",
                                     fitsHere ? "shadow-[0_0_0_3px_var(--gold),0_6px_14px_rgb(0_0_0/0.4)]" : "shadow-[0_6px_14px_rgb(0_0_0/0.35)]"
                                 )}
-                            />
-                            {slotIndex !== undefined && <CardTag className="top-1 left-1 bg-white/85 px-1.5 normal-case tracking-normal">{slots[slotIndex].title}</CardTag>}
-                            {fitsHere && <CardTag className="top-1 left-1 bg-gold px-1.5 text-gold-foreground normal-case tracking-normal">Fits</CardTag>}
+                            >
+                                <PlayingCard card={card} alt="" className="w-full" />
+                                {fitsHere && <CardTag className="top-1 left-1 bg-gold px-1.5 text-gold-foreground normal-case tracking-normal">Fits</CardTag>}
+                            </MovingCard>
                         </button>
                     );
                 })}
@@ -341,6 +417,17 @@ function GoDownSheet({hand, requirement, onCancel, onSubmit}: GoDownBodyProps) {
 
 interface GoDownDialogProps extends GoDownBodyProps {
     open: boolean;
+}
+
+let openings = 0;
+
+// Cards fly between your hand and the slots (MovingCard). Each time the dialog
+// opens, its cards' flights get names of their own: apart from the table's,
+// which share the cards' ids, and from the last time it was open, which Motion
+// would otherwise fly them from.
+function Flights({children}: {children: ReactNode}) {
+    let [id] = useState(() => "go-down-" + ++openings);
+    return <LayoutGroup id={id}>{children}</LayoutGroup>;
 }
 
 // Lay down the round's melds. Checks each slot as cards go in and says what's
@@ -357,12 +444,12 @@ function GoDownDialog({open, hand, requirement, onCancel, onSubmit}: GoDownDialo
                         showCloseButton={false}
                         className="top-0 left-0 block h-dvh max-w-none translate-x-0 translate-y-0 overflow-clip rounded-none bg-card p-0 ring-0 sm:max-w-none"
                     >
-                        {open && <GoDownSheet {...props} />}
+                        {open && <Flights><GoDownSheet {...props} /></Flights>}
                     </DialogContent>
                 )
                 : (
                     <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[960px]">
-                        {open && <GoDownBody {...props} />}
+                        {open && <Flights><GoDownBody {...props} /></Flights>}
                     </DialogContent>
                 )}
         </Dialog>

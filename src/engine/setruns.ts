@@ -1,4 +1,4 @@
-import {SET, asItself, asWild, isRedAce, isWild, type Card, type Setrun, type SetrunType, type Suit} from './cards.ts';
+import {RUN, SET, asItself, asWild, isRedAce, isWild, type Card, type Setrun, type SetrunType, type Suit} from './cards.ts';
 import {SUIT_SYMBOL, rankName} from './card-names.ts';
 
 // Red aces are wild. When one is used in a setrun as another card, its value
@@ -7,6 +7,15 @@ import {SUIT_SYMBOL, rankName} from './card-names.ts';
 
 type CheckResult = {valid: true; setrun: Setrun} | {valid: false};
 type AddResult = {valid: true; setrun: Setrun; returnedAce: Card | null} | {valid: false};
+
+/** Where a card goes on a run: before its first card, or after its last. */
+export type RunEnd = "low" | "high";
+
+/** One way a card can extend a run: at that end, and the run it makes. */
+export interface RunPlace {
+    end: RunEnd;
+    cards: Card[];
+}
 
 /** One way to play a group of cards: which are natural and which are wild. */
 interface Reading {
@@ -56,59 +65,80 @@ const checkSet = (naturals: Card[], wilds: Card[]): Card[] | null => {
     return [...naturals, ...wilds.map(ace => asWild(ace, value, ace.ace!.suit))];
 };
 
-// Lays out a run from naturals with fixed values, filling gaps with wilds and
-// putting any spare wilds below the run first, then above it.
-const layOutRun = (naturals: Card[], wilds: Card[]): Card[] | null => {
+// The ways to lay out a run from naturals with fixed values: wilds fill the
+// gaps, and any to spare go below the run or above it. Most below first.
+const layOutRun = (naturals: Card[], wilds: Card[]): Card[][] => {
     let sorted = naturals.toSorted((a, b) => a.value - b.value);
     let values = sorted.map(card => card.value);
-    if (new Set(values).size !== values.length) return null;
+    if (new Set(values).size !== values.length) return [];
 
     let min = values[0];
     let max = values[values.length - 1];
     let gaps = (max - min + 1) - values.length;
-    if (gaps > wilds.length) return null;
+    if (gaps > wilds.length) return [];
 
     let spare = wilds.length - gaps;
-    let start = Math.max(1, min - spare);
-    let end = start + naturals.length + wilds.length - 1;
-    if (end > 14) return null;
-
     let suit = sorted[0].suit;
-    let remainingWilds = [...wilds];
-    let cards: Card[] = [];
-    for (let value = start; value <= end; value++) {
-        let natural = sorted.find(card => card.value === value);
-        cards.push(natural ?? asWild(remainingWilds.shift()!, value, suit));
+    let layouts: Card[][] = [];
+    for (let below = spare; below >= 0; below--) {
+        let start = min - below;
+        let end = max + spare - below;
+        if (start < 1 || end > 14) continue;
+        let remainingWilds = [...wilds];
+        let cards: Card[] = [];
+        for (let value = start; value <= end; value++) {
+            let natural = sorted.find(card => card.value === value);
+            cards.push(natural ?? asWild(remainingWilds.shift()!, value, suit));
+        }
+        layouts.push(cards);
     }
-    return cards;
+    return layouts;
 };
 
-const checkRun = (naturals: Card[], wilds: Card[]): Card[] | null => {
-    if (naturals.length < 3 || naturals.length + wilds.length < 4) return null;
+// The ways to lay out a run, the ace low first.
+const runLayoutsOf = (naturals: Card[], wilds: Card[]): Card[][] => {
+    if (naturals.length < 3 || naturals.length + wilds.length < 4) return [];
     let suit = naturals[0].suit;
-    if (naturals.some(card => card.suit !== suit)) return null;
+    if (naturals.some(card => card.suit !== suit)) return [];
 
     // an ace can be low (below a two) or high (above a king)
     let aces = naturals.filter(card => card.value === 1);
-    let layouts = [naturals];
+    let values = [naturals];
     if (aces.length > 0) {
         let highAce = aces[aces.length - 1];
-        layouts.push(naturals.map(card => card === highAce ? {...card, value : 14} : card));
+        values.push(naturals.map(card => card === highAce ? {...card, value : 14} : card));
     }
-    for (let layout of layouts) {
-        let cards = layOutRun(layout, wilds);
-        if (cards) return cards;
+    return values.flatMap(layout => layOutRun(layout, wilds));
+};
+
+/**
+ * Every way to lay out cards as a run, each starting from a different value:
+ * a red ace that can go at either end gives two. The first is the one
+ * checkSetrun picks, with red aces as themselves where they can be, and any
+ * spare wild below the run.
+ */
+const runLayouts = (cards: Card[]): Setrun[] => {
+    let found = new Map<number, Setrun>();
+    for (let {naturals, wilds} of readings(cards, RUN)) {
+        if (wilds.length > naturals.length) continue;
+        for (let layout of runLayoutsOf(naturals, wilds)) {
+            if (!found.has(layout[0].value)) found.set(layout[0].value, {type : RUN, cards : layout});
+        }
     }
-    return null;
+    return [...found.values()];
 };
 
 // Checks whether a group of cards makes a valid set (3+ of a value) or run
 // (4+ in a row of one suit). Red aces are wild but can't outnumber the
-// natural cards. Returns the setrun in order, with wild values assigned.
-const checkSetrun = (cards: Card[], type: SetrunType): CheckResult => {
+// natural cards. Returns the setrun in order, with wild values assigned. A
+// run that could be laid out more than one way starts `from` that value, if
+// given (see runLayouts).
+const checkSetrun = (cards: Card[], type: SetrunType, from?: number): CheckResult => {
     for (let {naturals, wilds} of readings(cards, type)) {
         if (wilds.length > naturals.length) continue;
-        let ordered = (type === SET) ? checkSet(naturals, wilds) : checkRun(naturals, wilds);
+        let ordered = (type === SET)
+            ? checkSet(naturals, wilds)
+            : runLayoutsOf(naturals, wilds).find(layout => from === undefined || layout[0].value === from);
         if (ordered) return {valid : true, setrun : {type, cards : ordered}};
     }
     return {valid : false};
@@ -171,20 +201,50 @@ const explainSetrun = (cards: Card[], type: SetrunType): string | null => {
     return "These cards don't make a run.";
 };
 
+// The ends of a run a card can go on: as the next card down or up in its
+// suit, an ace above a King, or else a red ace as a wild, if there would still
+// be no more wilds than naturals. Low first. A red ace can often go at either
+// end (as the 8♥ or as the A♥ on 9–K♥), and so, rarely, can a natural ace.
+const runPlaces = (setrun: Setrun, card: Card): RunPlace[] => {
+    let cards = setrun.cards;
+    let first = cards[0];
+    let last = cards[cards.length - 1];
+    let suit = first.suit;
+    let wilds = cards.filter(isWild).length + 1;
+    let wildFits = isRedAce(card) && wilds <= cards.length + 1 - wilds;
+    let places: RunPlace[] = [];
+
+    if (card.suit === suit && card.value === first.value - 1) places.push({end : "low", cards : [card, ...cards]});
+    else if (wildFits && first.value > 1) places.push({end : "low", cards : [asWild(card, first.value - 1, suit), ...cards]});
+
+    if (card.suit === suit && card.value === last.value + 1) places.push({end : "high", cards : [...cards, card]});
+    else if (card.suit === suit && card.value === 1 && last.value === 13) places.push({end : "high", cards : [...cards, {...card, value : 14}]});
+    else if (wildFits && last.value < 14) places.push({end : "high", cards : [...cards, asWild(card, last.value + 1, suit)]});
+    return places;
+};
+
+/** The ends of a run a card can extend it at, or none if it can't, or if it would replace a wild. */
+const runEnds = (setrun: Setrun, card: Card): RunPlace[] =>
+    (setrun.type !== RUN || replacedWild(setrun, card)) ? [] : runPlaces(setrun, card);
+
+// The wild a natural card would replace: the card it stands in for (an ace
+// for a wild high ace too).
+const replacedWild = (setrun: Setrun, card: Card): Card | undefined => setrun.cards.find(wild => isWild(wild) &&
+    (wild.value === card.value || (card.value === 1 && wild.value === 14)) &&
+    (setrun.type === SET || wild.suit === card.suit));
+
 // Tries to add one card to a setrun already on the table. The natural card a
 // wild stands in for replaces it, and the wild goes back to the hand.
 // Otherwise the card has to extend the setrun: a red ace as itself if it can
 // (onto a set of aces, or as the ace of its own suit's run), or else as a wild.
-const addToSetrun = (setrun: Setrun, card: Card): AddResult => {
+// On a run, `end` says which end; left out, a card goes on as itself if it
+// can, and at the low end if either will do.
+const addToSetrun = (setrun: Setrun, card: Card, end?: RunEnd): AddResult => {
     let cards = setrun.cards;
     let first = cards[0];
-    let last = cards[cards.length - 1];
     let result = (newCards: Card[]): AddResult => ({valid : true, setrun : {...setrun, cards : newCards}, returnedAce : null});
 
-    // an ace is the natural for a wild standing in for a high ace too
-    let replaced = cards.find(wild => isWild(wild) &&
-        (wild.value === card.value || (card.value === 1 && wild.value === 14)) &&
-        (setrun.type === SET || wild.suit === card.suit));
+    let replaced = replacedWild(setrun, card);
     if (replaced) {
         return {
             valid : true,
@@ -196,23 +256,18 @@ const addToSetrun = (setrun: Setrun, card: Card): AddResult => {
     if (setrun.type === SET) {
         if (card.value === first.value) return result([...cards, card]);
         if (!isRedAce(card)) return {valid : false};
-    } else if (card.suit === first.suit) {
-        if (card.value === first.value - 1) return result([card, ...cards]);
-        if (card.value === last.value + 1) return result([...cards, card]);
-        if (card.value === 1 && last.value === 13) return result([...cards, {...card, value : 14}]);
-        if (!isRedAce(card)) return {valid : false};
-    } else if (!isRedAce(card)) {
-        return {valid : false};
+        // a red ace that can't play as itself goes on as a wild, if there
+        // would still be no more wilds than naturals
+        let wilds = cards.filter(isWild).length + 1;
+        if (wilds > cards.length + 1 - wilds) return {valid : false};
+        return result([...cards, asWild(card, first.value, card.ace!.suit)]);
     }
 
-    // a red ace that can't play as itself goes on as a wild, if there would
-    // still be no more wilds than naturals
-    let wilds = cards.filter(isWild).length + 1;
-    if (wilds > cards.length + 1 - wilds) return {valid : false};
-    if (setrun.type === SET) return result([...cards, asWild(card, first.value, card.ace!.suit)]);
-    if (first.value > 1) return result([asWild(card, first.value - 1, first.suit), ...cards]);
-    if (last.value < 14) return result([...cards, asWild(card, last.value + 1, first.suit)]);
-    return {valid : false};
+    let places = runPlaces(setrun, card);
+    let place = end
+        ? places.find(place => place.end === end)
+        : (places.find(place => !place.cards.some(placed => placed.id === card.id && isWild(placed))) ?? places[0]);
+    return place ? result(place.cards) : {valid : false};
 };
 
 export {
@@ -220,5 +275,7 @@ export {
     sortHand,
     checkSetrun,
     explainSetrun,
-    addToSetrun
+    addToSetrun,
+    runEnds,
+    runLayouts
 };

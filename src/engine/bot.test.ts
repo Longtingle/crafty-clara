@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {RUN, SET, type Card, type Setrun, type SetrunType} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
-import {getRuns, getSets, scoreHand, wantsCard, chooseDiscard, planGoDown, findAddition, botMove} from './bot.ts';
+import {getRuns, getSets, scoreHand, wantsCard, chooseDiscard, planGoDown, findAddition, botMove, NORMAL_BOT as NORMAL, type BotProfile} from './bot.ts';
 import {apply, createGame, type GameState} from './game.ts';
 import {viewFor} from './view.ts';
 import {card, cards, names, values} from './testing.ts';
@@ -218,12 +218,44 @@ describe('botMove', () => {
         expect(botMove(viewFor(state, 0, 0))).toBeNull();
     });
 
+    it('is ready to start as soon as a round is dealt', () => {
+        const state = createGame({names : ["A", "B", "C", "D"], seed : 11, lookMs : 30_000});
+        expect(botMove(viewFor(state, 0, 0))).toEqual({type : "start"});
+        state.look!.ready[0] = true;
+        expect(botMove(viewFor(state, 0, 0))).toBeNull();
+    });
+
     it('is ready for the next round as soon as a round ends', () => {
         const state = newGame();
         state.phase = "roundEnd";
         expect(botMove(viewFor(state, 2, 0))).toEqual({type : "ready"});
         state.seats[2].ready = true;
         expect(botMove(viewFor(state, 2, 0))).toBeNull();
+    });
+
+    it('at the hard level, puts a red ace where it can follow it up, or else where nobody can', () => {
+        const adding = (hand: string, profile: BotProfile = {level : "hard", seed : 3}) => {
+            let state = play(newGame(), 0, {type : "draw", from : "discard"});
+            state.seats[0].hand = cards(hand);
+            state.seats[0].table = [setrun("9H 10H 11H 12H 13H", RUN)];
+            state.seats[0].isDown = true;
+            return botMove(viewFor(state, 0, 0), profile);
+        };
+        // with the 7♥ to follow, as the 8♥
+        expect(adding("1D 7H 3S")).toEqual({type : "addToSetrun", card : "1D", target : {seat : 0, index : 0}, end : "low"});
+        // with nothing to follow, on top, where nothing can go after it
+        expect(adding("1D 3S")).toEqual({type : "addToSetrun", card : "1D", target : {seat : 0, index : 0}, end : "high"});
+        // a normal bot leaves it to the rules
+        expect(adding("1D 3S", NORMAL)).toEqual({type : "addToSetrun", card : "1D", target : {seat : 0, index : 0}});
+
+        // going down with J–K♥ and the A♦ (round 2: a set and a run)
+        let state = play(newGame(), 0, {type : "draw", from : "discard"});
+        state.round = 1;
+        state.seats[0].hand = cards("11H 12H 13H 1D 5C 5S 5D 2S");
+        const goDown = botMove(viewFor(state, 0, 0), {level : "hard", seed : 3});
+        expect(goDown?.type === "goDown" && goDown.setruns.find(s => s.type === RUN)).toMatchObject({from : 11});
+        const plain = botMove(viewFor(state, 0, 0), NORMAL);
+        expect(plain?.type === "goDown" && plain.setruns.find(s => s.type === RUN)).not.toHaveProperty("from");
     });
 
     it('goes down when it can, then adds cards one at a time, then discards', () => {

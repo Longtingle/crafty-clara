@@ -16,7 +16,7 @@ export interface BotPace {
     answer: number;
     /** before going down, before each card it adds to a setrun, and before its discard */
     move: number;
-    /** before saying it's ready for the next round */
+    /** before saying it's ready to start play, or for the next round */
     ready: number;
 }
 
@@ -29,8 +29,8 @@ export interface BotOptions {
     pace?: BotPace;
     /**
      * Told when the host refuses one of the bot's moves, which means the bot
-     * has a bug. A claim or pass that arrives after the window has closed
-     * isn't reported.
+     * has a bug. A claim or pass that arrives after the window has closed,
+     * or a start after play has started, isn't reported.
      */
     onRefused?: (message: RefusedMessage) => void;
 }
@@ -40,6 +40,7 @@ const pauseFor = (pace: BotPace, command: Command): number => {
         case "draw": return pace.draw;
         case "claim":
         case "pass": return pace.answer;
+        case "start":
         case "ready": return pace.ready;
         default: return pace.move;
     }
@@ -69,9 +70,10 @@ export const startBot = (port: SeatPort, {
 
     const stopListening = port.listen(message => {
         if (message.type === "refused") {
-            // an answer can cross with the claim window closing, which is no fault of the bot's
+            // an answer can cross with the claim window closing, or a start
+            // with play starting, which is no fault of the bot's
             let type = message.command.type;
-            if (type !== "claim" && type !== "pass") onRefused(message);
+            if (type !== "claim" && type !== "pass" && type !== "start") onRefused(message);
             return;
         }
         view = message.view;

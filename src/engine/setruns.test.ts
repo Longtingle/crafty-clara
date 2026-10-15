@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {SET, RUN, createCard, isWild, type Setrun} from './cards.ts';
-import {checkSetrun, explainSetrun, addToSetrun, sortHand} from './setruns.ts';
+import {checkSetrun, explainSetrun, addToSetrun, runEnds, runLayouts, sortHand} from './setruns.ts';
 import {card, cards, names, values} from './testing.ts';
 
 // the setrun from cards that must make one
@@ -183,6 +183,62 @@ describe('addToSetrun', () => {
         const swap = addToSetrun(long, card("1S", "other"));
         expect(swap.valid && swap.returnedAce).toEqual(card("1H"));
         expect(swap.valid && swap.setrun.cards[13]).toMatchObject({id : "other", value : 14});
+    });
+
+    it('puts a red ace at the end of a run you choose', () => {
+        const hearts = setrun("9H 10H 11H 12H 13H", RUN);
+        // the A♥ goes on top as itself, unless you choose it as the 8♥
+        expect(values(added(hearts, "1H"))).toEqual([9, 10, 11, 12, 13, 14]);
+        const low = addToSetrun(hearts, card("1H"), "low");
+        expect(low.valid && values(low.setrun)).toEqual([8, 9, 10, 11, 12, 13]);
+        expect(low.valid && isWild(low.setrun.cards[0])).toBe(true);
+        // the A♦ goes low as a wild, unless you choose it as a high A♥
+        expect(values(added(hearts, "1D"))).toEqual([8, 9, 10, 11, 12, 13]);
+        const high = addToSetrun(hearts, card("1D"), "high");
+        expect(high.valid && high.setrun.cards[5]).toMatchObject({value : 14, suit : "H", displayString : "1D"});
+        // a card that fits only one end doesn't go on the other
+        expect(addToSetrun(hearts, card("8H"), "high").valid).toBe(false);
+        expect(addToSetrun(setrun("1H 2H 3H 4H", RUN), card("1D"), "low").valid).toBe(false);
+    });
+});
+
+describe('runLayouts', () => {
+    it('gives each way to lay out a run, the one checkSetrun picks first', () => {
+        // the A♦ as the 10♥ or as the A♥
+        const kings = cards("11H 12H 13H 1D");
+        expect(runLayouts(kings).map(values)).toEqual([[10, 11, 12, 13], [11, 12, 13, 14]]);
+        expect(checkSetrun(kings, RUN)).toEqual({valid : true, setrun : runLayouts(kings)[0]});
+        expect(values(runLayouts(cards("13H 11H 12H 1H"))[0])).toEqual([11, 12, 13, 14]);
+        // the A♥ as itself on top, or a wild 10♥ below
+        expect(runLayouts(cards("11H 12H 13H 1H")).map(values)).toEqual([[11, 12, 13, 14], [10, 11, 12, 13]]);
+        // a wild in a gap has nowhere else to go
+        expect(runLayouts(cards("5C 7C 8C 1D")).map(values)).toEqual([[5, 6, 7, 8]]);
+        expect(runLayouts(cards("5C 7C 1D"))).toEqual([]);
+    });
+
+    it('lets checkSetrun lay a run out from the value chosen', () => {
+        const kings = cards("11H 12H 13H 1D");
+        const high = checkSetrun(kings, RUN, 11);
+        expect(high.valid && high.setrun.cards[3]).toMatchObject({value : 14, suit : "H", displayString : "1D"});
+        expect(checkSetrun(kings, RUN, 12).valid).toBe(false);
+    });
+});
+
+describe('runEnds', () => {
+    it('gives each end of a run a card can go on, low first', () => {
+        const hearts = setrun("9H 10H 11H 12H 13H", RUN);
+        expect(runEnds(hearts, card("1D")).map(place => [place.end, values(place)])).toEqual([
+            ["low", [8, 9, 10, 11, 12, 13]],
+            ["high", [9, 10, 11, 12, 13, 14]]
+        ]);
+        expect(runEnds(hearts, card("8H")).map(place => place.end)).toEqual(["low"]);
+        expect(runEnds(hearts, card("5C"))).toEqual([]);
+        expect(runEnds(setrun("1H 2H 3H 4H", RUN), card("1D")).map(place => place.end)).toEqual(["high"]);
+    });
+
+    it('has none for a set, or for a card that would replace a wild', () => {
+        expect(runEnds(setrun("9C 9D 9S", SET), card("1D"))).toEqual([]);
+        expect(runEnds(setrun("4S 5S 6S 1H", RUN), card("3S"))).toEqual([]);
     });
 });
 

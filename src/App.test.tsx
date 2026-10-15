@@ -18,7 +18,11 @@ it('starts a game against three opponents, with you to play first', async () => 
     const sort = screen.getByRole('group', {name : 'Sort hand'});
     expect(within(sort).getByRole('button', {pressed : true})).toHaveTextContent('By value');
     for (let name of ["Opponent 1", "Opponent 2", "Opponent 3"]) expect(screen.getAllByText(name).length).toBeGreaterThan(0);
-    expect(screen.getByText(/You start this round/)).toBeInTheDocument();
+    // time to look over your hand first, until you're ready (the bots already are)
+    expect(screen.getByText('Look over your hand')).toBeInTheDocument();
+    expect(screen.getByText(/You start the round/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name : 'Ready'}));
+    expect(await screen.findByText(/You start this round/)).toBeInTheDocument();
     // all normal: no opponent is tagged as hard
     expect(screen.queryAllByText('Hard')).toHaveLength(0);
 });

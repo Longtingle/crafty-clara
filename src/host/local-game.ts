@@ -20,6 +20,8 @@ export interface LocalGameOptions {
     /** deals the same cards, and makes the bots play the same way, every time */
     seed?: number;
     claimWindowMs?: number;
+    /** how long you have to look over your hand at the start of each round (ms) */
+    lookMs?: number;
     clock?: Clock;
     pace?: BotPace;
     /** a saved game to carry on, in place of a new one with the options above */
@@ -33,7 +35,7 @@ export interface LocalGameSave {
     state: GameState;
     /** each bot's profile, by seat after yours */
     bots: BotProfile[];
-    /** the game's time when it was saved, so a claim window keeps the time it had left */
+    /** the game's time when it was saved, so a deadline keeps the time it had left */
     savedAt: number;
 }
 
@@ -45,8 +47,9 @@ export interface LocalGame {
     levels: BotLevel[];
     /**
      * Pauses the whole game: the host, the bots and the messages between you
-     * all wait on one clock, which stops. Claim windows keep the time they
-     * had left. In a game with other people, pausing will need their say.
+     * all wait on one clock, which stops. Claim windows, and the time to
+     * look over your hand, keep the time they had left. In a game with other
+     * people, pausing will need their say.
      */
     pause(): void;
     resume(): void;
@@ -54,11 +57,20 @@ export interface LocalGame {
     stop(): void;
 }
 
-// A saved claim window's deadline is a time on the clock of the game that
-// saved it. On this game's clock, it keeps the time it had left.
-const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => state.claim
-    ? {...state, claim : {...state.claim, deadline : now + Math.max(0, state.claim.deadline - savedAt)}}
-    : state;
+/** How long you have to look over your hand at the start of each round (ms). */
+export const LOOK_MS = 30_000;
+
+// A saved deadline (a claim window's, or play starting) is a time on the
+// clock of the game that saved it. On this game's clock, it keeps the time it
+// had left.
+const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => {
+    let later = (deadline: number) => now + Math.max(0, deadline - savedAt);
+    return {
+        ...state,
+        claim : state.claim && {...state.claim, deadline : later(state.claim.deadline)},
+        look : state.look && {...state.look, deadline : later(state.look.deadline)}
+    };
+};
 
 export const startLocalGame = ({
     name,
@@ -66,6 +78,7 @@ export const startLocalGame = ({
     levels = [],
     seed,
     claimWindowMs,
+    lookMs = LOOK_MS,
     clock : baseClock = systemClock,
     pace,
     from,
@@ -86,6 +99,7 @@ export const startLocalGame = ({
         names : [name, ...opponents],
         seed,
         claimWindowMs,
+        lookMs,
         clock,
         state : from && carryOn(from, clock.now()),
         onChange : save

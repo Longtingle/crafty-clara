@@ -39,7 +39,19 @@ export interface PileMove {
     label: string;
 }
 
+/** The start of a round, while everyone looks over their hand before play starts. */
+export interface LookTurn {
+    /** "You start", or "Opponent 1 starts" */
+    starter: string;
+    /** ms everyone has to look, in all */
+    total: number;
+    /** the others not ready yet, once you are; null until you are */
+    waitingFor: string[] | null;
+}
+
 export interface YourTurn {
+    /** while everyone looks over their hand, before play starts */
+    look: LookTurn | null;
     /** it's your turn and you haven't drawn yet */
     drawing: boolean;
     /** it's your turn and you have drawn */
@@ -81,6 +93,14 @@ const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget
     let middle = me.isDown ? "Add to melds" : "Go down";
 
     if (view.phase === "roundEnd" || view.phase === "gameEnd") return {steps : null, prompt : "Round over.", brief : "Round over"};
+    if (view.look) {
+        let starter = startsRound(view);
+        if (view.look.ready[view.seat]) {
+            let waiting = "Waiting for " + waitingFor(view).join(" and ");
+            return {steps : null, prompt : waiting + ".", brief : waiting};
+        }
+        return {steps : null, prompt : "Look over your hand. " + starter + " the round.", brief : "Look over your hand · " + starter};
+    }
 
     if (view.turn === view.seat && view.phase === "draw") {
         let text, brief;
@@ -159,6 +179,14 @@ const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget
     return {steps : null, prompt : name + " is playing.", brief : name + " is playing"};
 }
 
+// Who starts the round: "You start", or "Opponent 1 starts".
+const startsRound = (view: GameView): string =>
+    (view.turn === view.seat) ? "You start" : view.seats[view.turn].name + " starts";
+
+// The others not ready to start play yet.
+const waitingFor = (view: GameView): string[] =>
+    view.seats.filter((_, seat) => seat !== view.seat && !view.look?.ready[seat]).map(player => player.name);
+
 /**
  * What you can do now. selectedIndex is the selected card's place in your
  * hand. Hints you've turned off are left out.
@@ -207,6 +235,11 @@ export const yourTurn = (view: GameView, hand: Card[], selectedIndex: number | n
 
     let fits = targets.flat().filter(target => target !== null);
     return {
+        look : view.look && {
+            starter : startsRound(view),
+            total : view.look.total,
+            waitingFor : view.look.ready[view.seat] ? waitingFor(view) : null
+        },
         drawing,
         playing,
         selected,

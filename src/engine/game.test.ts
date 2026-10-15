@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {RUN, SET, getPoints, type Setrun} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
-import {apply, createGame, expireClaims, type Command, type GameState, type Result} from './game.ts';
+import {apply, createGame, expire, type Command, type GameState, type Result} from './game.ts';
 import {card} from './testing.ts';
 
 const NAMES = ["Ann", "Bob", "Cat", "Dan"];
@@ -81,6 +81,44 @@ describe('createGame', () => {
     });
 });
 
+describe('time to look over your hand', () => {
+    const looking = () => createGame({names : NAMES, seed : 1, lookMs : 30000, now : 1000});
+
+    it('comes before play at the start of a round, when the game gives it', () => {
+        expect(newGame()).toMatchObject({phase : "draw", look : null});
+        const state = looking();
+        expect(state).toMatchObject({phase : "look", turn : 0, look : {deadline : 31000, ready : [false, false, false, false]}});
+        expect(refusal(state, 0, {type : "draw", from : "deck"}, 1000)).toBe("Play hasn't started yet");
+    });
+
+    it('ends once everyone is ready, and play starts', () => {
+        let state = looking();
+        for (let seat of [3, 1, 2]) state = play(state, seat, {type : "start"}, 2000);
+        expect(state.look!.ready).toEqual([false, true, true, true]);
+        expect(refusal(state, 1, {type : "start"}, 2000)).toBe("Waiting for the other players");
+
+        state = play(state, 0, {type : "start"}, 2000);
+        expect(state).toMatchObject({phase : "draw", look : null});
+        expect(refusal(state, 0, {type : "start"}, 2000)).toBe("Play has already started");
+        expect(play(state, 0, {type : "draw", from : "deck"}, 2000).phase).toBe("play");
+    });
+
+    it('ends at its deadline, whoever is ready', () => {
+        const state = looking();
+        expect(expire(state, 30999)).toBe(state);
+        expect(expire(state, 31000)).toMatchObject({phase : "draw", look : null});
+        // a command that arrives after the deadline finds play started
+        expect(play(state, 0, {type : "draw", from : "deck"}, 31000).phase).toBe("play");
+    });
+
+    it('comes again with each new deal', () => {
+        let state = arrange(looking(), {hands : {0 : "13S", 1 : "1C 5D", 2 : "", 3 : "10H 11H 2S"}, phase : "play", look : null});
+        state = play(state, 0, {type : "discard", card : "0.0"}, 5000);
+        for (let seat of [0, 1, 2, 3]) state = play(state, seat, {type : "ready"}, 9000);
+        expect(state).toMatchObject({round : 1, turn : 1, phase : "look", look : {deadline : 39000, ready : [false, false, false, false]}});
+    });
+});
+
 describe('taking turns', () => {
     it('lets only the player in turn draw, once', () => {
         const state = newGame();
@@ -110,7 +148,7 @@ describe('taking turns', () => {
 
     it('only discards a card from your hand', () => {
         const state = play(newGame(), 0, {type : "draw", from : "deck"}, 0);
-        const later = expireClaims(state, 6000);
+        const later = expire(state, 6000);
         expect(refusal(later, 0, {type : "discard", card : later.seats[1].hand[0].id}, 6000)).toBe("That card isn't in your hand");
     });
 
@@ -125,7 +163,7 @@ describe('taking turns', () => {
         let state = deepFreeze(newGame());
         state = deepFreeze(play(state, 0, {type : "draw", from : "deck"}));
         state = deepFreeze(play(state, 1, {type : "claim"}));
-        state = deepFreeze(expireClaims(state, 6000));
+        state = deepFreeze(expire(state, 6000));
         expect(state.seats[0].hand).toHaveLength(13);
     });
 });
@@ -184,8 +222,8 @@ describe('claiming the discard', () => {
         let state = play(seatOnesTurn(), 1, {type : "draw", from : "deck"}, 0);
         const top = state.discard[0];
         state = play(state, 3, {type : "claim"}, 100);
-        expect(expireClaims(state, 5999)).toBe(state);
-        state = expireClaims(state, 6000);
+        expect(expire(state, 5999)).toBe(state);
+        state = expire(state, 6000);
         expect(state.claim).toBeNull();
         expect(state.seats[3].hand).toContainEqual(top);
     });
@@ -248,6 +286,17 @@ describe('going down', () => {
     it('only uses cards from your hand, each once', () => {
         expect(refusal(ready(), 0, goDown([SET, sevens], [SET, ["nope", "0.4", "0.5"]]))).toBe("That card isn't in your hand");
         expect(refusal(ready(), 0, goDown([SET, sevens], [SET, ["0.0", "0.4", "0.5"]]))).toBe("A card can only go in one setrun");
+    });
+
+    it('lays a run out from the value chosen, when it could go more than one way', () => {
+        // round 2: a set and a run, the A♦ on top of J–K♥
+        let state = play(arrange(newGame(), {hands : {0 : "11H 12H 13H 1D 5C 5S 5D 2S 3S 4S 6S 7S"}, round : 1, turn : 0}), 0, {type : "draw", from : "deck"});
+        state = expire(state, 6000);
+        const run = {type : RUN as typeof RUN, cards : ["0.0", "0.1", "0.2", "0.3"]};
+        const set = {type : SET as typeof SET, cards : ["0.4", "0.5", "0.6"]};
+        expect(refusal(state, 0, {type : "goDown", setruns : [{...run, from : 12}, set]}, 6000)).toBe("Those cards can't be laid out that way");
+        expect(play(state, 0, {type : "goDown", setruns : [run, set]}, 6000).seats[0].table[0].cards.map(c => c.value)).toEqual([10, 11, 12, 13]);
+        expect(play(state, 0, {type : "goDown", setruns : [{...run, from : 11}, set]}, 6000).seats[0].table[0].cards.map(c => c.value)).toEqual([11, 12, 13, 14]);
     });
 
     it('comes before adding to setruns', () => {
@@ -378,7 +427,7 @@ describe('an empty deck', () => {
         let state = arrange(newGame(), {deck : "", discard : "5C 6C", reshuffles : 1});
         state = play(state, 0, {type : "draw", from : "deck"});
         expect(state).toMatchObject({deck : [], reshuffles : 2});
-        state = expireClaims(state, 6000);
+        state = expire(state, 6000);
         const hands = state.seats.map(seat => seat.hand);
         state = play(state, 0, {type : "discard", card : state.seats[0].hand[0].id}, 6000);
         expect(state).toMatchObject({phase : "roundEnd", wentOut : null, outs : [null]});
@@ -390,7 +439,7 @@ describe('an empty deck', () => {
     it('lets the game go on after a second reshuffle', () => {
         let state = arrange(newGame(), {deck : "", discard : "5C 6C 7C", reshuffles : 1});
         state = play(state, 0, {type : "draw", from : "deck"});
-        state = expireClaims(state, 6000);
+        state = expire(state, 6000);
         state = play(state, 0, {type : "discard", card : state.seats[0].hand[0].id}, 6000);
         expect(state).toMatchObject({phase : "draw", turn : 1, reshuffles : 2});
     });
