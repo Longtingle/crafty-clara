@@ -198,7 +198,10 @@ Function components only; there is no global store.
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
-  - whether the game is paused: the top bar's Pause button calls `pause()` on the game, and the Paused dialog (`pause-dialog.tsx`) resumes it. The claim countdown stops meanwhile.
+  - whether the game is paused, and whether the Scores or Rules dialog is open. The game is held (`pause()` on the game) while any of these is true, and the claim countdown stops meanwhile:
+    - The top bar's Pause button opens the Paused dialog (`pause-dialog.tsx`), whose Resume carries on.
+    - Leaving the page (another tab, or another app on a phone) pauses the game the same way, so you come back to the Paused dialog. Not between rounds, though, and not while Scores or Rules is open, since that's already holding the game.
+    - Scores and Rules hold the game only while they're open.
   - the card being dragged, which counts as the selected card while it's dragged
   
   It works out what you can do (`yourTurn`), turns clicks into commands (`TableActions`), and renders `GameTable` and the go-down and round-end dialogs.

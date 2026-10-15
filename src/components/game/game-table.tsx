@@ -1,4 +1,3 @@
-import {useState} from 'react';
 import {cn} from '@/lib/utils.ts';
 import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
@@ -23,6 +22,9 @@ import {activityEntries, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
 import type {HandSort} from './hand-order.ts';
 
+/** A dialog you can open from the top bar while you play. */
+export type TableDialog = "scores" | "rules";
+
 /** Everything you can do at the table. GameScreen turns each into a command or a change to your hand. */
 export interface TableActions extends DragActions {
     drawFromDeck(): void;
@@ -33,6 +35,7 @@ export interface TableActions extends DragActions {
     sortHand(sort: HandSort): void;
     pause(): void;
     openGoDown(): void;
+    showDialog(dialog: TableDialog | null): void;
 }
 
 interface GameTableProps {
@@ -42,8 +45,10 @@ interface GameTableProps {
     sort: HandSort;
     /** each seat's bot level, by seat (null for a person) */
     levels: (BotLevel | null)[];
-    /** whether the game is paused */
+    /** whether the game is paused, which stops the claim countdown */
     paused: boolean;
+    /** the scores or the rules, if open */
+    dialog: TableDialog | null;
     /** what you can do now (yourTurn) */
     turn: YourTurn;
     newCard: NewCard | null;
@@ -92,8 +97,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom. Short screens (phones held sideways) get their own layout
 // (PhoneTable), with the opponents in the top bar.
-function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, notice, actions}: GameTableProps) {
-    let [dialog, setDialog] = useState<"scores" | "rules" | null>(null);
+function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, speech, notice, actions}: GameTableProps) {
     // Each card is rendered for one layout only, because each card must
     // appear once for its animations to work.
     let short = useMediaQuery("(max-height: 560px)");
@@ -140,8 +144,8 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
             }))}
             you={{points : me.total, active : isInTurn(view, view.seat)}}
             onPause={actions.pause}
-            onShowScores={() => setDialog("scores")}
-            onShowRules={() => setDialog("rules")}
+            onShowScores={() => actions.showDialog("scores")}
+            onShowRules={() => actions.showDialog("rules")}
         />
     );
     let piles = (
@@ -158,8 +162,8 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
     );
     let dialogs = (
         <>
-            <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => setDialog(open ? "scores" : null)} view={view} />
-            <RulesDialog open={dialog === "rules"} onOpenChange={(open) => setDialog(open ? "rules" : null)} />
+            <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => actions.showDialog(open ? "scores" : null)} view={view} />
+            <RulesDialog open={dialog === "rules"} onOpenChange={(open) => actions.showDialog(open ? "rules" : null)} />
             <RotatePrompt />
         </>
     );

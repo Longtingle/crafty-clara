@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import type {BotLevel} from '@/engine/bot.ts';
 import type {GameClient, Refusal} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
-import GameTable, {type TableActions} from './game-table.tsx';
+import GameTable, {type TableActions, type TableDialog} from './game-table.tsx';
 import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
 import RoundEndDialog from './round-end-dialog.tsx';
 import PauseDialog from './pause-dialog.tsx';
@@ -69,9 +69,6 @@ function useNotice(refusal: Refusal | null): string | null {
     return (refusal && refusal.seq !== expired) ? refusal.error : null;
 }
 
-// A game in progress, as your seat sees it through the client. Everything
-// here besides the view is yours alone: how your hand is sorted, the card
-// you've selected, and the open dialogs. Moves go to the host as commands.
 /** Stops and restarts the whole game (for now, a game in this page against bots). */
 export interface Pausing {
     pause(): void;
@@ -86,6 +83,13 @@ interface GameScreenProps {
     onNewGame: () => void;
 }
 
+// A game in progress, as your seat sees it through the client. Everything
+// here besides the view is yours alone: how your hand is sorted, the card
+// you've selected, and the open dialogs. Moves go to the host as commands.
+//
+// Nothing in the game moves while you've paused it, or while you're reading
+// the scores or the rules. Leaving the page (for another tab, or another app
+// on a phone) pauses it, so you come back to the Paused dialog.
 function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
     let {view, refusal, send} = useGame(client);
     // The hand stays sorted the way you last chose until you arrange it
@@ -97,8 +101,27 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
     let [draggingId, setDraggingId] = useState<string | null>(null);
     let [goingDown, setGoingDown] = useState(false);
     let [paused, setPaused] = useState(false);
+    let [dialog, setDialog] = useState<TableDialog | null>(null);
     let speech = useSpeech(client);
     let notice = useNotice(refusal);
+
+    let held = paused || dialog !== null;
+    useEffect(() => {
+        if (held) pausing.pause();
+        else pausing.resume();
+    }, [held, pausing]);
+
+    // between rounds there's nothing to pause
+    let playing = view?.phase === "draw" || view?.phase === "play";
+    useEffect(() => {
+        // already held by an open dialog, which is still there when you come back
+        if (!playing || dialog !== null) return;
+        let leave = () => {
+            if (document.hidden) setPaused(true);
+        };
+        document.addEventListener("visibilitychange", leave);
+        return () => document.removeEventListener("visibilitychange", leave);
+    }, [playing, dialog]);
 
     if (!view) return <div className="h-dvh bg-felt" />;
 
@@ -138,14 +161,12 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
                 setOwn(null);
             }
         },
-        pause : () => {
-            pausing.pause();
-            setPaused(true);
-        },
+        pause : () => setPaused(true),
         openGoDown : () => {
             setSelectedId(null);
             setGoingDown(true);
-        }
+        },
+        showDialog : setDialog
     };
 
     let goDown = (slots: GoDownSlot[]) => {
@@ -160,7 +181,8 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
                 hand={hand}
                 sort={sort}
                 levels={levels}
-                paused={paused}
+                paused={held}
+                dialog={dialog}
                 turn={turn}
                 newCard={newCardTag(view)}
                 speech={speech}
@@ -175,13 +197,7 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
                 onSubmit={goDown}
             />
             <RoundEndDialog view={view} onReady={() => send({type : "ready"})} onNewGame={onNewGame} />
-            <PauseDialog
-                open={paused}
-                onResume={() => {
-                    pausing.resume();
-                    setPaused(false);
-                }}
-            />
+            <PauseDialog open={paused} onResume={() => setPaused(false)} />
         </>
     );
 }
