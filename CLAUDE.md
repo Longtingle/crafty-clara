@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Crafty Clara is a browser card game, a contract-rummy variant played against bot opponents. It is built with Vite and React 19, styled with Tailwind CSS v4 and shadcn/ui, and animated with Motion. There is no backend yet: all game logic runs in the browser, and the site is static.
+Crafty Clara is a browser card game, a contract-rummy variant played against bot opponents. It is built with Vite and React 19, styled with Tailwind CSS v4 and shadcn/ui, and animated with Motion. There is no backend yet: all game logic runs in the browser, and the site is static. A service worker keeps the whole site on the device, so it can be installed and played offline.
 
 It is built so it can later be played online. Three layers talk only through messages:
 - **`src/engine/`:** a TypeScript rules engine, with a seat-by-seat view of the game and bots that play from those views.
@@ -204,7 +204,8 @@ What's kept between visits, behind a layer each platform fills in its own way:
 Function components only; there is no global store.
 - **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), or a game.
   - The levels are remembered (`settings`), and so is a game in progress (`savedGame`). With a saved game, the home screen offers "Continue game" first, and dealing a new one replaces it.
-  - Dealing (or continuing) calls `startSession`. The game (`session.ts`, `GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline, or a new deploy has replaced the files), the page reloads.
+  - Dealing (or continuing) calls `startSession`. The game (`session.ts`, `GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline before the service worker has it, or a new deploy has replaced the files), the page reloads.
+  - **Offline:** `vite-plugin-pwa` (`vite.config.js`) builds a service worker that precaches the whole site, card faces included. `src/index.tsx` registers it by hand, so an update never reloads the page under a game; a new version takes over and is used the next time the page opens. Once installed, the page asks the browser to keep its storage (`navigator.storage.persist`). Both are web-only, and an app build would leave them out.
   - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
   - Each seat's level reaches `GameScreen` as `levels`, by seat. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
