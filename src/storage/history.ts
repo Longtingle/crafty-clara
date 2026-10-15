@@ -49,7 +49,7 @@ export const gameRecord = (view: GameView, levels: (BotLevel | null)[], finished
 });
 
 export interface GameHistory {
-    /** your finished games, oldest first */
+    /** your finished games, oldest first, including any still being added */
     list(): Promise<GameRecord[]>;
     add(record: GameRecord): Promise<void>;
 }
@@ -64,7 +64,10 @@ export const createGameHistory = (store: KeyValueStore): GameHistory => {
     // one change at a time, so two games finishing together are both kept
     let adding = Promise.resolve();
     return {
-        list : async () => (await read()) ?? [],
+        list : async () => {
+            await adding;
+            return (await read()) ?? [];
+        },
         add(record) {
             adding = adding
                 .then(async () => {

@@ -80,3 +80,36 @@ it('pauses the game until you resume it', async () => {
     fireEvent.click(screen.getByRole('button', {name : 'Resume'}));
     await waitFor(() => expect(screen.queryByRole('dialog', {name : 'Paused'})).not.toBeInTheDocument());
 });
+
+it('shows your stats, once you have some', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Your stats'}));
+    expect(await screen.findByText('No finished games yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name : 'Back'}));
+
+    // a game you won, on the lowest total
+    const player = (name: string, level: string | null, scores: number[]) => ({name, level, scores, downs : scores.map(() => true)});
+    localStorage.setItem("crafty-clara.history", JSON.stringify({version : 1, games : [{
+        finishedAt : Date.now(),
+        seat : 0,
+        players : [player("You", null, [5, 10]), player("Opponent 1", "hard", [20, 0]), player("Opponent 2", "normal", [0, 30]), player("Opponent 3", "normal", [9, 9])],
+        outs : [2, 1]
+    }]}));
+    fireEvent.click(screen.getByRole('button', {name : 'Your stats'}));
+    expect(await screen.findByText('From the 1 game you’ve finished on this device')).toBeInTheDocument();
+    expect(screen.getByText('next best 18')).toBeInTheDocument();
+});
+
+it('remembers your hints', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
+    const dialog = await screen.findByRole('dialog', {name : 'Settings'});
+    fireEvent.click(within(dialog).getByRole('switch', {name : 'Cards that fit a meld'}));
+    expect(within(dialog).getByRole('switch', {name : 'Cards that fit a meld'})).not.toBeChecked();
+
+    cleanup();
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
+    const again = await screen.findByRole('dialog', {name : 'Settings'});
+    await waitFor(() => expect(within(again).getByRole('switch', {name : 'Cards that fit a meld'})).not.toBeChecked());
+});

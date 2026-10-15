@@ -22,8 +22,8 @@ import {activityEntries, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
 import type {HandSort} from './hand-order.ts';
 
-/** A dialog you can open from the top bar while you play. */
-export type TableDialog = "scores" | "rules";
+/** A dialog you can open from the top bar while you play. GameScreen shows the settings. */
+export type TableDialog = "scores" | "rules" | "settings";
 
 /** Everything you can do at the table. GameScreen turns each into a command or a change to your hand. */
 export interface TableActions extends DragActions {
@@ -47,7 +47,7 @@ interface GameTableProps {
     levels: (BotLevel | null)[];
     /** whether the game is paused, which stops the claim countdown */
     paused: boolean;
-    /** the scores or the rules, if open */
+    /** the scores, the rules or the settings, if open */
     dialog: TableDialog | null;
     /** what you can do now (yourTurn) */
     turn: YourTurn;
@@ -146,6 +146,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
             onPause={actions.pause}
             onShowScores={() => actions.showDialog("scores")}
             onShowRules={() => actions.showDialog("rules")}
+            onShowSettings={() => actions.showDialog("settings")}
         />
     );
     let piles = (
@@ -256,7 +257,13 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, newCard, spe
                     {/* no taller than the hand in a short window, to leave the piles room */}
                     <div className="mb-4 flex flex-col gap-3 compact:mb-0 compact:gap-2">
                         <SortSwitch sort={sort} onChange={actions.sortHand} />
-                        <Button size="lg" variant="secondary" disabled={!turn.goDown.enabled} onClick={actions.openGoDown}>
+                        <Button
+                            size="lg"
+                            variant={turn.goDown.ready ? "default" : "secondary"}
+                            disabled={!turn.goDown.enabled}
+                            onClick={actions.openGoDown}
+                            className={cn(turn.goDown.ready && "pulse-gold")}
+                        >
                             Go down
                         </Button>
                         <span className="text-center text-[13px] text-muted-foreground">{turn.goDown.hint}</span>

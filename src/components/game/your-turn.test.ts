@@ -79,9 +79,37 @@ describe('yourTurn', () => {
         expect(yourTurn(view, hand, 3).prompt).toBe("2♣ doesn't fit any meld. Discard it to end your turn.");
         expect(yourTurn(view, hand, 3).brief).toBe("2♣ fits no meld: discard it");
         expect(yourTurn(view, hand, null).prompt).toBe("Select a card to add to a meld or discard. Gold dots mark cards that fit.");
+
+        // with the dots turned off, finding what fits is up to you
+        const noDots = {fits : false, targets : true, ready : false};
+        const unhinted = yourTurn(view, hand, null, noDots);
+        expect(unhinted.playable).toEqual([false, false, false, false]);
+        expect(unhinted.prompt).toBe("Select a card to add to a meld or discard.");
+        expect(yourTurn(view, hand, 1, noDots).targets[1][0]).toMatchObject({label : "Add 8♠", lit : true});
     });
 
-    it("doesn't say whether your hand meets the requirement", () => {
+    it("lets you try a card on any meld, without saying where it fits, with that hint off", () => {
+        const hand = cards("5S 8S 9D 2C");
+        const view = viewFor(building(hand), 0, 0);
+        const hints = {fits : true, targets : false, ready : false};
+
+        // the 5♠ would swap out Opponent 1's wild ace, and fits nowhere else
+        const swap = yourTurn(view, hand, 0, hints);
+        expect(swap.targets).toEqual([
+            [{label : "Add 5♠", owner : "your set", returnedAce : null, lit : false}],
+            [{label : "Add 5♠", owner : "Opponent 1's run", returnedAce : null, lit : false}],
+            [],
+            []
+        ]);
+        expect(swap.prompt).toBe("Add 5♠ to a meld, or discard it to end your turn.");
+        expect(swap.brief).toBe("Add 5♠ to a meld, or discard it");
+        // the 2♣ fits nowhere, and it doesn't say so
+        expect(yourTurn(view, hand, 3, hints).prompt).toBe("Add 2♣ to a meld, or discard it to end your turn.");
+        // the dots are a separate hint
+        expect(swap.playable).toEqual([true, true, false, false]);
+    });
+
+    it("says whether your hand meets the requirement only with that hint on", () => {
         const state = play(newGame(), 0, {type : "draw", from : "discard"});
         const ready = cards("7C 7D 7S 9C 9H 9S 2D");
         const notReady = cards("7C 7D 3S 9C 9H 4S 2D");
@@ -89,9 +117,21 @@ describe('yourTurn', () => {
             state.seats[0].hand = hand;
             const view = viewFor(state, 0, 0);
             const turn = yourTurn(view, view.hand, null);
-            expect(turn.goDown).toEqual({enabled : true, hint : "Need " + requirementText(view.requirement)});
+            expect(turn.goDown).toEqual({enabled : true, ready : false, hint : "Need " + requirementText(view.requirement)});
             expect(turn.prompt).toBe("Select a card to discard. To go down you need " + requirementText(view.requirement) + ".");
         }
+
+        const hints = {fits : true, targets : true, ready : true};
+        state.seats[0].hand = ready;
+        let view = viewFor(state, 0, 0);
+        let turn = yourTurn(view, view.hand, null, hints);
+        expect(turn.goDown).toEqual({enabled : true, ready : true, hint : "You have what you need!"});
+        expect(turn.prompt).toBe("You have what you need. Go down, or select a card to discard.");
+        expect(turn.brief).toBe("You can go down, or pick a card to discard");
+
+        state.seats[0].hand = notReady;
+        view = viewFor(state, 0, 0);
+        expect(yourTurn(view, view.hand, null, hints).goDown.ready).toBe(false);
     });
 
     it("lets you claim on someone else's turn, and nothing else", () => {

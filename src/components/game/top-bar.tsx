@@ -1,6 +1,6 @@
 import type {ReactNode} from 'react';
 import {DropdownMenu} from 'radix-ui';
-import {Check, CircleHelp, Maximize, Menu, Pause, Trophy} from 'lucide-react';
+import {Check, CircleHelp, Maximize, Menu, Pause, Settings, Trophy} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
 import {canGoFullscreen, goFullscreen} from '@/lib/fullscreen.ts';
 import {Button} from '@/components/ui/button.tsx';
@@ -92,13 +92,14 @@ interface MenuProps {
     onPause: () => void;
     onShowScores: () => void;
     onShowRules: () => void;
+    onShowSettings: () => void;
 }
 
 const menuItem = "flex h-11 cursor-pointer items-center gap-3 rounded-lg px-3 font-bold outline-none select-none data-highlighted:bg-white/10 [&_svg]:size-4.5";
 
 // On short screens the game's buttons go in a menu. It offers full screen
 // too, on a phone that has left it.
-function GameMenu({onPause, onShowScores, onShowRules}: MenuProps) {
+function GameMenu({onPause, onShowScores, onShowRules, onShowSettings}: MenuProps) {
     return (
         // not modal, so a dialog opened from it gets the focus cleanly
         <DropdownMenu.Root modal={false}>
@@ -116,6 +117,7 @@ function GameMenu({onPause, onShowScores, onShowRules}: MenuProps) {
                     <DropdownMenu.Item className={menuItem} onSelect={onPause}><Pause aria-hidden="true" />Pause</DropdownMenu.Item>
                     <DropdownMenu.Item className={menuItem} onSelect={onShowScores}><Trophy aria-hidden="true" />Scores</DropdownMenu.Item>
                     <DropdownMenu.Item className={menuItem} onSelect={onShowRules}><CircleHelp aria-hidden="true" />Rules</DropdownMenu.Item>
+                    <DropdownMenu.Item className={menuItem} onSelect={onShowSettings}><Settings aria-hidden="true" />Settings</DropdownMenu.Item>
                     {canGoFullscreen() && (
                         <DropdownMenu.Item className={menuItem} onSelect={() => void goFullscreen()}>
                             <Maximize aria-hidden="true" />Full screen
@@ -138,12 +140,12 @@ interface TopBarProps extends MenuProps {
     you: {points: number; active: boolean};
 }
 
-// Round, what this round needs, and pausing, the scores and the rules. On
-// short screens it also has everyone at the table, as chips.
-function TopBar({round, roundCount, requirement, requirementMet, opponents, you, onPause, onShowScores, onShowRules}: TopBarProps) {
+// Round, what this round needs, and pausing, the scores, the rules and the
+// settings. On short screens it also has everyone at the table, as chips.
+function TopBar({round, roundCount, requirement, requirementMet, opponents, you, onPause, onShowScores, onShowRules, onShowSettings}: TopBarProps) {
     return (
         <header className="grid h-15 min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-white/8 bg-black/34 px-6 short:flex short:h-11 short:gap-1.5 short:pr-1.5 short:pl-0">
-            <GameMenu onPause={onPause} onShowScores={onShowScores} onShowRules={onShowRules} />
+            <GameMenu onPause={onPause} onShowScores={onShowScores} onShowRules={onShowRules} onShowSettings={onShowSettings} />
             <div className="truncate font-heading text-2xl font-extrabold tracking-tight short:hidden">Crafty Clara</div>
             <div className="flex items-center gap-3.5 short:flex-none short:gap-2">
                 <span className="font-bold whitespace-nowrap short:text-sm">Round {round + 1} of {roundCount}</span>
@@ -164,6 +166,9 @@ function TopBar({round, roundCount, requirement, requirementMet, opponents, you,
                 </Button>
                 <Button variant="outline" onClick={onShowRules}>
                     <CircleHelp aria-hidden="true" />Rules
+                </Button>
+                <Button variant="outline" size="icon" aria-label="Settings" onClick={onShowSettings}>
+                    <Settings aria-hidden="true" />
                 </Button>
             </nav>
         </header>

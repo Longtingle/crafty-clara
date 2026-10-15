@@ -12,14 +12,15 @@ interface MeldProps {
     seat: number;
     index: number;
     setrun: Setrun;
-    /** what the selected card would do here, if it can go here */
+    /** what the selected card would do here, if it can be played here */
     target: MeldTarget | null;
     dimmed: boolean;
     onClick: () => void;
 }
 
 // A setrun on the table. It is a button only while the selected card can be
-// added to it, and a card dragged from your hand can be dropped on it then.
+// played on it, and a card dragged from your hand can be dropped on it then.
+// It lights up gold where the card fits, unless that hint is off.
 function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
     let caption = setrunCaption(setrun);
     let hasWild = setrun.cards.some(isWild);
@@ -30,13 +31,16 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
             type="button"
             disabled={!target}
             onClick={onClick}
-            aria-label={caption + (hasWild ? ", with a wild ace" : "") + (target ? ". " + target.label : "")}
+            aria-label={caption + (hasWild ? ", with a wild ace" : "") + (target?.lit ? ". " + target.label : "")}
             className={cn(
                 "relative flex flex-none flex-col items-start gap-1.5 rounded-xl border-2 border-transparent bg-black/18 px-(--meld-pad-x) pt-3 pb-1.5 transition",
                 // on a phone, just the cards, in their player's quarter of the table
                 "short:rounded-md short:border-0 short:bg-transparent short:py-(--meld-pad-x)",
-                target && "border-gold shadow-[0_0_0_5px_rgb(245_184_61/0.22)] hover:brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_7px_rgb(245_184_61/0.25)]",
-                target && isOver && "shadow-[0_0_0_7px_rgb(245_184_61/0.45)] brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_9px_rgb(245_184_61/0.45)]",
+                target?.lit && "border-gold shadow-[0_0_0_5px_rgb(245_184_61/0.22)] hover:brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_7px_rgb(245_184_61/0.25)]",
+                target?.lit && isOver && "shadow-[0_0_0_7px_rgb(245_184_61/0.45)] brightness-110 short:shadow-[0_0_0_3px_var(--gold),0_0_0_9px_rgb(245_184_61/0.45)]",
+                // unlit, it only shows where the card would go
+                target && !target.lit && "hover:border-white/35 short:hover:shadow-[0_0_0_2px_rgb(255_255_255/0.35)]",
+                target && !target.lit && isOver && "border-white/50 short:shadow-[0_0_0_2px_rgb(255_255_255/0.5)]",
                 dimmed && "opacity-50"
             )}
         >
@@ -49,7 +53,7 @@ function Meld({seat, index, setrun, target, dimmed, onClick}: MeldProps) {
             </span>
             {/* as wide as the cards, never wider, so MeldRow's sums hold */}
             <span className="w-0 min-w-full truncate text-xs text-muted-foreground short:hidden">{caption}</span>
-            {target && (
+            {target?.lit && (
                 <span className="absolute -top-3 right-2 z-10 rounded-full bg-gold px-2 py-0.5 text-xs font-bold whitespace-nowrap text-gold-foreground short:-top-2.5 short:-right-2 short:py-px short:text-[11px]">
                     {target.label}
                 </span>

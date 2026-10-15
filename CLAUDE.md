@@ -188,8 +188,8 @@ What's kept between visits, behind a layer each platform fills in its own way:
 - **`store.ts`:** a `KeyValueStore` (async `get`, `set` and `remove` of JSON values). `browserStore` uses localStorage, and `memoryStore` is for tests. An app build would add one for the phone's own storage. It's async because everything but localStorage is. A store that can't keep something lets it go quietly.
 - **On top of it:**
   - **`saved-game.ts`:** the game in progress. Saves are written one at a time, and one waiting its turn is replaced by any newer one. A save carries a version, and one from another version is dropped, so bump `VERSION` when a change to the game state would break old saves.
-  - **`history.ts`:** your finished games, for stats (up to 1000). A `GameRecord` is what happened (each player's level, scores and downs by round, and who went out), not totals, so stats can be worked out in new ways later. This is the player's history, so a change to the record needs a way to read old versions, not a reset.
-  - **`settings.ts`:** your choices kept for next time (the opponents' levels).
+  - **`history.ts`:** your finished games, for stats (up to 1000). A `GameRecord` is what happened (each player's level, scores and downs by round, and who went out), not totals, so stats can be worked out in new ways later. This is the player's history, so a change to the record needs a way to read old versions, not a reset. `list` waits for any game still being added, so the game just finished is in it.
+  - **`settings.ts`:** your choices kept for next time: the opponents' levels, and your `Hints` (each on or off; `DEFAULT_HINTS` for any never chosen).
 - **`platform.ts`** builds these on the browser's store. It's the one place to swap: an app build would give them the phone's storage, and online play would keep saves and history on the server.
 
 **`src/session.ts`** (loaded with the game screen) starts a local game and keeps it as it goes. It saves after every change, and when the game ends it forgets the save and adds the game to your history, once.
@@ -202,8 +202,10 @@ What's kept between visits, behind a layer each platform fills in its own way:
 ### The UI
 
 Function components only; there is no global store.
-- **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), or a game.
-  - The levels are remembered (`settings`), and so is a game in progress (`savedGame`). With a saved game, the home screen offers "Continue game" first, and dealing a new one replaces it.
+- **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), your stats (`stats-screen.tsx`), or a game.
+  - The levels and the hints are remembered (`settings`), and so is a game in progress (`savedGame`). With a saved game, the home screen offers "Continue game" first, and dealing a new one replaces it.
+  - The home screen has Your stats and Settings in a corner: top right, or on a phone top left as icons, clear of the title. Settings (`settings-dialog.tsx`) holds the hints, with a picture of each; on a phone it's a sheet that fills the screen. It opens from the game too (the top bar, or the ☰ menu on a phone), and holds the game while it's open.
+  - **Stats** are worked out from your history (`stats.ts`, pure and tested on its own). The lowest total wins, and a tie for the lowest counts as a win, as on the game-over screen. You beat an opponent when you finish on a lower total. The stats screen is one page on a big screen, and three tabs (Overview, Rounds, Games) on a phone.
   - Dealing (or continuing) calls `startSession`. The game (`session.ts`, `GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline before the service worker has it, or a new deploy has replaced the files), the page reloads.
   - **Offline:** `vite-plugin-pwa` (`vite.config.js`) builds a service worker that precaches the whole site, card faces included. `src/index.tsx` registers it by hand, so an update never reloads the page under a game; a new version takes over and is used the next time the page opens. Once installed, the page asks the browser to keep its storage (`navigator.storage.persist`). Both are web-only, and an app build would leave them out.
   - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
@@ -214,20 +216,24 @@ Function components only; there is no global store.
   - whether the go-down dialog is open
   - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
-  - whether the game is paused, and whether the Scores or Rules dialog is open. The game is held (`pause()` on the game) while any of these is true, and the claim countdown stops meanwhile:
+  - whether the game is paused, and whether the Scores, Rules or Settings dialog is open. The game is held (`pause()` on the game) while any of these is true, and the claim countdown stops meanwhile:
     - The top bar's Pause button opens the Paused dialog (`pause-dialog.tsx`), whose Resume carries on.
-    - Leaving the page (another tab, or another app on a phone) pauses the game the same way, so you come back to the Paused dialog. Not between rounds, though, and not while Scores or Rules is open, since that's already holding the game.
-    - Scores and Rules hold the game only while they're open.
+    - Leaving the page (another tab, or another app on a phone) pauses the game the same way, so you come back to the Paused dialog. Not between rounds, though, and not while a dialog is open, since that's already holding the game.
+    - Scores, Rules and Settings hold the game only while they're open.
   - the card being dragged, which counts as the selected card while it's dragged
   
   It works out what you can do (`yourTurn`), turns clicks into commands (`TableActions`), and renders `GameTable` and the go-down and round-end dialogs.
-- **`your-turn.ts`** (`yourTurn(view, hand, selectedIndex)`) works out what you can do right now, with no React, so it is tested on its own:
-  - where the selected card can go (via `addToSetrun`), and the gold "fits a meld" dots
+- **`your-turn.ts`** (`yourTurn(view, hand, selectedIndex, hints)`) works out what you can do right now, with no React, so it is tested on its own:
+  - where the selected card can be played (`targets`)
   - what the deck and the discard pile do if clicked. While a claim window is open on your turn, you can't discard.
-  - whether the go-down dialog can open. Nothing says whether your hand is ready to go down: spotting that is part of the game.
+  - whether the go-down dialog can open
+  - three hints, each with its own switch in Settings:
+    - **Cards that fit a meld** (on by default): once you're down, a gold dot on each card in your hand that fits a setrun on the table (`playable`).
+    - **Where a card can go** (on by default): the setruns the selected (or dragged) card fits light up gold (`lit`, via `addToSetrun`), the rest are dimmed, and the prompt says what the card would do there. With it off, every setrun takes the card, unlit, and the prompt doesn't say where it fits: the host refuses a card that doesn't fit ("That card doesn't fit there").
+    - **When you can go down** (off by default): Go down glows gold (`pulse-gold`) and the prompt says so, once your hand has what the round needs (`goDown.ready`, from `planGoDown`). Spotting that is part of the game, so it's off unless you turn it on.
   - the turn prompt and its steps, and a brief prompt for the status line on a phone
 - **`game-table.tsx`** lays out the table from the view and `yourTurn`'s answers. It holds no game logic. Short screens (560px high or less: a phone held sideways) get **`phone-table.tsx`** instead:
-  - The top bar holds everyone as chips, with your points in a "You" chip. Pause, Scores, Rules and Full screen go in a ☰ menu.
+  - The top bar holds everyone as chips, with your points in a "You" chip. Pause, Scores, Rules, Settings and Full screen go in a ☰ menu.
   - A status line under it says what an opponent last did or said, and what you can do (`brief`).
   - Every player's melds have a fixed place in a grid two rows high (`seatPlaces` in `players.ts`): you at the bottom left, the others round clockwise in turn order. A player who isn't down has a dashed "Not down yet" place, where your own shows a Go down button while you can go down. Melds stay on one line, their cards sized to the place's height (`--meld-w-full`, with `cqh` units).
   - The deck and the discard pile are stacked, overhanging the right edge.
@@ -235,7 +241,7 @@ Function components only; there is no global store.
   - Its root is `overflow: clip`, not `hidden`: the browser can scroll a `hidden` box to show a card you tap, and the hand and piles hang off the edges.
 - **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
 - `go-down-dialog.tsx` keeps its slot picks in local state (`useSlots`) and only hands back the finished setruns, as indices into your hand. On a phone it's a sheet that fills the screen: the slots across the top, your hand in the arch along the bottom.
-- The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people. On a phone it fills the screen, with the result on the left and a compact `Scoreboard` on the right.
+- The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people. On a phone it fills the screen, with the result on the left and a compact `Scoreboard` on the right. At the end of the game it shows your record (wins, games, and where you finished in the last ten, this game ringed) once `GameScreen` has your history, and offers Your stats beside New game.
 - `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`, which writes `.tsx`). They are copied into the repo to be edited: `button.tsx` sizes were raised so every button is at least 44px.
 - **Animation** uses Motion (`motion/react`):
   - Every element that shows a card on the table is a `MovingCard` (`playing-card.tsx`) whose `layoutId` is the card's `id`. When a card moves between the deck, the discard pile, a hand and a setrun, its old element unmounts and a new one mounts, and Motion flies the card between them.

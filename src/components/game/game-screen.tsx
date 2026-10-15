@@ -2,10 +2,13 @@ import {useEffect, useState} from 'react';
 import type {BotLevel} from '@/engine/bot.ts';
 import type {GameClient, Refusal} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
+import type {Hints} from '@/storage/settings.ts';
+import type {GameRecord} from '@/storage/history.ts';
 import GameTable, {type TableActions, type TableDialog} from './game-table.tsx';
 import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
 import RoundEndDialog from './round-end-dialog.tsx';
 import PauseDialog from './pause-dialog.tsx';
+import SettingsDialog from './settings-dialog.tsx';
 import {opponentSeats} from './players.ts';
 import {newCardTag, speechFor} from './log-text.ts';
 import {yourTurn} from './your-turn.ts';
@@ -58,6 +61,22 @@ function useSpeech(client: GameClient): Record<number, string | null> {
     return lines;
 }
 
+// Your finished games, once this one has ended and been added to them.
+function useRecord(ended: boolean, games: () => Promise<GameRecord[]>): GameRecord[] | null {
+    let [records, setRecords] = useState<GameRecord[] | null>(null);
+    useEffect(() => {
+        if (!ended) return;
+        let live = true;
+        void games().then(list => {
+            if (live) setRecords(list);
+        });
+        return () => {
+            live = false;
+        };
+    }, [ended, games]);
+    return ended ? records : null;
+}
+
 // Why the host refused your last move, for a few seconds after it did.
 function useNotice(refusal: Refusal | null): string | null {
     let [expired, setExpired] = useState(0);
@@ -80,7 +99,12 @@ interface GameScreenProps {
     /** each seat's bot level, by seat (null for a person) */
     levels: (BotLevel | null)[];
     pausing: Pausing;
+    hints: Hints;
+    onHintsChange: (hints: Hints) => void;
+    /** your finished games, for your record when this one ends */
+    games: () => Promise<GameRecord[]>;
     onNewGame: () => void;
+    onShowStats: () => void;
 }
 
 // A game in progress, as your seat sees it through the client. Everything
@@ -88,9 +112,9 @@ interface GameScreenProps {
 // you've selected, and the open dialogs. Moves go to the host as commands.
 //
 // Nothing in the game moves while you've paused it, or while you're reading
-// the scores or the rules. Leaving the page (for another tab, or another app
-// on a phone) pauses it, so you come back to the Paused dialog.
-function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
+// the scores, the rules or the settings. Leaving the page (for another tab,
+// or another app on a phone) pauses it, so you come back to the Paused dialog.
+function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNewGame, onShowStats}: GameScreenProps) {
     let {view, refusal, send} = useGame(client);
     // The hand stays sorted the way you last chose until you arrange it
     // yourself. Your own order lasts until the next deal, which comes sorted.
@@ -104,6 +128,7 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
     let [dialog, setDialog] = useState<TableDialog | null>(null);
     let speech = useSpeech(client);
     let notice = useNotice(refusal);
+    let record = useRecord(view?.phase === "gameEnd", games);
 
     let held = paused || dialog !== null;
     useEffect(() => {
@@ -129,7 +154,7 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
     let sort: HandSort = (own && own.round === view.round) ? "own" : sorted;
     let hand = orderHand(view.hand, sort, own?.order ?? []);
     let selectedIndex = hand.findIndex(card => card.id === (draggingId ?? selectedId));
-    let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex);
+    let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex, hints);
     let selected = turn.selected?.card;
 
     let actions: TableActions = {
@@ -196,8 +221,15 @@ function GameScreen({client, levels, pausing, onNewGame}: GameScreenProps) {
                 onCancel={() => setGoingDown(false)}
                 onSubmit={goDown}
             />
-            <RoundEndDialog view={view} onReady={() => send({type : "ready"})} onNewGame={onNewGame} />
+            <RoundEndDialog view={view} record={record} onReady={() => send({type : "ready"})} onNewGame={onNewGame} onShowStats={onShowStats} />
             <PauseDialog open={paused} onResume={() => setPaused(false)} />
+            <SettingsDialog
+                open={dialog === "settings"}
+                onOpenChange={(open) => setDialog(open ? "settings" : null)}
+                hints={hints}
+                onHintsChange={onHintsChange}
+                inGame
+            />
         </>
     );
 }

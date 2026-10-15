@@ -34,6 +34,10 @@ it('keeps your games, oldest first, as many as it keeps', async () => {
     await Promise.all([history.add(record(1)), history.add(record(2))]);
     expect((await history.list()).map(game => game.finishedAt)).toEqual([1, 2]);
 
+    // a game still being added is listed
+    void history.add(record(3));
+    expect(await history.list()).toHaveLength(3);
+
     await Promise.all(Array.from({length : 1000}, (_, i) => history.add(record(i + 3))));
     const games = await history.list();
     expect(games).toHaveLength(1000);

@@ -66,12 +66,14 @@ interface SeatGridProps {
     melds: (seat: number) => ReactNode;
     /** opens the go-down dialog, while you can go down */
     onGoDown: (() => void) | null;
+    /** whether your hand has what the round needs (a hint) */
+    ready: boolean;
 }
 
 // Every player's melds in their own place (seatPlaces), down or not, so
 // nothing moves when someone goes down. A player's melds stay on one line,
 // their cards shrinking to fit the width and the height of the place.
-function SeatGrid({view, melds, onGoDown}: SeatGridProps) {
+function SeatGrid({view, melds, onGoDown, ready}: SeatGridProps) {
     let seats = [view.seat, ...opponentSeats(view)];
     let {columns, places} = seatPlaces(seats.length);
     return (
@@ -112,7 +114,7 @@ function SeatGrid({view, melds, onGoDown}: SeatGridProps) {
                             </div>
                         )}
                         {!player.isDown && you && onGoDown && (
-                            <Button variant="secondary" onClick={onGoDown}>Go down</Button>
+                            <Button variant={ready ? "default" : "secondary"} onClick={onGoDown} className={cn(ready && "pulse-gold")}>Go down</Button>
                         )}
                         {!player.isDown && !(you && onGoDown) && (
                             <span className="text-xs text-muted-foreground">Not down yet</span>
@@ -169,7 +171,7 @@ function PhoneTable({view, hand, sort, turn, newCard, speech, notice, actions, t
         <div className="relative h-dvh overflow-clip bg-felt shadow-[inset_0_0_140px_rgb(0_0_0/0.4)]">
             {topBar}
             <StatusLine view={view} speech={speech} prompt={turn.brief} notice={notice} />
-            <SeatGrid view={view} melds={melds} onGoDown={turn.goDown.enabled ? actions.openGoDown : null} />
+            <SeatGrid view={view} melds={melds} onGoDown={turn.goDown.enabled ? actions.openGoDown : null} ready={turn.goDown.ready} />
             {/* the hand starts right of the sort button and stops short of the piles */}
             <div className="absolute right-[calc(var(--pile-w)*0.8+10px)] bottom-0 left-[58px] h-(--hand-show)">
                 <Hand
