@@ -1,27 +1,17 @@
 import {lazy, Suspense, useEffect, useState} from 'react';
 import {MotionConfig} from 'motion/react';
-import type {LocalGame} from './host/local-game.ts';
 import type {BotLevel} from './engine/bot.ts';
-import type {GameClient} from './client/game-client.ts';
+import type {LocalGameSave} from './host/local-game.ts';
+import type {Session, SessionOptions} from './session.ts';
+import {gameHistory, savedGame, settings} from './storage/platform.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
 import {goFullscreen} from './lib/fullscreen.ts';
 
 // The game itself (its screen, the host and the bots) is a separate download,
 // fetched once the home screen is up, so the home screen comes first.
-const loadGame = () => Promise.all([
-    import('./host/local-game.ts'),
-    import('./client/game-client.ts'),
-    import('./components/game/game-screen.tsx')
-]);
+const loadGame = () => Promise.all([import('./session.ts'), import('./components/game/game-screen.tsx')]);
 const GameScreen = lazy(() => import('./components/game/game-screen.tsx'));
-
-interface Session {
-    game: LocalGame;
-    client: GameClient;
-    /** each seat's bot level, by seat (null for you) */
-    levels: (BotLevel | null)[];
-}
 
 // In development, ?seed=123 in the URL deals the same cards every game, to
 // reproduce a bug or set up a hand to test.
@@ -30,42 +20,28 @@ const devSeed = (): number | undefined => {
     return (seed === null || !Number.isInteger(Number(seed))) ? undefined : Number(seed);
 };
 
-// The opponents' levels are remembered on this device for the next game.
-// Storage can be unavailable (private windows) or hold something stale.
-const LEVELS_KEY = "crafty-clara.levels";
 const OPPONENTS = 3;
-
-const loadLevels = (): BotLevel[] => {
-    try {
-        let saved: unknown = JSON.parse(localStorage.getItem(LEVELS_KEY) ?? "null");
-        if (Array.isArray(saved) && saved.length === OPPONENTS && saved.every(level => level === "normal" || level === "hard")) {
-            return saved;
-        }
-    } catch {
-        // fall through to the default
-    }
-    return Array.from({length : OPPONENTS}, () => "normal");
-};
-
-const saveLevels = (levels: BotLevel[]): void => {
-    try {
-        localStorage.setItem(LEVELS_KEY, JSON.stringify(levels));
-    } catch {
-        // not remembered, which is fine
-    }
-};
+const ALL_NORMAL: BotLevel[] = Array.from({length : OPPONENTS}, () => "normal");
 
 // The home screen, the choice of opponents, or a game against the bots. Each
 // game has its own host running in this page (src/host), and the screen sees
 // the game only through your seat's client, the way it would see a game online.
+// What's kept between visits (the game in progress, the opponents you chose
+// last time, your finished games) is in src/storage.
 function App() {
     let [choosing, setChoosing] = useState(false);
-    let [levels, setLevels] = useState(loadLevels);
+    let [levels, setLevels] = useState(ALL_NORMAL);
+    // a game from an earlier visit, to carry on
+    let [saved, setSaved] = useState<LocalGameSave | null>(null);
     let [session, setSession] = useState<Session | null>(null);
 
     useEffect(() => {
         // a failure here is tried again when you deal
         loadGame().catch(() => {});
+        void settings.levels().then(kept => {
+            if (kept?.length === OPPONENTS) setLevels(kept);
+        });
+        void savedGame.load().then(setSaved);
     }, []);
 
     // a game's host and bots run until it's stopped
@@ -73,7 +49,7 @@ function App() {
 
     let changeLevels = (next: BotLevel[]) => {
         setLevels(next);
-        saveLevels(next);
+        settings.setLevels(next);
     };
 
     // On a phone or tablet, starting a game goes full screen (if you've left
@@ -83,12 +59,19 @@ function App() {
         setChoosing(true);
     };
 
-    let deal = () => {
+    let play = (options: Pick<SessionOptions, "levels" | "seed" | "from">) => {
         void goFullscreen();
         loadGame().then(
-            ([{startLocalGame}, {createGameClient}]) => {
-                let game = startLocalGame({name : "You", seed : devSeed(), levels});
-                setSession({game, client : createGameClient(game.port), levels : [null, ...levels]});
+            ([{startSession}]) => {
+                try {
+                    setSession(startSession({...options, savedGame, history : gameHistory}));
+                } catch (error) {
+                    // a saved game this version can't carry on
+                    console.error(error);
+                    savedGame.save(null);
+                }
+                // a new game replaces the saved one
+                setSaved(null);
             },
             // Offline, or a new version of the site has replaced the files
             // this page asks for: start again from the home screen.
@@ -106,9 +89,22 @@ function App() {
     if (session) {
         screen = <GameScreen client={session.client} levels={session.levels} pausing={session.game} onNewGame={newGame} />;
     } else if (choosing) {
-        screen = <NewGame levels={levels} onLevelsChange={changeLevels} onDeal={deal} onBack={() => setChoosing(false)} />;
+        screen = (
+            <NewGame
+                levels={levels}
+                onLevelsChange={changeLevels}
+                onDeal={() => play({levels, seed : devSeed()})}
+                onBack={() => setChoosing(false)}
+            />
+        );
     } else {
-        screen = <Home onStartGame={startGame} />;
+        screen = (
+            <Home
+                savedRound={saved && saved.state.round}
+                onContinue={() => saved && play({from : saved})}
+                onStartGame={startGame}
+            />
+        );
     }
 
     // animations respect the "reduce motion" system setting

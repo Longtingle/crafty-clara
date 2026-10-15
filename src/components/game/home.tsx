@@ -1,16 +1,24 @@
 import {useEffect, useState} from 'react';
 import {motion} from 'motion/react';
 import {Button} from '@/components/ui/button.tsx';
-import {createCard} from '@/engine/cards.ts';
+import {createCard, ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {PlayingCard} from './playing-card.tsx';
 import {preloadCardImages} from './cards.ts';
 import RulesDialog from './rules-dialog.tsx';
 
 const FAN = [createCard(10, "H", "10H"), createCard(11, "C", "11C"), createCard(12, "D", "12D"), createCard(13, "S", "13S"), createCard(1, "H", "1H")];
 
-// The title screen. On a phone held sideways (a short screen) the fan of
-// cards sits beside the title, so it all fits on one screen.
-function Home({onStartGame}: {onStartGame: () => void}) {
+interface HomeProps {
+    /** the round (from 0) of a saved game you can carry on, if there is one */
+    savedRound: number | null;
+    onContinue: () => void;
+    onStartGame: () => void;
+}
+
+// The title screen. With a game saved from last time, carrying it on comes
+// first. On a phone held sideways (a short screen) the fan of cards sits
+// beside the title, so it all fits on one screen.
+function Home({savedRound, onContinue, onStartGame}: HomeProps) {
     let [showRules, setShowRules] = useState(false);
     // load the card faces while the player reads the home screen
     useEffect(preloadCardImages, []);
@@ -38,7 +46,17 @@ function Home({onStartGame}: {onStartGame: () => void}) {
                         <p className="text-lg text-muted-foreground short:text-base">Contract rummy against crafty computer opponents.</p>
                     </div>
                     <div className="flex flex-wrap justify-center gap-3 short:justify-start">
-                        <Button size="lg" onClick={onStartGame} className="px-8 text-lg">Start game</Button>
+                        {(savedRound === null)
+                            ? <Button size="lg" onClick={onStartGame} className="px-8 text-lg">Start game</Button>
+                            : (
+                                <>
+                                    <Button size="lg" onClick={onContinue} className="px-8 text-lg">
+                                        Continue game{" "}
+                                        <span className="text-base font-normal opacity-80">· Round {savedRound + 1} of {ROUND_REQUIREMENTS.length}</span>
+                                    </Button>
+                                    <Button size="lg" variant="outline" onClick={onStartGame}>New game</Button>
+                                </>
+                            )}
                         <Button size="lg" variant="outline" onClick={() => setShowRules(true)}>How to play</Button>
                     </div>
                 </div>

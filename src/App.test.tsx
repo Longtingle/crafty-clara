@@ -35,13 +35,32 @@ it('lets you choose each opponent’s level, and remembers it', async () => {
     cleanup();
     render(<App />);
     fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
-    expect(within(screen.getByRole('group', {name : 'Opponent 2'})).getByRole('button', {name : 'Hard'})).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => {
+        expect(within(screen.getByRole('group', {name : 'Opponent 2'})).getByRole('button', {name : 'Hard'})).toHaveAttribute('aria-pressed', 'true');
+    });
     expect(within(screen.getByRole('group', {name : 'Opponent 1'})).getByRole('button', {name : 'Normal'})).toHaveAttribute('aria-pressed', 'true');
 
     // and the game shows who's hard
     fireEvent.click(screen.getByRole('button', {name : 'Deal the cards'}));
     await screen.findByRole('group', {name : 'Your hand'});
     expect(screen.getAllByText('Hard').length).toBeGreaterThan(0);
+});
+
+it('offers to carry on a game from your last visit', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Start game'}));
+    fireEvent.click(screen.getByRole('button', {name : 'Deal the cards'}));
+    const cards = async () => within(await screen.findByRole('group', {name : 'Your hand'}))
+        .getAllByRole('button')
+        .map(card => card.getAttribute('aria-label'))
+        .toSorted();
+    const dealt = await cards();
+
+    // the page is closed, and opened again
+    cleanup();
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', {name : /Continue game · Round 1 of 7/}));
+    expect(await cards()).toEqual(dealt);
 });
 
 it('goes back to the home screen from the choice of opponents', () => {

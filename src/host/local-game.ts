@@ -1,7 +1,8 @@
 // A game in this page: you in seat 0, bots in the other seats, and the host
 // between you, all talking through local ports as they would over a network.
 
-import type {BotLevel} from '../engine/bot.ts';
+import type {BotLevel, BotProfile} from '../engine/bot.ts';
+import type {GameState} from '../engine/game.ts';
 import {random} from '../engine/random.ts';
 import {createPausableClock, systemClock, type Clock} from './clock.ts';
 import {createHost, type Host} from './host.ts';
@@ -21,12 +22,27 @@ export interface LocalGameOptions {
     claimWindowMs?: number;
     clock?: Clock;
     pace?: BotPace;
+    /** a saved game to carry on, in place of a new one with the options above */
+    from?: LocalGameSave;
+    /** given the game as it starts and after every change, to save it */
+    onChange?: (save: LocalGameSave) => void;
+}
+
+/** Everything needed to carry on a game later. It's JSON-safe, to be stored. */
+export interface LocalGameSave {
+    state: GameState;
+    /** each bot's profile, by seat after yours */
+    bots: BotProfile[];
+    /** the game's time when it was saved, so a claim window keeps the time it had left */
+    savedAt: number;
 }
 
 export interface LocalGame {
     /** your end of the connection: send commands on it, and listen for your views */
     port: SeatPort;
     host: Host;
+    /** each bot's level, by seat after yours */
+    levels: BotLevel[];
     /**
      * Pauses the whole game: the host, the bots and the messages between you
      * all wait on one clock, which stops. Claim windows keep the time they
@@ -38,6 +54,12 @@ export interface LocalGame {
     stop(): void;
 }
 
+// A saved claim window's deadline is a time on the clock of the game that
+// saved it. On this game's clock, it keeps the time it had left.
+const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => state.claim
+    ? {...state, claim : {...state.claim, deadline : now + Math.max(0, state.claim.deadline - savedAt)}}
+    : state;
+
 export const startLocalGame = ({
     name,
     opponents = ["Opponent 1", "Opponent 2", "Opponent 3"],
@@ -45,26 +67,41 @@ export const startLocalGame = ({
     seed,
     claimWindowMs,
     clock : baseClock = systemClock,
-    pace
+    pace,
+    from,
+    onChange
 }: LocalGameOptions): LocalGame => {
     let clock = createPausableClock(baseClock);
-    let host = createHost({names : [name, ...opponents], seed, claimWindowMs, clock});
+    // each bot's seed decides what it forgets and when it takes a risk, if
+    // it's a hard bot, and its risk is secret and lasts the game
+    let seeded = {rng : seed ?? Math.floor(Math.random() * 2 ** 32)};
+    let profiles = from?.bots ?? opponents.map((_, i) => ({
+        level : levels[i] ?? "normal",
+        seed : Math.floor(random(seeded) * 2 ** 32),
+        risk : random(seeded)
+    }));
+    const save = (state: GameState) => onChange?.({state, bots : profiles, savedAt : clock.now()});
+
+    let host = createHost({
+        names : [name, ...opponents],
+        seed,
+        claimWindowMs,
+        clock,
+        state : from && carryOn(from, clock.now()),
+        onChange : save
+    });
+    save(host.state());
     const seat = (index: number): SeatPort => {
         let [seatEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
         host.connect(index, hostEnd);
         return seatEnd;
     };
     let port = seat(0);
-    // each bot's seed decides what it forgets and when it takes a risk, if
-    // it's a hard bot, and its risk is secret and lasts the game
-    let seeded = {rng : seed ?? Math.floor(Math.random() * 2 ** 32)};
-    let bots = opponents.map((_, i) => {
-        let profile = {level : levels[i] ?? "normal", seed : Math.floor(random(seeded) * 2 ** 32), risk : random(seeded)};
-        return startBot(seat(i + 1), {profile, clock, pace});
-    });
+    let bots = profiles.map((profile, i) => startBot(seat(i + 1), {profile, clock, pace}));
     return {
         port,
         host,
+        levels : profiles.map(profile => profile.level),
         pause : () => clock.pause(),
         resume : () => clock.resume(),
         stop() {

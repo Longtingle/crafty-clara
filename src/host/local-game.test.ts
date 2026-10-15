@@ -3,7 +3,7 @@ import {ROUND_REQUIREMENTS} from '../engine/cards.ts';
 import type {Command} from '../engine/game.ts';
 import type {GameView} from '../engine/view.ts';
 import {startBot} from './bot-player.ts';
-import {startLocalGame} from './local-game.ts';
+import {startLocalGame, type LocalGameSave} from './local-game.ts';
 import {createTestClock, type TestClock} from './testing.ts';
 import type {SeatPort} from './protocol.ts';
 
@@ -86,6 +86,64 @@ describe('a local game', () => {
         expect(game.host.state()).not.toBe(paused);
         clock.runAll();
         expect(game.host.state().phase).toBe("gameEnd");
+    });
+
+    it('saves itself as it starts and after every change', () => {
+        const clock = createTestClock();
+        const saves: LocalGameSave[] = [];
+        const game = startLocalGame({name : "You", seed : 7, levels : ["hard"], clock, onChange : save => saves.push(save)});
+        expect(saves).toHaveLength(1);
+        expect(saves[0].state).toBe(game.host.state());
+        expect(saves[0].bots.map(bot => bot.level)).toEqual(["hard", "normal", "normal"]);
+
+        playAsYou(game.port, clock);
+        clock.advance(20_000);
+        expect(saves.length).toBeGreaterThan(5);
+        expect(saves.at(-1)).toMatchObject({state : game.host.state(), bots : saves[0].bots});
+        expect(saves.at(-1)!.savedAt).toBeGreaterThan(saves[0].savedAt);
+        // ready to be stored
+        expect(JSON.parse(JSON.stringify(saves.at(-1)))).toEqual(saves.at(-1));
+    });
+
+    it('carries on from a save to the end of the game', () => {
+        const warn = vi.spyOn(console, "warn");
+        const saves: LocalGameSave[] = [];
+        const first = createTestClock();
+        const before = startLocalGame({name : "You", seed : 7, clock : first, onChange : save => saves.push(save)});
+        playAsYou(before.port, first);
+        first.advance(30_000);
+        before.stop();
+        const saved: LocalGameSave = JSON.parse(JSON.stringify(saves.at(-1)));
+
+        const clock = createTestClock(1_000_000);
+        const game = startLocalGame({name : "Someone else", seed : 1, clock, from : saved});
+        expect(game.host.state().seats).toEqual(saved.state.seats);
+        const you = playAsYou(game.port, clock);
+        clock.runAll();
+        expect(game.host.state().phase).toBe("gameEnd");
+        expect(you.refusals).toEqual([]);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('gives a saved claim window the time it had left', () => {
+        const saves: LocalGameSave[] = [];
+        const first = createTestClock();
+        const before = startLocalGame({name : "You", seed : 7, clock : first, onChange : save => saves.push(save)});
+        playAsYou(before.port, first, ["claim", "pass"]);
+        first.advance(60_000);
+        before.stop();
+        const saved = saves.find(save => save.state.claim && save.state.claim.deadline > save.savedAt)!;
+        const left = saved.state.claim!.deadline - saved.savedAt;
+
+        const clock = createTestClock(1_000_000);
+        // bots too slow to answer, so only the deadline closes it
+        const pace = {draw : 1e9, answer : 1e9, move : 1e9, ready : 1e9};
+        const game = startLocalGame({name : "You", clock, pace, from : saved});
+        expect(game.host.state().claim!.deadline - clock.now()).toBe(left);
+        clock.advance(left - 1);
+        expect(game.host.state().claim).not.toBeNull();
+        clock.advance(1);
+        expect(game.host.state().claim).toBeNull();
     });
 
     it('stops where it stands', () => {

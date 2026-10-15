@@ -174,12 +174,25 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 
 - **`transport.ts`:** a `Port` is one end of a connection (`send`, `listen`, `close`). `createLocalPair` connects two ends in the page. Each message arrives a moment after it is sent, never during `send`, and as a copy made through JSON, as over a socket. A WebSocket can later be wrapped as a `Port`.
 - **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
-- **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need.
+- **`host.ts`:** `createHost({names, seed, clock})` holds the one true state and applies each seat's commands. It closes claim windows at their deadline with a timer and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need. Given a `state`, it carries on that game instead of dealing one, and `onChange` hears of every change, to save the game.
 - **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. `App.tsx` starts one per game. In development, `?seed=N` in the URL fixes the deal.
+- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). The bots' seeds come from the game's seed, so a seeded game replays exactly. A game starts through `src/session.ts`, one per game. In development, `?seed=N` in the URL fixes the deal.
+  - **Saving:** `onChange` is given a `LocalGameSave` as the game starts and after every change: the state, the bots' profiles (with their secret risks), and the game's time (`savedAt`). `from` carries on a save. A claim window's deadline is a time on the clock of the game that saved it, so `carryOn` gives it the time it had left.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default.
   - A local game wraps its clock in `createPausableClock`, so pausing stops everything at once. Timers wait, and time spent paused doesn't count, so a claim window keeps the time it had left.
   - Pausing a game with other people will need a host command and their say. Tests use `createTestClock()` (`testing.ts`), which moves only when told to (`advance(ms)`, `runAll()`). So `local-game.test.ts` plays whole games, timers and all, in milliseconds, and a game replays exactly from its seed.
+
+### Storage (`src/storage/`)
+
+What's kept between visits, behind a layer each platform fills in its own way:
+- **`store.ts`:** a `KeyValueStore` (async `get`, `set` and `remove` of JSON values). `browserStore` uses localStorage, and `memoryStore` is for tests. An app build would add one for the phone's own storage. It's async because everything but localStorage is. A store that can't keep something lets it go quietly.
+- **On top of it:**
+  - **`saved-game.ts`:** the game in progress. Saves are written one at a time, and one waiting its turn is replaced by any newer one. A save carries a version, and one from another version is dropped, so bump `VERSION` when a change to the game state would break old saves.
+  - **`history.ts`:** your finished games, for stats (up to 1000). A `GameRecord` is what happened (each player's level, scores and downs by round, and who went out), not totals, so stats can be worked out in new ways later. This is the player's history, so a change to the record needs a way to read old versions, not a reset.
+  - **`settings.ts`:** your choices kept for next time (the opponents' levels).
+- **`platform.ts`** builds these on the browser's store. It's the one place to swap: an app build would give them the phone's storage, and online play would keep saves and history on the server.
+
+**`src/session.ts`** (loaded with the game screen) starts a local game and keeps it as it goes. It saves after every change, and when the game ends it forgets the save and adds the game to your history, once.
 
 ### The client (`src/client/`)
 
@@ -190,8 +203,8 @@ TypeScript with no React or DOM. It is the "server" for a game, run in the page 
 
 Function components only; there is no global store.
 - **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), or a game.
-  - The levels are remembered in `localStorage`. Every read and write is wrapped in try/catch, so the screen still works where storage is blocked.
-  - Dealing calls `startLocalGame` and `createGameClient`. The game (`GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline, or a new deploy has replaced the files), the page reloads.
+  - The levels are remembered (`settings`), and so is a game in progress (`savedGame`). With a saved game, the home screen offers "Continue game" first, and dealing a new one replaces it.
+  - Dealing (or continuing) calls `startSession`. The game (`session.ts`, `GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline, or a new deploy has replaced the files), the page reloads.
   - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
   - Each seat's level reaches `GameScreen` as `levels`, by seat. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:

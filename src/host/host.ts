@@ -11,12 +11,16 @@ import type {ClientMessage, HostPort} from './protocol.ts';
 
 export interface HostOptions {
     /** one per seat, in turn order */
-    names: string[];
+    names?: string[];
     /** a random one if left out */
     seed?: number;
     /** how long the other players have to claim a discard (ms) */
     claimWindowMs?: number;
     clock?: Clock;
+    /** a game to carry on, in place of dealing a new one with the options above */
+    state?: GameState;
+    /** told of every change to the state, to save the game */
+    onChange?: (state: GameState) => void;
 }
 
 export interface Host {
@@ -28,9 +32,16 @@ export interface Host {
     close(): void;
 }
 
-export const createHost = ({names, seed = Math.floor(Math.random() * 2 ** 32), claimWindowMs, clock = systemClock}: HostOptions): Host => {
-    let state = createGame({names, seed, claimWindowMs});
-    let connections: ({port: HostPort; stop: () => void} | null)[] = names.map(() => null);
+export const createHost = ({
+    names = [],
+    seed = Math.floor(Math.random() * 2 ** 32),
+    claimWindowMs,
+    clock = systemClock,
+    state : from,
+    onChange
+}: HostOptions): Host => {
+    let state = from ?? createGame({names, seed, claimWindowMs});
+    let connections: ({port: HostPort; stop: () => void} | null)[] = state.seats.map(() => null);
     let deadline: TimerId | undefined;
 
     const sendView = (seat: number): void => {
@@ -40,6 +51,7 @@ export const createHost = ({names, seed = Math.floor(Math.random() * 2 ** 32), c
     const update = (next: GameState): void => {
         state = next;
         watchDeadline();
+        onChange?.(state);
         connections.forEach((_, seat) => sendView(seat));
     };
 
@@ -56,6 +68,8 @@ export const createHost = ({names, seed = Math.floor(Math.random() * 2 ** 32), c
             else update(next);
         }, state.claim.deadline - clock.now());
     };
+    // a game carried on may have a claim window open
+    watchDeadline();
 
     const receive = (seat: number, message: ClientMessage): void => {
         if (message.type !== "command") return;
@@ -79,7 +93,7 @@ export const createHost = ({names, seed = Math.floor(Math.random() * 2 ** 32), c
 
     return {
         connect(seat, port) {
-            if (!Number.isInteger(seat) || seat < 0 || seat >= names.length) throw new Error("There's no seat " + seat);
+            if (!Number.isInteger(seat) || seat < 0 || seat >= state.seats.length) throw new Error("There's no seat " + seat);
             disconnect(seat);
             connections[seat] = {port, stop : port.listen(message => receive(seat, message))};
             sendView(seat);
