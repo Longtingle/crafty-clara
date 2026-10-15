@@ -210,8 +210,10 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
                     ))}
                 </section>
 
-                <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 px-6 [grid-template-areas:'mine_piles_log']">
-                    <div className="flex min-w-0 flex-col gap-2.5 self-end pb-1 [grid-area:mine]">
+                {/* as tall as the window leaves, so the activity can't push the piles down */}
+                <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-center gap-6 px-6 [grid-template-areas:'mine_piles_log']">
+                    {/* in a short window it runs down into the space above your panel */}
+                    <div className="flex min-w-0 flex-col gap-2.5 self-end pb-1 [grid-area:mine] compact:self-start compact:pt-2">
                         <h2 className={sectionLabel}>Your melds</h2>
                         {me.isDown
                             ? <MeldRow setruns={me.table}>{melds(view.seat)}</MeldRow>
@@ -224,7 +226,7 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
 
                     <div className="[grid-area:piles]">{piles}</div>
 
-                    <div className="flex justify-end [grid-area:log]">
+                    <div className="flex min-h-0 items-center justify-end self-stretch [grid-area:log]">
                         <ActivityLog entries={activityEntries(view)} />
                     </div>
                 </section>
@@ -247,7 +249,8 @@ function GameTable({view, hand, sort, levels, paused, turn, newCard, speech, not
                         />
                     </div>
 
-                    <div className="mb-4 flex flex-col gap-3">
+                    {/* no taller than the hand in a short window, to leave the piles room */}
+                    <div className="mb-4 flex flex-col gap-3 compact:mb-0 compact:gap-2">
                         <SortSwitch sort={sort} onChange={actions.sortHand} />
                         <Button size="lg" variant="secondary" disabled={!turn.goDown.enabled} onClick={actions.openGoDown}>
                             Go down

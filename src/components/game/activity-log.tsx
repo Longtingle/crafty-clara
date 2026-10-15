@@ -4,18 +4,23 @@ import type {ActivityEntry} from './log-text.ts';
 const SHOWN = 5;
 
 // The latest moves, newest first, so nothing an opponent does goes unseen.
-// entries come from activityEntries (log-text.ts).
+// entries come from activityEntries (log-text.ts). In a short window the
+// oldest fade out at the bottom: the fade covers the list's bottom padding, so
+// it only shows on entries that don't fit.
 function ActivityLog({entries}: {entries: ActivityEntry[]}) {
     return (
-        <aside aria-label="Activity" className="w-[300px] max-w-full rounded-2xl bg-panel px-4 pt-3 pb-3.5">
-            <div className="mb-2.5 flex items-baseline justify-between">
+        <aside aria-label="Activity" className="flex max-h-full w-[300px] max-w-full flex-col rounded-2xl bg-panel px-4 pt-3">
+            <div className="mb-2.5 flex flex-none items-baseline justify-between">
                 <h2 className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">Activity</h2>
                 <span className="text-xs text-muted-foreground">Newest first</span>
             </div>
             {entries.length === 0
-                ? <p className="text-sm text-muted-foreground">Nothing yet this round.</p>
+                ? <p className="pb-4 text-sm text-muted-foreground">Nothing yet this round.</p>
                 : (
-                    <ol aria-live="polite" className="flex flex-col gap-2">
+                    <ol
+                        aria-live="polite"
+                        className="flex min-h-0 flex-col gap-2 overflow-hidden pb-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-16px),transparent)]"
+                    >
                         {entries.slice(0, SHOWN).map(entry => (
                             <motion.li
                                 key={entry.id}
