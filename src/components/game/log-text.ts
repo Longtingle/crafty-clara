@@ -1,4 +1,4 @@
-import {SET, type Setrun} from '@/engine/cards.ts';
+import {SET, type Card, type Setrun} from '@/engine/cards.ts';
 import {shortName} from '@/engine/card-names.ts';
 import type {LogEntry} from '@/engine/game.ts';
 import type {GameView} from '@/engine/view.ts';
@@ -100,4 +100,17 @@ const newCardTag = (view: GameView): NewCard | null => {
     return null;
 }
 
-export {describeEntry, activityEntries, lastAction, newCardTag};
+// The cards in a player's hand that everyone knows, by id: taken from the
+// discard pile, claimed, or a wild ace they took back, this round.
+const knownCards = (view: GameView, seat: number): Record<string, Card> => {
+    let known: Record<string, Card> = {};
+    for (let entry of view.log) {
+        if (entry.seat !== seat) continue;
+        if ((entry.type === "draw" && entry.from === "discard") || entry.type === "claim") known[entry.card.id] = entry.card;
+        if (entry.type === "add" && entry.returnedAce) known[entry.returnedAce.id] = entry.returnedAce;
+    }
+    let holding = new Set(view.seats[seat].cards);
+    return Object.fromEntries(Object.entries(known).filter(([id]) => holding.has(id)));
+};
+
+export {describeEntry, activityEntries, lastAction, newCardTag, knownCards};

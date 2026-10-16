@@ -1,4 +1,3 @@
-import type {Transition} from 'motion/react';
 import {SUITS} from '@/engine/cards.ts';
 
 // Card faces are half-size WebP versions of the PNGs in art/card-faces. They
@@ -15,7 +14,4 @@ const preloadCardImages = (): void => {
     }
 }
 
-// How cards move: a short spring with a little overshoot.
-const FLIGHT: Transition = {type : "spring", duration : 0.5, bounce : 0.18};
-
-export {cardImage, preloadCardImages, FLIGHT};
+export {cardImage, preloadCardImages};

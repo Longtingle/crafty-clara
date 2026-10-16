@@ -4,7 +4,7 @@ import {checkSetrun} from '@/engine/setruns.ts';
 import type {LogEntry} from '@/engine/game.ts';
 import type {GameView} from '@/engine/view.ts';
 import {card, cards} from '@/engine/testing.ts';
-import {describeEntry, activityEntries, lastAction, newCardTag} from './log-text.ts';
+import {describeEntry, activityEntries, lastAction, newCardTag, knownCards} from './log-text.ts';
 
 const setrun = (str: string, type: SetrunType) => {
     let result = checkSetrun(cards(str), type);
@@ -93,6 +93,21 @@ describe('lastAction', () => {
         const view = viewWith([{type : "goDown", seat : 2}, {type : "discard", seat : 2, card : card("12S")}]);
         expect(lastAction(view, 2)).toBe("discarded Q♠");
         expect(lastAction(view, 3)).toBeNull();
+    });
+});
+
+describe('knownCards', () => {
+    it("is the cards everyone saw a player take that they still hold", () => {
+        const view = viewWith([
+            {type : "draw", seat : 1, from : "discard", card : card("12S", "q")},
+            {type : "claim", seat : 1, card : card("3C", "t")},
+            {type : "draw", seat : 1, from : "deck", card : null},
+            {type : "add", seat : 1, card : card("9S"), target : {seat : 0, index : 0}, returnedAce : card("1H", "a")},
+            {type : "claim", seat : 2, card : card("5D", "f")},
+            {type : "discard", seat : 1, card : card("3C", "t")}
+        ]);
+        view.seats[1].cards = ["q", "a", "x"];
+        expect(knownCards(view, 1)).toEqual({q : card("12S", "q"), a : card("1H", "a")});
     });
 });
 

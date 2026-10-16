@@ -4,7 +4,7 @@ import {Check, CircleHelp, Maximize, Menu, Pause, Settings, Trophy} from 'lucide
 import {cn} from '@/lib/utils.ts';
 import {canGoFullscreen, goFullscreen} from '@/lib/fullscreen.ts';
 import {Button} from '@/components/ui/button.tsx';
-import type {Requirement} from '@/engine/cards.ts';
+import type {Card, Requirement} from '@/engine/cards.ts';
 import type {CharacterId} from '@/engine/cast.ts';
 import {plural} from '@/engine/card-names.ts';
 import {aiColor, portraitImage} from './players.ts';
@@ -24,6 +24,8 @@ export interface OpponentChip {
     active: boolean;
     /** their cards' ids, set only on short screens, where their cards fly to and from here */
     cards: string[] | null;
+    /** the cards in their hand everyone knows (knownCards) */
+    known: Record<string, Card>;
 }
 
 function RequirementChip({met, children}: {met: boolean; children: ReactNode}) {
@@ -65,7 +67,7 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                                 <Check className="size-2.5" strokeWidth={4} />
                             </span>
                         )}
-                        {opponent.cards && <HiddenHand ids={opponent.cards} className="top-0 left-1.5 w-3" />}
+                        {opponent.cards && <HiddenHand ids={opponent.cards} known={opponent.known} className="top-0 left-1.5 w-3" />}
                     </span>
                     <span className="sr-only">{opponent.name}:</span>
                     {opponent.count}<span className="max-[820px]:sr-only"> cards</span>

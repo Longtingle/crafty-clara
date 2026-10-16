@@ -6,7 +6,7 @@ import {cn} from '@/lib/utils.ts';
 import type {Card} from '@/engine/cards.ts';
 import {longName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardTag} from './playing-card.tsx';
-import {FLIGHT} from './cards.ts';
+import {useFlight} from './flight.ts';
 import type {NewCard} from './log-text.ts';
 import {HAND_AREA, PlayedCard} from './drop-targets.ts';
 import {archPlace, type ArchPlace} from './arch.ts';
@@ -49,6 +49,7 @@ function HandCard({card, index, order, isSelected, selectable, tag, playable, pl
         }
     });
     let held = (isDragging || played) ? dragged : null;
+    let flight = useFlight().transition;
     let moved = held ? {...held, scaleX : 1, scaleY : 1} : transform;
     return (
         <button
@@ -75,7 +76,7 @@ function HandCard({card, index, order, isSelected, selectable, tag, playable, pl
                 // in the arch, a card leans from its bottom edge, which is off the screen
                 animate={{opacity : 1, y : isSelected ? "-17%" : 0, rotate : (place && !held) ? place.angle : 0}}
                 whileHover={selectable && !isSelected && !isDragging ? {y : "-6%"} : undefined}
-                transition={dealing ? {...FLIGHT, delay : 0.1 + index * 0.045} : FLIGHT}
+                transition={dealing ? {...flight, delay : 0.1 + index * 0.045} : flight}
                 onAnimationComplete={dealing ? onDealt : undefined}
                 className={cn(
                     "rounded-[5%/3.3%] group-focus-visible:outline-3 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring",

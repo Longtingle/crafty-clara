@@ -3,7 +3,8 @@ import {motion, type HTMLMotionProps} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
 import {isWild, type Card, type SetrunType} from '@/engine/cards.ts';
 import {longName, standInName} from '@/engine/card-names.ts';
-import {cardImage, FLIGHT} from './cards.ts';
+import {cardImage} from './cards.ts';
+import {useFlight} from './flight.ts';
 
 interface PlayingCardProps {
     card: Card;
@@ -42,9 +43,10 @@ type MovingCardProps = Omit<HTMLMotionProps<"span">, "id" | "layoutId"> & {
 // Wraps whatever shows one physical card (by card.id) on the table. Every
 // element showing the same card shares a layoutId, so when the card moves
 // between the deck, the discard pile, a hand and a setrun, Motion flies it
-// from where it was. Render each id in one place only: Motion hides all but
-// the newest element with a given layoutId.
+// from where it was, at the game's speed (flight.ts). Render each id in one
+// place only: Motion hides all but the newest element with a given layoutId.
 function MovingCard({id, className, style, children, ...motionProps}: MovingCardProps) {
+    let {transition} = useFlight();
     // Raise the card while it flies, so it passes over the rest of the table.
     // Motion doesn't report the end of an animation it cancels (it does that
     // when the window resizes), so the raise also wears off by itself.
@@ -57,13 +59,13 @@ function MovingCard({id, className, style, children, ...motionProps}: MovingCard
     let takeOff = () => {
         clearTimeout(timer.current);
         setFlying(true);
-        timer.current = setTimeout(land, 1000);
+        timer.current = setTimeout(land, transition.duration * 1000 + 500);
     }
     useEffect(() => () => clearTimeout(timer.current), []);
     return (
         <motion.span
             layoutId={id}
-            transition={FLIGHT}
+            transition={transition}
             onLayoutAnimationStart={takeOff}
             onLayoutAnimationComplete={land}
             className={cn("relative block", className)}

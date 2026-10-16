@@ -17,6 +17,7 @@ import SettingsDialog from './settings-dialog.tsx';
 import {newCardTag} from './log-text.ts';
 import type {Bubble} from './speech-bubble.tsx';
 import {soundsFor, VOLUME} from './sounds.ts';
+import {FLIGHTS, FlightContext} from './flight.ts';
 import {yourTurn} from './your-turn.ts';
 import {moveCard, orderHand, type HandSort} from './hand-order.ts';
 
@@ -271,8 +272,9 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
         setGoingDown(false);
     };
 
+    // cards fly at the game's speed
     return (
-        <>
+        <FlightContext value={FLIGHTS[speed]}>
             <GameTable
                 view={view}
                 hand={hand}
@@ -312,7 +314,7 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
                 onSoundChange={onSoundChange}
                 inGame
             />
-        </>
+        </FlightContext>
     );
 }
 

@@ -21,7 +21,7 @@ import RulesDialog from './rules-dialog.tsx';
 import RotatePrompt from './rotate-prompt.tsx';
 import PhoneTable from './phone-table.tsx';
 import {opponentSeats, opponentIndex} from './players.ts';
-import {activityEntries, lastAction, type NewCard} from './log-text.ts';
+import {activityEntries, knownCards, lastAction, type NewCard} from './log-text.ts';
 import {isInTurn, type YourTurn} from './your-turn.ts';
 import type {RunEnd} from '@/engine/setruns.ts';
 import type {EndChoice} from './meld.tsx';
@@ -163,7 +163,8 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
                 hard : levels[seat] === "hard",
                 character : characters[seat] ?? null,
                 active : isInTurn(view, seat),
-                cards : short ? view.seats[seat].cards : null
+                cards : short ? view.seats[seat].cards : null,
+                known : knownCards(view, seat)
             }))}
             you={{points : me.total, active : isInTurn(view, view.seat)}}
             onPause={actions.pause}
@@ -232,6 +233,7 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
                             index={opponentIndex(view, seat)}
                             hard={levels[seat] === "hard"}
                             character={characters[seat]}
+                            known={knownCards(view, seat)}
                             active={isInTurn(view, seat)}
                             speech={speech[seat]}
                             lastAction={view.look ? (view.look.ready[seat] ? "Ready" : "Looking at their hand") : lastAction(view, seat)}
