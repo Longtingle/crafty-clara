@@ -71,7 +71,7 @@ const activityEntries = (view: GameView, talk: Talk[] = []): ActivityEntry[] => 
         seat : line.seat,
         name : seatName(view, line.seat),
         color : seatColor(view, line.seat),
-        text : "“" + line.line.text + "”",
+        text : "“" + line.text + "”",
         quote : true
     });
     let entries = view.log.flatMap((entry, index) => [...said.filter(line => line.after === index).map(saying), {

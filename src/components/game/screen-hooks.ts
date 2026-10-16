@@ -85,12 +85,12 @@ export function useBubbles(talk: Talk[]): Record<number, Bubble | null> {
         let fresh = talk.filter(said => said.seq > shown.current);
         if (fresh.length === 0) return;
         shown.current = fresh.at(-1)!.seq;
-        setBubbles(old => ({...old, ...Object.fromEntries(fresh.map(said => [said.seat, {key : said.seq, text : said.line.text}]))}));
+        setBubbles(old => ({...old, ...Object.fromEntries(fresh.map(said => [said.seat, {key : said.seq, text : said.text}]))}));
         for (let said of fresh) {
             clearTimeout(timers.current[said.seat]);
             timers.current[said.seat] = setTimeout(() => {
                 setBubbles(old => (old[said.seat]?.key === said.seq) ? {...old, [said.seat] : null} : old);
-            }, bubbleMs(said.line.text));
+            }, bubbleMs(said.text));
         }
     }, [talk]);
     useEffect(() => {

@@ -3,8 +3,9 @@ import {RUN} from './cards.ts';
 import {CAST, type CharacterId} from './cast.ts';
 import {createGame, type GameState} from './game.ts';
 import {LINES, type Moment} from './lines.ts';
+import {lineText, linesFor, meaning, type Line} from './catalogue.ts';
 import {checkSetrun} from './setruns.ts';
-import {answer, claim, createTalker, feel, talkAbout, type Heard, type Line} from './talk.ts';
+import {answer, claim, createTalker, feel, talkAbout, type Heard} from './talk.ts';
 import {cards} from './testing.ts';
 import {viewFor} from './view.ts';
 
@@ -15,10 +16,16 @@ const WHO: CharacterId[] = ["clara", "alan", "gemma"];
 // round 1 dealt, while everyone looks over their hand: you start, so Gemma dealt
 const dealt = (seed: number): GameState => createGame({names : NAMES, seed, lookMs : 30_000});
 
+// a line's words as you hear them, in seat 0
+const words = (line: Line): string => lineText(line, seat => (seat === 0) ? null : NAMES[seat]);
+
 const readable = (line: Line) => {
-    expect(line.text).not.toMatch(/[{}]/);
-    expect(line.text).not.toMatch(/\bYou\b/);
+    expect(words(line)).not.toMatch(/[{}]/);
+    expect(words(line)).not.toMatch(/\bYou\b/);
 };
+
+// a character's line for a moment, by its words
+const entry = (who: CharacterId, moment: Moment, text: string) => linesFor(who, moment).find(line => line.text === text)!;
 
 describe('the lines', () => {
     it('only use a name to address someone, so it can be left out', () => {
@@ -110,7 +117,8 @@ describe('talking about the game', () => {
             for (let seat of [1, 2]) {
                 const line = talkAbout(null, viewFor(state, seat, 0), createTalker("alan", seed));
                 if (!line?.id.startsWith("alan.dealBlame.")) continue;
-                expect(line).toMatchObject({to : 3, invites : "dealer"});
+                expect(line.to).toBe(3);
+                expect(meaning(line).invites).toBe("dealer");
                 readable(line);
 
                 // Gemma dealt, and nearly always says something back, by name
@@ -119,9 +127,9 @@ describe('talking about the game', () => {
                 expect(replies.filter(Boolean).length).toBeGreaterThan(10);
                 for (let reply of replies.filter(reply => reply !== null)) {
                     expect(reply.id).toMatch(/^gemma\.dealer\./);
-                    expect(reply.to).toBe(seat);
+                    expect(reply).toMatchObject({to : seat, re : line.id});
                     // an answer asks for none
-                    expect(reply.invites).toBeUndefined();
+                    expect(meaning(reply).invites).toBeNull();
                     readable(reply);
                 }
                 // nobody else answers
@@ -147,7 +155,7 @@ describe('talking about the game', () => {
         for (let line of lines) {
             expect(line.to).toBe(0);
             readable(line);
-            expect(line.text[0]).toBe(line.text[0].toUpperCase());
+            expect(words(line)[0]).toBe(words(line)[0].toUpperCase());
         }
     });
 
@@ -166,7 +174,8 @@ describe('talking about the game', () => {
             const lines = said.filter(line => line !== null);
             expect(lines.length).toBeLessThanOrEqual(1);
             if (lines.length === 0) continue;
-            expect(lines[0]).toMatchObject({to : 0, big : true, invites : "comeback"});
+            expect(lines[0].to).toBe(0);
+            expect(meaning(lines[0])).toMatchObject({big : true, invites : "comeback"});
             expect(lines[0].id).toMatch(/\.downBig\./);
             readable(lines[0]);
             return;
@@ -199,7 +208,7 @@ describe('claims', () => {
 describe('answering', () => {
     it('gives the answer written for a line, from one of the others', () => {
         const state = dealt(2);
-        const line: Line = {id : "alan.handBad.3", text : "That's it, I'm capitulating.", invites : "doubt", replies : ["Well, if you do, you'll clean it up."]};
+        const line: Line = {id : entry("alan", "handBad", "That's it, I'm capitulating.").id};
         let answered = 0;
         for (let after = 0; after < 40; after++) {
             const answers = [1, 3]
@@ -207,8 +216,9 @@ describe('answering', () => {
                 .filter(reply => reply !== null);
             expect(answers.length).toBeLessThanOrEqual(1);
             for (let reply of answers) {
-                expect(reply).toMatchObject({text : "Well, if you do, you'll clean it up.", to : 2});
-                expect(reply.invites).toBeUndefined();
+                expect(reply).toMatchObject({to : 2, re : line.id});
+                expect(words(reply)).toBe("Well, if you do, you'll clean it up.");
+                expect(meaning(reply).invites).toBeNull();
                 answered++;
             }
         }
@@ -217,24 +227,26 @@ describe('answering', () => {
 
     it("doesn't say a line again while it has others, nor one heard in a recent game", () => {
         const state = dealt(1);
-        const blame: Line = {id : "clara.dealBlame.0", text : "Who dealt this?", to : 3, invites : "dealer"};
+        const blame: Line = {id : linesFor("clara", "dealBlame")[0].id, to : 3};
+        const julie = linesFor("julie", "dealer").map(line => line.id);
         const answers = (talker: ReturnType<typeof createTalker>) => Array.from({length : 30}, (_, after) => answer({seat : 1, line : blame, round : 0, after}, viewFor(state, 3, 0), talker))
             .filter(reply => reply !== null)
             .map(reply => reply.id);
         // Julie has two answers for blaming the dealer: both, then the one said longest ago
         const said = answers(createTalker("julie", 1));
-        expect(said.slice(0, 2).toSorted()).toEqual(["julie.dealer.0", "julie.dealer.1"]);
+        expect(said.slice(0, 2).toSorted()).toEqual(julie.toSorted());
         expect(said.slice(2, 6)).toEqual([said[0], said[1], said[0], said[1]]);
-        expect(answers(createTalker("julie", 1, ["julie.dealer.1", "julie.dealer.0"])).slice(0, 2)).toEqual(["julie.dealer.1", "julie.dealer.0"]);
+        expect(answers(createTalker("julie", 1, [julie[1], julie[0]])).slice(0, 2)).toEqual([julie[1], julie[0]]);
     });
 
     it("has one of the others groan at Chris's puns", () => {
         const state = createGame({names : ["You", "Chris", "Alan", "Gemma"], seed : 1});
-        const pun: Line = {id : "chris.reshuffle.0", text : "Shuffle off this mortal coil.", invites : "groan"};
+        const pun: Line = {id : entry("chris", "reshuffle", "Shuffle off this mortal coil.").id};
+        expect(meaning(pun).invites).toBe("groan");
         const groans = Array.from({length : 60}, (_, after) => [2, 3]
             .map(seat => answer({seat : 1, line : pun, round : 0, after}, viewFor(state, seat, 0), createTalker((seat === 2) ? "alan" : "gemma", after)))
             .filter(reply => reply !== null)).flat();
         expect(groans.length).toBeGreaterThan(5);
-        expect(groans.every(reply => /\.groan\./.test(reply.id) && reply.text.includes("Chris"))).toBe(true);
+        expect(groans.every(reply => /\.groan\./.test(reply.id) && lineText(reply, seat => NAMES[seat]).includes("Chris"))).toBe(true);
     });
 });

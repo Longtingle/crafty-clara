@@ -18,6 +18,28 @@
     {
       "files": ["scripts/**"],
       "env": { "node": true }
+    },
+    {
+      "files": ["src/engine/**"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [{
+            "group": ["../host/*", "../client/*", "../components/*", "../storage/*", "../lib/*", "../session*", "@/*", "react", "react-dom", "motion", "motion/*"],
+            "message": "The engine runs anywhere, a server included: it can't depend on the host, the client, the UI or storage."
+          }]
+        }]
+      }
+    },
+    {
+      "files": ["src/host/**"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [{
+            "group": ["../client/*", "../components/*", "../storage/*", "../lib/*", "../session*", "@/*", "react", "react-dom", "motion", "motion/*"],
+            "message": "The host is meant to move onto a server as it is: it can't depend on the client, the UI or storage."
+          }]
+        }]
+      }
     }
   ]
 }

@@ -16,9 +16,8 @@ import {gameRecord, type GameHistory} from './storage/history.ts';
 
 export interface Session {
     game: LocalGame;
+    /** your seat's end: the screen hears who sits where from the host, as it would online */
     client: GameClient;
-    /** who sits in each seat, by seat: you, then the bots */
-    seats: SeatInfo[];
 }
 
 export interface SessionOptions {
@@ -47,7 +46,8 @@ export const startSession = ({cast, levels = [], seed, speed, from, savedGame, h
             finished = true;
             savedGame.save(null);
             let view = viewFor(save.state, 0, save.savedAt);
-            void history.add(gameRecord(view, [null, ...save.bots.map(bot => bot.level)], Date.now(), [null, ...save.bots.map(bot => bot.character ?? null)]));
+            let seats: SeatInfo[] = [{level : null, character : null}, ...save.bots.map(bot => ({level : bot.level, character : bot.character ?? null}))];
+            void history.add(gameRecord(view, seats, Date.now()));
         }
     };
     let game = startLocalGame({name : "You", cast, levels, seed, speed, from, recentLines : heard, clock, onChange : keep});
@@ -61,6 +61,5 @@ export const startSession = ({cast, levels = [], seed, speed, from, savedGame, h
             heardLines?.add(said.line.id);
         }
     });
-    let bots = game.levels.map((level, i): SeatInfo => ({level, character : game.characters[i]}));
-    return {game, client, seats : [{level : null, character : null}, ...bots]};
+    return {game, client};
 };

@@ -6,8 +6,10 @@ import {cards} from '@/engine/testing.ts';
 import {viewFor} from '@/engine/view.ts';
 import {startLocalGame, type LocalGame} from '@/host/local-game.ts';
 import {createLocalPair} from '@/host/transport.ts';
-import type {ClientMessage, HostMessage, SeatInfo} from '@/host/protocol.ts';
+import {PROTOCOL, type ClientMessage, type HostMessage, type SeatInfo} from '@/host/protocol.ts';
 import type {CharacterId} from '@/engine/cast.ts';
+import {linesFor} from '@/engine/catalogue.ts';
+import type {Moment} from '@/engine/lines.ts';
 import {createGameClient} from '@/client/game-client.ts';
 import {DEFAULT_PREFERENCES, type TalkLevel} from '@/storage/settings.ts';
 import GameScreen from './game-screen.tsx';
@@ -32,7 +34,6 @@ beforeEach(async () => {
     render(
         <GameScreen
             client={createGameClient(game.port)}
-            seats={seats()}
             pausing={pausing}
             prefs={DEFAULT_PREFERENCES}
             onPrefsChange={changePrefs}
@@ -111,7 +112,6 @@ describe('table talk', () => {
         render(
             <GameScreen
                 client={createGameClient(port)}
-                seats={seats(["clara", "alan", "gemma"])}
                 pausing={pausing}
                 prefs={{...DEFAULT_PREFERENCES, talk}}
                 onPrefsChange={changePrefs}
@@ -121,10 +121,13 @@ describe('table talk', () => {
             />
         );
         const state = createGame({names : ["You", "Clara", "Alan", "Gemma"], seed : 1});
+        hostEnd.send({type : "welcome", protocol : PROTOCOL, seat : 0, seats : seats(["clara", "alan", "gemma"])});
         hostEnd.send({type : "view", view : viewFor(state, 0, 0)});
         await screen.findByRole('group', {name : 'Your hand'});
-        hostEnd.send({type : "said", seat : 2, line : {id : "a", text : "I've got a hand like a foot."}, round : 0, after : 0});
-        hostEnd.send({type : "said", seat : 3, line : {id : "b", text : "Show-off.", big : true}, round : 0, after : 0});
+        const line = (who: CharacterId, moment: Moment, text: string) => ({id : linesFor(who, moment).find(line => line.text === text)!.id});
+        hostEnd.send({type : "said", seat : 2, line : line("alan", "dealBad", "I've got a hand like a foot."), round : 0, after : 0});
+        // a big moment
+        hostEnd.send({type : "said", seat : 3, line : line("gemma", "downBig", "Show-off."), round : 0, after : 0});
     };
 
     it('shows what an opponent says in a bubble from their portrait, and in the activity', async () => {
@@ -160,7 +163,6 @@ it('asks which end of a run a red ace goes, and plays it there', async () => {
     render(
         <GameScreen
             client={createGameClient(game.port)}
-            seats={seats()}
             pausing={pausing}
             prefs={DEFAULT_PREFERENCES}
             onPrefsChange={changePrefs}

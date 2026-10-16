@@ -11,7 +11,7 @@ import {createHost, type Host} from './host.ts';
 import {startBot, type BotPace} from './bot-player.ts';
 import {DEFAULT_SPEED, GAME_SPEEDS, type GameSpeed} from './game-speed.ts';
 import {createLocalPair} from './transport.ts';
-import type {ClientMessage, HostMessage, SeatPort} from './protocol.ts';
+import type {ClientMessage, HostMessage, SeatInfo, SeatPort} from './protocol.ts';
 
 export interface LocalGameOptions {
     /** your name */
@@ -56,10 +56,8 @@ export interface LocalGame {
     /** your end of the connection: send commands on it, and listen for your views */
     port: SeatPort;
     host: Host;
-    /** each bot's level, by seat after yours */
-    levels: BotLevel[];
-    /** who each bot is, by seat after yours: null for one that isn't a character */
-    characters: (CharacterId | null)[];
+    /** who sits in each seat, by seat: you, then the bots */
+    seats: SeatInfo[];
     /** Plays faster or slower from now on: the bots' pauses, and the claim windows still to come. */
     setSpeed(speed: GameSpeed): void;
     /**
@@ -84,7 +82,7 @@ const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => {
     let later = (deadline: number) => now + Math.max(0, deadline - savedAt);
     return {
         ...state,
-        claim : state.claim && {...state.claim, deadline : later(state.claim.deadline), shownUntil : later(state.claim.shownUntil ?? 0)},
+        claim : state.claim && {...state.claim, deadline : later(state.claim.deadline), shownUntil : later(state.claim.shownUntil)},
         look : state.look && {...state.look, deadline : later(state.look.deadline)}
     };
 };
@@ -119,9 +117,14 @@ export const startLocalGame = ({
     });
     let names = from ? from.state.seats.slice(1).map(seat => seat.name) : (cast ? cast.map(id => character(id).name) : opponents);
     const save = (state: GameState) => onChange?.({state, bots : profiles, savedAt : clock.now()});
+    let seats: SeatInfo[] = [
+        {level : null, character : null},
+        ...profiles.map(profile => ({level : profile.level, character : profile.character ?? null}))
+    ];
 
     let host = createHost({
         names : [name, ...names],
+        seats,
         seed,
         claimWindowMs : claimWindow,
         claimShowMs : claimShow,
@@ -142,8 +145,7 @@ export const startLocalGame = ({
     return {
         port,
         host,
-        levels : profiles.map(profile => profile.level),
-        characters : profiles.map(profile => profile.character ?? null),
+        seats,
         setSpeed(next) {
             botPace = GAME_SPEEDS[next].pace;
             host.setClaimTimes(GAME_SPEEDS[next].claimWindowMs, GAME_SPEEDS[next].claimShowMs);

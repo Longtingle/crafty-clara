@@ -31,6 +31,32 @@ it('drops a save from another version, or one that is the wrong shape', async ()
     expect(await saved.load()).toBeNull();
 });
 
+it('brings a game saved by an older version up to date', async () => {
+    const store = memoryStore();
+    const old = JSON.parse(JSON.stringify(aSave()));
+    for (let key of ["version", "claimShowMs", "lookMs", "look"]) delete old.state[key];
+    await store.set("crafty-clara.game", {version : 1, game : old});
+    expect(await createSavedGame(store).load()).toEqual(aSave());
+});
+
+it('puts right a bot whose level or character this version does not know', async () => {
+    const store = memoryStore();
+    const save = {...aSave(), bots : [
+        {level : "fiendish", seed : 1, risk : 0.5, character : "clara"},
+        {level : "hard", seed : 2, character : "zebedee"},
+        {level : "normal", seed : 3, risk : 0.1}
+    ]};
+    await store.set("crafty-clara.game", {version : 1, game : save});
+    expect((await createSavedGame(store).load())?.bots).toEqual([
+        {level : "normal", seed : 1, risk : 0.5, character : "clara"},
+        {level : "hard", seed : 2},
+        {level : "normal", seed : 3, risk : 0.1}
+    ]);
+    // a bot with no seed can't play
+    await store.set("crafty-clara.game", {version : 1, game : {...save, bots : [{level : "hard"}, ...save.bots.slice(1)]}});
+    expect(await createSavedGame(store).load()).toBeNull();
+});
+
 it('writes one save at a time, skipping any a newer one replaces', async () => {
     const store = memoryStore();
     const writes: unknown[] = [];

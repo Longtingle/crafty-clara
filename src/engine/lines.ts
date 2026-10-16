@@ -41,6 +41,13 @@ export type Moment =
     // at one of Chris's puns
     | "groan";
 
+/**
+ * The kind of answer a line asks for: the dealer's, when blamed for the
+ * deal; a comeback, from whoever a remark was made to; or doubt, or a groan
+ * at a pun, from one of the others.
+ */
+export type Invite = "dealer" | "doubt" | "comeback" | "groan";
+
 /** A line, and the answers written for it in particular. */
 export type Written = string | {text: string; replies: string[]};
 

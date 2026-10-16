@@ -22,11 +22,10 @@ describe('the table', () => {
 
     // you play first in this deal, so the bots wait for you
     beforeEach(async () => {
-        game = startLocalGame({name : "You", seed : 1});
+        game = startLocalGame({name : "You", seed : 1, levels : ["normal", "hard", "normal"]});
         render(
             <GameScreen
                 client={createGameClient(game.port)}
-                seats={[{level : null, character : null}, ...(["normal", "hard", "normal"] as const).map(level => ({level, character : null}))]}
                 pausing={{pause() {}, resume() {}}}
                 prefs={DEFAULT_PREFERENCES}
                 onPrefsChange={changePrefs}

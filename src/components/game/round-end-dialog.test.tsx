@@ -7,7 +7,7 @@ import RoundEndDialog from './round-end-dialog.tsx';
 it('shows your record when the game ends, and offers your stats', () => {
     const {state} = simulateGame(5);
     const view = viewFor(state, 0, 0);
-    const record = gameRecord(view, [null, "normal", "normal", "normal"], 1);
+    const record = gameRecord(view, view.seats.map((_, seat) => ({level : (seat === 0) ? null : "normal", character : null})), 1);
     const showStats = vi.fn();
     render(
         <RoundEndDialog

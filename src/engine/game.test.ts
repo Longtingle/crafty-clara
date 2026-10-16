@@ -146,6 +146,11 @@ describe('taking turns', () => {
         expect(play(last, 3, {type : "discard", card : last.seats[3].hand[0].id}).turn).toBe(0);
     });
 
+    it('only draws from the deck or the discard pile', () => {
+        const draw = {type : "draw", from : "Deck"} as unknown as Command;
+        expect(apply(newGame(), 0, draw, 0)).toEqual({ok : false, error : "Draw from the deck or the discard pile", code : "illegal"});
+    });
+
     it('only discards a card from your hand', () => {
         const state = play(newGame(), 0, {type : "draw", from : "deck"}, 0);
         const later = expire(state, 6000);
@@ -248,9 +253,15 @@ describe('claiming the discard', () => {
         expect(state.seats[3].hand).toContainEqual(top);
     });
 
-    it('refuses a claim that arrives after the deadline', () => {
+    it('refuses a claim that arrives after the deadline, as late rather than wrong', () => {
         const state = play(seatOnesTurn(), 1, {type : "draw", from : "deck"}, 0);
         expect(refusal(state, 2, {type : "claim"}, 6000)).toBe("There's no discard for you to claim");
+        expect(apply(state, 2, {type : "claim"}, 6000)).toMatchObject({ok : false, code : "late"});
+        // an answer given twice crossed with itself
+        const answered = play(state, 2, {type : "pass"});
+        expect(apply(answered, 2, {type : "claim"}, 0)).toMatchObject({ok : false, code : "late"});
+        // but a claim from whoever discarded the card is wrong
+        expect(apply(state, 0, {type : "claim"}, 0)).toMatchObject({ok : false, code : "illegal"});
     });
 
     it('lets the player in turn play on, but not discard, until it closes', () => {

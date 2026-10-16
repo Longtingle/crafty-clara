@@ -70,7 +70,7 @@ describe('activityEntries', () => {
             {type : "draw", seat : 1, from : "deck", card : null},
             {type : "discard", seat : 1, card : card("12S")}
         ]);
-        const said = (seat: number, text: string, after: number, seq: number, round = 2) => ({seat, line : {id : "x" + seq, text}, round, after, seq});
+        const said = (seat: number, text: string, after: number, seq: number, round = 2) => ({seat, line : {id : "x" + seq}, round, after, seq, text, big : false});
         const entries = activityEntries(view, [
             said(2, "Who dealt this rubbish?", 0, 1),
             said(3, "Not me.", 0, 2),

@@ -11,6 +11,7 @@ import {RUN, SET, ROUND_REQUIREMENTS, SUITS, createCard, getPoints, type Card, t
 import {addToSetrun, checkSetrun, explainSetrun, type RunEnd} from './setruns.ts';
 import {requirementText} from './card-names.ts';
 import {random, shuffle} from './random.ts';
+import {STATE_VERSION} from './upgrade.ts';
 
 export const HAND_SIZE = 12;
 const DECKS = 2;
@@ -53,8 +54,8 @@ export interface ClaimWindow {
     card: string;
     /** when the window closes, on the host's clock (ms) */
     deadline: number;
-    /** until when a window that's settled stays open, unless everyone has answered (absent in games saved before) */
-    shownUntil?: number;
+    /** until when a window that's settled stays open, unless everyone has answered */
+    shownUntil: number;
     /** the seats that may claim, in line: from the player in turn onwards */
     seats: number[];
     /** each seat's answer, by seat (null: not answered, or can't claim) */
@@ -108,17 +109,27 @@ export type Command =
     /** ready for the next round, which is dealt once every seat is ready */
     | {type: "ready"};
 
-export type Result = {ok: true; state: GameState} | {ok: false; error: string};
+/**
+ * Why a command was refused: it came too late, crossing with the game moving
+ * on (a claim window closing, play starting, an answer already given), which
+ * is nobody's fault; or it broke the rules. The host adds "malformed", for a
+ * command that isn't one at all (parseCommand).
+ */
+export type RefusalCode = "late" | "illegal" | "malformed";
+
+export type Result = {ok: true; state: GameState} | {ok: false; error: string; code: RefusalCode};
 
 export interface GameState {
+    /** which shape of state this is (STATE_VERSION): a saved game from before is brought up to date by upgradeState */
+    version: number;
     /** the random generator's state (random.ts) */
     rng: number;
     /** card ids are this game's prefix and a number */
     idPrefix: string;
     nextId: number;
     claimWindowMs: number;
-    /** how long a claim window stays open, at least, unless everyone has answered (ms; absent in games saved before) */
-    claimShowMs?: number;
+    /** how long a claim window stays open, at least, unless everyone has answered (ms) */
+    claimShowMs: number;
     /** how long everyone has to look over their hand at the start of a round (ms); 0 for no time */
     lookMs: number;
     /** 0 to ROUND_REQUIREMENTS.length - 1 */
@@ -167,6 +178,7 @@ export const createGame = ({names, seed, claimWindowMs = 6000, claimShowMs = 0, 
         throw new Error("A game needs 2 to " + MAX_SEATS + " players");
     }
     let state: GameState = {
+        version : STATE_VERSION,
         rng : seed | 0,
         idPrefix : "",
         nextId : 1,
@@ -196,13 +208,28 @@ export const createGame = ({names, seed, claimWindowMs = 6000, claimShowMs = 0, 
 export const apply = (state: GameState, seat: number, command: Command, now: number): Result => {
     let next = structuredClone(state);
     let error = run(next, seat, command, now);
-    return error ? {ok : false, error} : {ok : true, state : next};
+    if (!error) return {ok : true, state : next};
+    return {ok : false, error, code : tooLate(next, seat, command) ? "late" : "illegal"};
+};
+
+// Whether a refused command only crossed with the game moving on: an answer
+// to a claim window that has closed, or that was already answered; a start
+// once play has started, or already said; ready, already said. `state` is as
+// the command found it.
+const tooLate = (state: GameState, seat: number, command: Command): boolean => {
+    switch (command.type) {
+        case "claim":
+        case "pass": return state.claim === null || state.claim.answers[seat] !== null;
+        case "start": return state.look === null || state.look.ready[seat];
+        case "ready": return state.seats[seat]?.ready === true;
+        default: return false;
+    }
 };
 
 /** When the game next moves on by itself: the claim window closes, or play starts. Null if it waits for a player. */
 export const nextDeadline = (state: GameState): number | null => {
     let claim = state.claim;
-    if (claim) return outcome(claim, false).settled ? Math.min(claim.shownUntil ?? 0, claim.deadline) : claim.deadline;
+    if (claim) return outcome(claim, false).settled ? Math.min(claim.shownUntil, claim.deadline) : claim.deadline;
     return state.look?.deadline ?? null;
 };
 
@@ -314,6 +341,8 @@ const draw = (state: GameState, seat: number, from: "deck" | "discard", now: num
         return null;
     }
 
+    // the log shows everyone a card drawn from anywhere but the deck
+    if (from !== "deck") return "Draw from the deck or the discard pile";
     if (!canDrawFromDeck(state)) return "The deck is empty";
     if (state.deck.length === 0) {
         // everything but the top discard is shuffled into a new deck
@@ -344,7 +373,7 @@ const openClaims = (state: GameState, now: number): void => {
     state.claim = {
         card : top.id,
         deadline : now + state.claimWindowMs,
-        shownUntil : now + (state.claimShowMs ?? 0),
+        shownUntil : now + state.claimShowMs,
         seats,
         answers : state.seats.map(() => null)
     };
@@ -379,7 +408,7 @@ const settleClaims = (state: GameState, now: number): void => {
     let {settled, winner} = outcome(claim, closing);
     if (!settled) return;
     let everyone = claim.seats.every(seat => claim.answers[seat] !== null);
-    if (!closing && !everyone && now < (claim.shownUntil ?? 0)) return;
+    if (!closing && !everyone && now < claim.shownUntil) return;
     if (winner !== null) {
         let card = state.discard.shift()!;
         state.seats[winner].hand.push(card);

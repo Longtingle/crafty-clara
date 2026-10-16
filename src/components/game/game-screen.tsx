@@ -1,8 +1,8 @@
 import {useEffect, useMemo, useState} from 'react';
+import {Button} from '@/components/ui/button.tsx';
 import {runEnds} from '@/engine/setruns.ts';
 import type {GameClient} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
-import type {SeatInfo} from '@/host/protocol.ts';
 import type {Preferences} from '@/storage/settings.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import GameTable from './game-table.tsx';
@@ -15,6 +15,21 @@ import {yourTurn} from './your-turn.ts';
 import {TableContext, type TableActions, type TableDialog} from './table-context.ts';
 import {useBubbles, useHandOrder, useLookTime, useLostClaim, useNotice, useRecord, useSounds} from './screen-hooks.ts';
 
+// The game has moved on to a newer version than this page: a page left open
+// from before an update, playing a game online. A reload brings the page up
+// to date.
+function Updated() {
+    return (
+        <main className="grid h-dvh place-items-center bg-felt p-6 text-center">
+            <div className="flex max-w-md flex-col items-center gap-4">
+                <h1 className="font-heading text-3xl font-extrabold">Crafty Clara has been updated</h1>
+                <p className="text-muted-foreground">Reload the page to carry on playing.</p>
+                <Button size="lg" onClick={() => window.location.reload()}>Reload</Button>
+            </div>
+        </main>
+    );
+}
+
 /** Stops and restarts the whole game (for now, a game in this page against bots). */
 export interface Pausing {
     pause(): void;
@@ -23,8 +38,6 @@ export interface Pausing {
 
 interface GameScreenProps {
     client: GameClient;
-    /** who sits in each seat, by seat */
-    seats: SeatInfo[];
     pausing: Pausing;
     /** how you like the game: hints, table talk, speed and sound */
     prefs: Preferences;
@@ -44,12 +57,12 @@ interface GameScreenProps {
 // Nothing in the game moves while you've paused it, or while you're reading
 // the scores, the rules or the settings. Leaving the page (for another tab,
 // or another app on a phone) pauses it, so you come back to the Paused dialog.
-function GameScreen({client, seats, pausing, prefs, onPrefsChange, games, onNewGame, onShowStats}: GameScreenProps) {
-    let {view, refusal, talk, send} = useGame(client);
+function GameScreen({client, pausing, prefs, onPrefsChange, games, onNewGame, onShowStats}: GameScreenProps) {
+    let {status, seats : sitting, view, refusal, talk, send} = useGame(client);
     // the table talk you see: none, the big moments, or all of it
     let seat = view?.seat;
     let heard = useMemo(
-        () => talk.filter(said => said.seat !== seat && (prefs.talk === "chatty" || (prefs.talk === "quiet" && said.line.big))),
+        () => talk.filter(said => said.seat !== seat && (prefs.talk === "chatty" || (prefs.talk === "quiet" && said.big))),
         [talk, prefs.talk, seat]
     );
     let speech = useBubbles(heard);
@@ -87,8 +100,11 @@ function GameScreen({client, seats, pausing, prefs, onPrefsChange, games, onNewG
         return () => document.removeEventListener("visibilitychange", leave);
     }, [playing, dialog]);
 
+    if (status === "mismatch") return <Updated />;
     if (!view) return <div className="h-dvh bg-felt" />;
 
+    // who sits where, as the host said when it welcomed you
+    let seats = sitting ?? view.seats.map(() => ({level : null, character : null}));
     let me = view.seats[view.seat];
     let selectedIndex = hand.findIndex(card => card.id === (draggingId ?? selectedId));
     let turn = yourTurn(view, hand, (selectedIndex === -1) ? null : selectedIndex, prefs.hints);

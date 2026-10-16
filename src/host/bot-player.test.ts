@@ -1,12 +1,12 @@
 // @vitest-environment node
 import type {BotProfile} from '../engine/bot.ts';
 import {apply, createGame, expire, type Command, type GameState} from '../engine/game.ts';
-import type {Line} from '../engine/talk.ts';
+import {linesFor, type Line} from '../engine/catalogue.ts';
 import {viewFor} from '../engine/view.ts';
 import {startBot, TALK_PACE} from './bot-player.ts';
 import {createLocalPair} from './transport.ts';
 import {createTestClock} from './testing.ts';
-import type {ClientMessage, HostMessage, RefusedMessage} from './protocol.ts';
+import {PROTOCOL, type ClientMessage, type HostMessage, type RefusedMessage} from './protocol.ts';
 
 const PACE = {draw : 1000, answer : 500, move : 800, ready : 0};
 
@@ -74,10 +74,20 @@ describe('a bot player', () => {
         expect(sent).toEqual([]);
     });
 
+    it('says hello', () => {
+        const clock = createTestClock();
+        const [botEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
+        const received: ClientMessage[] = [];
+        hostEnd.listen(message => received.push(message));
+        startBot(botEnd, {clock});
+        clock.advance(0);
+        expect(received).toEqual([{type : "hello", protocol : PROTOCOL}]);
+    });
+
     it('reports a refused move, but not an answer that crossed with the claim window closing', () => {
         const {clock, hostEnd, refused} = setUp();
-        const late: RefusedMessage = {type : "refused", command : {type : "pass"}, error : "There's no discard for you to claim"};
-        const wrong: RefusedMessage = {type : "refused", command : {type : "draw", from : "deck"}, error : "It's not your turn"};
+        const late: RefusedMessage = {type : "refused", command : {type : "pass"}, error : "There's no discard for you to claim", code : "late"};
+        const wrong: RefusedMessage = {type : "refused", command : {type : "draw", from : "deck"}, error : "It's not your turn", code : "illegal"};
         hostEnd.send(late);
         hostEnd.send(wrong);
         clock.advance(0);
@@ -116,7 +126,7 @@ describe('a bot player', () => {
             clock.advance(0);
             return {clock, hostEnd, said};
         };
-        const BLAMED: Line = {id : "alan.dealBlame.1", text : "Dan, have you got something against me?", to : 3, invites : "dealer"};
+        const BLAMED: Line = {id : linesFor("alan", "dealBlame")[1].id, to : 3};
 
         it('answers back, after a moment, when blamed for the deal', () => {
             let answered = 0;

@@ -142,7 +142,6 @@ function App() {
         screen = (
             <GameScreen
                 client={session.client}
-                seats={session.seats}
                 pausing={session.game}
                 prefs={prefs}
                 onPrefsChange={changePrefs}

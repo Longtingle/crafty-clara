@@ -1,7 +1,8 @@
 // What the cast say at the table, and when. A bot talks from its own view,
 // as it plays from it, so it never says what it couldn't know: it talks about
 // its own hand (truly or not, as its character goes), and about what everyone
-// can see. The lines themselves are in lines.ts.
+// can see. The lines themselves are in lines.ts, and a bot says one by its id
+// in the catalogue (catalogue.ts).
 //
 // Every bot sees the same log, so they agree without a word between them on
 // who reacts to each move (chosen): one of the others, or nobody, when the
@@ -13,27 +14,11 @@ import {SET, isRedAce, type Card} from './cards.ts';
 import {shortName} from './card-names.ts';
 import {character, type CharacterId} from './cast.ts';
 import {planGoDown, scoreHand} from './bot.ts';
+import {lineEntry, linesFor, meaning, type Entry, type Line} from './catalogue.ts';
 import type {LogEntry} from './game.ts';
-import {LINES, type Moment, type Written} from './lines.ts';
+import type {Moment} from './lines.ts';
 import {random, type Seeded} from './random.ts';
 import type {GameView} from './view.ts';
-
-export type Invite = "dealer" | "doubt" | "comeback" | "groan";
-
-/** A line of table talk, as a seat says it. It's JSON-safe, to send. */
-export interface Line {
-    /** names the line, so it isn't said again soon */
-    id: string;
-    text: string;
-    /** the seat it's said to */
-    to?: number;
-    /** said at a big moment, so it shows even when the talk is turned down */
-    big?: boolean;
-    /** the kind of answer it asks for */
-    invites?: Invite;
-    /** answers written for this line in particular */
-    replies?: string[];
-}
 
 /** A line as the table hears it: who said it, and when, by the round's log. */
 export interface Heard {
@@ -68,27 +53,6 @@ export const createTalker = (id: CharacterId, seed: number, recent: string[] = [
 /** Remembers a line said at the table, so the bot doesn't say it again soon. */
 export const hear = (talker: Talker, line: Line): void => {
     talker.used.set(line.id, ++talker.count);
-};
-
-// The moments that show even when the talk is turned down.
-const BIG = new Set<Moment>(["downSelf", "downOther", "downBig", "outSelf", "outOther", "caught", "deckOut", "wonGame", "lostGame"]);
-
-// What each moment's lines ask for. Chris's other lines ask for a groan.
-const INVITES: Partial<Record<Moment, Invite>> = {
-    dealBlame : "dealer",
-    dealGood : "doubt",
-    dealBad : "doubt",
-    handGood : "doubt",
-    handBad : "doubt",
-    handCoy : "doubt",
-    downOther : "comeback",
-    downBig : "comeback",
-    claimOther : "comeback",
-    wonClaim : "comeback",
-    discardOther : "comeback",
-    addedToMine : "comeback",
-    redAce : "comeback",
-    outOther : "comeback"
 };
 
 /** A seat's own points, this round, that count as being caught. */
@@ -153,50 +117,31 @@ export const claim = (talker: Talker, truth: "good" | "bad" | "middling"): "good
     }
 };
 
-// A line said to a seat names them, but the bots don't know the name of the
-// person playing ("You"), so a line said to them leaves it out: "Get you,
-// {name}." becomes "Get you.", and "{dealer}, did you shuffle?" "Did you
-// shuffle?". A name is only ever used to address someone (lines.ts).
-const fill = (text: string, name: string | null, card?: Card): string => {
-    let filled = card ? text.replaceAll("{card}", shortName(card)) : text;
-    if (name !== null) return filled.replace(/\{(?:name|dealer)\}/g, name);
-    return filled
-        .replace(/, \{(?:name|dealer)\}/g, "")
-        .replace(/(^|[.!?] )\{(?:name|dealer)\}, (.)/g, (_, before: string, first: string) => before + first.toUpperCase());
-};
-
-const nameOf = (view: GameView, seat: number | undefined): string | null => {
-    let name = (seat === undefined) ? null : view.seats[seat].name;
-    return (name === "You") ? null : name;
-};
-
 interface Saying {
     to?: number;
     card?: Card;
-    /** an answer to another line, which asks for no answer itself */
+    /** the line it answers */
     answering?: Line;
 }
 
 // One of the character's lines for the moment: one not heard lately, if it
 // has any, or else the one heard longest ago.
-const say = (talker: Talker, view: GameView, moment: Moment, {to, card, answering}: Saying = {}): Line | null => {
-    let lines = (LINES[talker.character][moment] ?? []).map((written, index) => ({written, id : talker.character + "." + moment + "." + index}));
+const say = (talker: Talker, moment: Moment, saying: Saying = {}): Line | null => {
+    let lines = linesFor(talker.character, moment);
     if (lines.length === 0) return null;
     let fresh = lines.filter(line => !talker.used.has(line.id));
-    let {written, id} = (fresh.length > 0)
+    let entry = (fresh.length > 0)
         ? fresh[Math.floor(random(talker.seeded) * fresh.length)]
         : lines.reduce((oldest, line) => (talker.used.get(line.id)! < talker.used.get(oldest.id)!) ? line : oldest);
-    return speak(talker, view, id, written, moment, {to, card, answering});
+    return speak(talker, entry, saying);
 };
 
-const speak = (talker: Talker, view: GameView, id: string, written: Written, moment: Moment | null, {to, card, answering}: Saying): Line => {
-    talker.used.set(id, ++talker.count);
-    let line: Line = {id, text : fill((typeof written === "string") ? written : written.text, nameOf(view, to), card)};
+const speak = (talker: Talker, entry: Entry, {to, card, answering}: Saying): Line => {
+    talker.used.set(entry.id, ++talker.count);
+    let line: Line = {id : entry.id};
     if (to !== undefined) line.to = to;
-    if ((moment && BIG.has(moment)) || answering?.big) line.big = true;
-    let invites = moment && (INVITES[moment] ?? ((talker.character === "chris") ? "groan" : undefined));
-    if (invites && !answering) line.invites = invites;
-    if (typeof written !== "string" && !answering) line.replies = written.replies;
+    if (card) line.card = shortName(card);
+    if (answering) line.re = answering.id;
     return line;
 };
 
@@ -206,10 +151,10 @@ const aboutMyHand = (view: GameView, talker: Talker, dealt: boolean): Line | nul
     let said = claim(talker, feel(view));
     if (said === "coy") {
         let closed = character(talker.character).honesty === "closed";
-        return (closed || chance(talker, 0.4)) ? say(talker, view, "handCoy") : null;
+        return (closed || chance(talker, 0.4)) ? say(talker, "handCoy") : null;
     }
-    if (dealt) return say(talker, view, (said === "good") ? "dealGood" : "dealBad");
-    return say(talker, view, (said === "good") ? "handGood" : "handBad");
+    if (dealt) return say(talker, (said === "good") ? "dealGood" : "dealBad");
+    return say(talker, (said === "good") ? "handGood" : "handBad");
 };
 
 // As the cards are dealt, one of the table says something: about their hand,
@@ -218,7 +163,7 @@ const aboutTheDeal = (view: GameView, talker: Talker): Line | null => {
     let count = view.seats.length;
     let dealer = (view.turn - 1 + count) % count;
     if (chosen(view, view.round * 7919 + 1, []) !== view.seat || !chance(talker, 0.8)) return null;
-    if (dealer !== view.seat && chance(talker, 0.45)) return say(talker, view, "dealBlame", {to : dealer});
+    if (dealer !== view.seat && chance(talker, 0.45)) return say(talker, "dealBlame", {to : dealer});
     return aboutMyHand(view, talker, true);
 };
 
@@ -228,15 +173,15 @@ const aboutTheEnd = (view: GameView, out: number | null, key: number, talker: Ta
     if (view.phase === "gameEnd") {
         let totals = view.seats.map(seat => seat.total);
         let winner = totals.indexOf(Math.min(...totals));
-        if (winner === me) return chance(talker, 0.9) ? say(talker, view, "wonGame") : null;
+        if (winner === me) return chance(talker, 0.9) ? say(talker, "wonGame") : null;
         if (chosen(view, key, [winner]) !== me) return null;
-        return chance(talker, 0.6) ? say(talker, view, "lostGame") : null;
+        return chance(talker, 0.6) ? say(talker, "lostGame") : null;
     }
-    if (out === me) return chance(talker, 0.9) ? say(talker, view, "outSelf") : null;
+    if (out === me) return chance(talker, 0.9) ? say(talker, "outSelf") : null;
     if (chosen(view, key, (out === null) ? [] : [out]) !== me) return null;
-    if (out === null) return chance(talker, 0.6) ? say(talker, view, "deckOut") : null;
-    if ((view.seats[me].scores.at(-1) ?? 0) >= CAUGHT) return chance(talker, 0.85) ? say(talker, view, "caught") : null;
-    return chance(talker, 0.7) ? say(talker, view, "outOther", {to : out}) : null;
+    if (out === null) return chance(talker, 0.6) ? say(talker, "deckOut") : null;
+    if ((view.seats[me].scores.at(-1) ?? 0) >= CAUGHT) return chance(talker, 0.85) ? say(talker, "caught") : null;
+    return chance(talker, 0.7) ? say(talker, "outOther", {to : out}) : null;
 };
 
 // What the bot says about one move, if anything. index is the move's place
@@ -249,39 +194,39 @@ const aboutMove = (entry: LogEntry, index: number, view: GameView, talker: Talke
     let to = entry.seat;
     switch (entry.type) {
         case "draw":
-            if (mine && entry.from === "discard") return chance(talker, 0.25) ? say(talker, view, "tookDiscard", {card : entry.card}) : null;
+            if (mine && entry.from === "discard") return chance(talker, 0.25) ? say(talker, "tookDiscard", {card : entry.card}) : null;
             // now and then, as its turn starts, something about its hand
             if (mine) return (!view.seats[me].isDown && chance(talker, 0.15)) ? aboutMyHand(view, talker, false) : null;
-            if (entry.from === "discard" && isRedAce(entry.card) && reacts([to])) return chance(talker, 0.5) ? say(talker, view, "redAce", {to}) : null;
+            if (entry.from === "discard" && isRedAce(entry.card) && reacts([to])) return chance(talker, 0.5) ? say(talker, "redAce", {to}) : null;
             // waiting on someone else's turn
-            return (reacts([to]) && chance(talker, 0.1)) ? say(talker, view, "idle", {to}) : null;
+            return (reacts([to]) && chance(talker, 0.1)) ? say(talker, "idle", {to}) : null;
         case "discard":
-            if (mine) return chance(talker, 0.2) ? say(talker, view, "discardSelf", {card : entry.card}) : null;
-            return (reacts([to]) && chance(talker, 0.12)) ? say(talker, view, "discardOther", {to}) : null;
+            if (mine) return chance(talker, 0.2) ? say(talker, "discardSelf", {card : entry.card}) : null;
+            return (reacts([to]) && chance(talker, 0.12)) ? say(talker, "discardOther", {to}) : null;
         case "claim":
             // got it ahead of someone who wanted it too: rub it in
-            if (mine && entry.beaten) return chance(talker, 0.85) ? say(talker, view, "wonClaim", {to : entry.beaten[0]}) : null;
-            if (mine) return chance(talker, 0.45) ? say(talker, view, "claimSelf") : null;
+            if (mine && entry.beaten) return chance(talker, 0.85) ? say(talker, "wonClaim", {to : entry.beaten[0]}) : null;
+            if (mine) return chance(talker, 0.45) ? say(talker, "claimSelf") : null;
             // wanted it too, and lost
-            if (entry.beaten?.includes(me)) return chance(talker, 0.5) ? say(talker, view, "claimOther", {to}) : null;
+            if (entry.beaten?.includes(me)) return chance(talker, 0.5) ? say(talker, "claimOther", {to}) : null;
             if (!reacts([to])) return null;
-            if (isRedAce(entry.card)) return chance(talker, 0.6) ? say(talker, view, "redAce", {to}) : null;
-            return chance(talker, 0.3) ? say(talker, view, "claimOther", {to}) : null;
+            if (isRedAce(entry.card)) return chance(talker, 0.6) ? say(talker, "redAce", {to}) : null;
+            return chance(talker, 0.3) ? say(talker, "claimOther", {to}) : null;
         case "goDown": {
-            if (mine) return chance(talker, 0.75) ? say(talker, view, "downSelf") : null;
+            if (mine) return chance(talker, 0.75) ? say(talker, "downSelf") : null;
             if (!reacts([to])) return null;
             let table = view.seats[to].table;
-            if (table.some(setrun => setrun.cards.length >= 6)) return chance(talker, 0.9) ? say(talker, view, "downBig", {to}) : null;
-            if (table.some(setrun => setrun.cards.some(isRedAce))) return chance(talker, 0.5) ? say(talker, view, "redAce", {to}) : null;
-            return chance(talker, 0.55) ? say(talker, view, "downOther", {to}) : null;
+            if (table.some(setrun => setrun.cards.length >= 6)) return chance(talker, 0.9) ? say(talker, "downBig", {to}) : null;
+            if (table.some(setrun => setrun.cards.some(isRedAce))) return chance(talker, 0.5) ? say(talker, "redAce", {to}) : null;
+            return chance(talker, 0.55) ? say(talker, "downOther", {to}) : null;
         }
         case "add":
             if (mine) return null;
-            if (entry.target.seat === me) return chance(talker, 0.5) ? say(talker, view, "addedToMine", {to}) : null;
-            if (isRedAce(entry.card) && reacts([to])) return chance(talker, 0.4) ? say(talker, view, "redAce", {to}) : null;
+            if (entry.target.seat === me) return chance(talker, 0.5) ? say(talker, "addedToMine", {to}) : null;
+            if (isRedAce(entry.card) && reacts([to])) return chance(talker, 0.4) ? say(talker, "redAce", {to}) : null;
             return null;
         case "reshuffle":
-            return (reacts([]) && chance(talker, 0.5)) ? say(talker, view, "reshuffle") : null;
+            return (reacts([]) && chance(talker, 0.5)) ? say(talker, "reshuffle") : null;
         case "out":
             return aboutTheEnd(view, entry.seat, key, talker);
         case "deckOut":
@@ -311,23 +256,24 @@ export const talkAbout = (before: GameView | null, view: GameView, talker: Talke
 export const answer = (heard: Heard, view: GameView, talker: Talker): Line | null => {
     let {seat, line} = heard;
     let me = view.seat;
-    if (seat === me || !line.invites || heard.round !== view.round) return null;
+    let {invites, replies} = meaning(line);
+    if (seat === me || !invites || heard.round !== view.round) return null;
     let answering = {to : seat, answering : line};
-    switch (line.invites) {
+    switch (invites) {
         case "dealer":
-            return (line.to === me && chance(talker, 0.85)) ? say(talker, view, "dealer", answering) : null;
+            return (line.to === me && chance(talker, 0.85)) ? say(talker, "dealer", answering) : null;
         case "comeback":
-            return (line.to === me && chance(talker, 0.45)) ? say(talker, view, "comeback", answering) : null;
+            return (line.to === me && chance(talker, 0.45)) ? say(talker, "comeback", answering) : null;
         case "doubt":
         case "groan": {
             if (chosen(view, view.round * 7919 + heard.after * 31 + hashString(line.id), [seat]) !== me) return null;
             // a line with its own answer is a set piece: that's the answer
-            if (line.replies) {
+            if (replies.length > 0) {
                 if (!chance(talker, 0.8)) return null;
-                let index = Math.floor(random(talker.seeded) * line.replies.length);
-                return speak(talker, view, line.id + ".reply." + index, line.replies[index], null, answering);
+                let reply = lineEntry(replies[Math.floor(random(talker.seeded) * replies.length)]);
+                return reply ? speak(talker, reply, answering) : null;
             }
-            return chance(talker, 0.4) ? say(talker, view, line.invites, answering) : null;
+            return chance(talker, 0.4) ? say(talker, invites, answering) : null;
         }
     }
 };

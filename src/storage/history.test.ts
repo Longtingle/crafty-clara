@@ -2,6 +2,7 @@
 import {simulateGame} from '@/engine/simulate.ts';
 import {viewFor} from '@/engine/view.ts';
 import {memoryStore} from './store.ts';
+import type {SeatInfo} from '@/host/protocol.ts';
 import {createGameHistory, gameRecord, type GameRecord} from './history.ts';
 
 const record = (finishedAt: number): GameRecord => ({finishedAt, seat : 0, players : [], outs : []});
@@ -9,8 +10,12 @@ const record = (finishedAt: number): GameRecord => ({finishedAt, seat : 0, playe
 it('records what happened in a finished game, round by round', () => {
     const {state} = simulateGame(5);
     const view = viewFor(state, 0, 0);
-    const kept = gameRecord(view, [null, "hard", "normal", "hard"], 1234);
+    const seats = [null, "hard", "normal", "hard"].map(level => ({level, character : null}) as SeatInfo);
+    const kept = gameRecord(view, seats, 1234);
     expect(kept).toMatchObject({finishedAt : 1234, seat : 0, outs : state.outs});
+    // each record has a name of its own
+    expect(kept.id).toEqual(expect.any(String));
+    expect(gameRecord(view, seats, 1234).id).not.toBe(kept.id);
     expect(kept.players.map(player => player.level)).toEqual([null, "hard", "normal", "hard"]);
     expect(kept.players[2]).toEqual({
         name : state.seats[2].name,

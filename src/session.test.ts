@@ -16,7 +16,9 @@ it('saves the game as it goes, and records it in your history when it ends', asy
     const clock = createTestClock();
     const {savedGame, history} = stores();
     const session = startSession({cast : ["julie", "chris", "cis"], levels : ["hard", "normal", "hard"], seed : 4, savedGame, history, clock});
-    expect(session.seats).toEqual([
+    // the screen hears who sits where from the host
+    clock.advance(0);
+    expect(session.client.getSnapshot().seats).toEqual([
         {level : null, character : null},
         {level : "hard", character : "julie"},
         {level : "normal", character : "chris"},
@@ -59,7 +61,7 @@ it('carries on a saved game with the same opponents', async () => {
     first.game.stop();
 
     const session = startSession({cast : ["clara", "steve", "julie"], levels : ["normal", "normal", "normal"], from : saved, savedGame, history, clock : createTestClock()});
-    expect(session.seats).toEqual([
+    expect(session.game.seats).toEqual([
         {level : null, character : null},
         {level : "normal", character : "vena"},
         {level : "hard", character : "alan"},

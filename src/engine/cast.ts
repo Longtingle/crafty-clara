@@ -2,6 +2,8 @@
 // game to game, so a player can get to know them: how readily they hold off
 // going down, and how they talk (lines.ts), and whether to believe them.
 
+import type {Invite} from './lines.ts';
+
 export type CharacterId = "clara" | "alan" | "julie" | "steve" | "gemma" | "chris" | "cis" | "vena";
 
 /**
@@ -22,6 +24,8 @@ export interface Character {
      */
     risk: number;
     honesty: Honesty;
+    /** what their lines ask for, where a moment's lines ask for nothing in particular (catalogue.ts) */
+    asksFor?: Invite;
 }
 
 export const CAST: Character[] = [
@@ -30,7 +34,7 @@ export const CAST: Character[] = [
     {id : "julie", name : "Julie", manner : "Sweet as pie, but ruthless", risk : 0.5, honesty : "mostly"},
     {id : "steve", name : "Steve", manner : "Cocky show-off", risk : 0.1, honesty : "boasts"},
     {id : "gemma", name : "Gemma", manner : "Blunt. Says it straight", risk : 0.2, honesty : "honest"},
-    {id : "chris", name : "Chris", manner : "Terrible puns", risk : 0.5, honesty : "random"},
+    {id : "chris", name : "Chris", manner : "Terrible puns", risk : 0.5, honesty : "random", asksFor : "groan"},
     {id : "cis", name : "Cis", manner : "Kind, but razor sharp", risk : 0.6, honesty : "honest"},
     {id : "vena", name : "Vena", manner : "Pompous, and gives nothing away", risk : 1, honesty : "closed"}
 ];

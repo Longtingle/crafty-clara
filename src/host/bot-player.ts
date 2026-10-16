@@ -4,10 +4,11 @@
 
 import {NORMAL_BOT, botMove, type BotProfile} from '../engine/bot.ts';
 import type {Command} from '../engine/game.ts';
-import {answer, createTalker, hear, talkAbout, type Line} from '../engine/talk.ts';
+import {answer, createTalker, hear, talkAbout} from '../engine/talk.ts';
+import {meaning, type Line} from '../engine/catalogue.ts';
 import type {GameView} from '../engine/view.ts';
 import {systemClock, type Clock, type TimerId} from './clock.ts';
-import type {RefusedMessage, SeatPort} from './protocol.ts';
+import {PROTOCOL, type RefusedMessage, type SeatPort} from './protocol.ts';
 
 /** How long a bot pauses before each kind of move (ms). */
 export interface BotPace {
@@ -39,8 +40,9 @@ export interface BotOptions {
     pace?: BotPace | (() => BotPace);
     /**
      * Told when the host refuses one of the bot's moves, which means the bot
-     * has a bug. A claim or pass that arrives after the window has closed,
-     * or a start after play has started, isn't reported.
+     * has a bug. A move that only crossed with the game moving on (a claim
+     * or pass after the window has closed, a start after play has started)
+     * isn't reported.
      */
     onRefused?: (message: RefusedMessage) => void;
 }
@@ -79,7 +81,8 @@ export const startBot = (port: SeatPort, {
     // A remark in passing keeps for another time if someone else has just
     // spoken. A big moment's line, or an answer, doesn't.
     const say = (line: Line, delay: number, answering: boolean): void => {
-        let quiet = (): boolean => answering || line.big === true || clock.now() - heardAt >= QUIET_MS;
+        let big = meaning(line).big;
+        let quiet = (): boolean => answering || big || clock.now() - heardAt >= QUIET_MS;
         if (speaking !== undefined || !quiet()) return;
         speaking = clock.setTimeout(() => {
             speaking = undefined;
@@ -106,10 +109,10 @@ export const startBot = (port: SeatPort, {
         if (message.type === "refused") {
             // an answer can cross with the claim window closing, or a start
             // with play starting, which is no fault of the bot's
-            let type = message.command.type;
-            if (type !== "claim" && type !== "pass" && type !== "start") onRefused(message);
+            if (message.code !== "late") onRefused(message);
             return;
         }
+        if (message.type !== "view") return;
         let before = view;
         view = message.view;
         let line = talker && talkAbout(before, view, talker);
@@ -124,6 +127,7 @@ export const startBot = (port: SeatPort, {
             pause = clock.setTimeout(move, pauseFor((typeof pace === "function") ? pace() : pace, command));
         }
     });
+    port.send({type : "hello", protocol : PROTOCOL});
 
     return () => {
         cancel();

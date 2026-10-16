@@ -2,11 +2,12 @@
 import {ROUND_REQUIREMENTS} from '../engine/cards.ts';
 import {character} from '../engine/cast.ts';
 import type {Command} from '../engine/game.ts';
+import {lineText} from '../engine/catalogue.ts';
 import type {GameView} from '../engine/view.ts';
 import {startBot} from './bot-player.ts';
 import {LOOK_MS, startLocalGame, type LocalGameSave} from './local-game.ts';
 import {createTestClock, type TestClock} from './testing.ts';
-import type {SeatPort} from './protocol.ts';
+import {PROTOCOL, type SeatPort} from './protocol.ts';
 
 // Plays your seat with a bot that never sends the ignored commands: like
 // someone who lets claim windows run out, or who doesn't click "Next round".
@@ -75,6 +76,7 @@ describe('a local game', () => {
         expect(game.host.state()).toMatchObject({phase : "draw", look : null});
 
         const again = startLocalGame({name : "You", seed : 7, clock});
+        again.port.send({type : "hello", protocol : PROTOCOL});
         again.port.send({type : "command", command : {type : "start"}});
         clock.advance(0);
         expect(again.host.state()).toMatchObject({phase : "draw", look : null});
@@ -129,7 +131,8 @@ describe('a local game', () => {
         const saves: LocalGameSave[] = [];
         const game = startLocalGame({name : "You", seed : 7, cast : ["clara", "steve", "vena"], levels : ["hard"], clock : createTestClock(), onChange : save => saves.push(save)});
         expect(game.host.state().seats.map(seat => seat.name)).toEqual(["You", "Clara", "Steve", "Vena"]);
-        expect(game.characters).toEqual(["clara", "steve", "vena"]);
+        expect(game.seats.map(seat => seat.character)).toEqual([null, "clara", "steve", "vena"]);
+        expect(game.seats.map(seat => seat.level)).toEqual([null, "hard", "normal", "normal"]);
         expect(saves[0].bots).toMatchObject([
             {level : "hard", character : "clara", risk : character("clara").risk},
             {level : "normal", character : "steve", risk : character("steve").risk},
@@ -139,12 +142,12 @@ describe('a local game', () => {
 
         // carried on, they're still themselves
         const again = startLocalGame({name : "You", clock : createTestClock(), from : JSON.parse(JSON.stringify(saves[0]))});
-        expect(again.characters).toEqual(["clara", "steve", "vena"]);
+        expect(again.seats.map(seat => seat.character)).toEqual([null, "clara", "steve", "vena"]);
         expect(again.host.state().seats.map(seat => seat.name)).toEqual(["You", "Clara", "Steve", "Vena"]);
         again.stop();
 
         // bots from before the cast aren't anyone in particular
-        expect(startLocalGame({name : "You", clock : createTestClock()}).characters).toEqual([null, null, null]);
+        expect(startLocalGame({name : "You", clock : createTestClock()}).seats.map(seat => seat.character)).toEqual([null, null, null, null]);
     });
 
     it('has the cast talk as they play, each in their own words, and never you', () => {
@@ -152,7 +155,7 @@ describe('a local game', () => {
         const game = startLocalGame({name : "You", seed : 3, cast : ["clara", "chris", "gemma"], clock});
         const said: {seat: number; id: string; text: string}[] = [];
         game.port.listen(message => {
-            if (message.type === "said") said.push({seat : message.seat, id : message.line.id, text : message.line.text});
+            if (message.type === "said") said.push({seat : message.seat, id : message.line.id, text : lineText(message.line, seat => game.host.state().seats[seat].name)});
         });
         playAsYou(game.port, clock);
         clock.runAll();
@@ -161,7 +164,7 @@ describe('a local game', () => {
         for (let {seat, id, text} of said) {
             expect(seat).toBeGreaterThan(0);
             // their own lines, or the answer written for someone else's
-            expect(id.startsWith(game.characters[seat - 1] + ".") || id.includes(".reply.")).toBe(true);
+            expect(id.startsWith(game.seats[seat].character + ".") || id.includes(".re.")).toBe(true);
             expect(text).not.toMatch(/[{}]/);
         }
     });

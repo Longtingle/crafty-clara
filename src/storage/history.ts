@@ -4,6 +4,7 @@
 import type {BotLevel} from '@/engine/levels.ts';
 import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
+import type {SeatInfo} from '@/host/protocol.ts';
 import type {KeyValueStore} from './store.ts';
 
 const KEY = "crafty-clara.history";
@@ -16,6 +17,11 @@ const KEEP = 1000;
 
 /** A finished game, from your seat. */
 export interface GameRecord {
+    /**
+     * names the record, so a copy kept elsewhere (on a server, later) isn't
+     * counted twice; absent in games recorded before
+     */
+    id?: string;
     /** when it finished, in ms since 1970 */
     finishedAt: number;
     /** your seat */
@@ -38,14 +44,18 @@ export interface PlayerRecord {
     downs: boolean[];
 }
 
-/** The record of a game that has ended, from its last view, with each seat's level and character, by seat. */
-export const gameRecord = (view: GameView, levels: (BotLevel | null)[], finishedAt: number, characters: (CharacterId | null)[] = []): GameRecord => ({
+// a new record's name, different from every other's
+const newId = (): string => globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+
+/** The record of a game that has ended, from its last view, with who sat in each seat. */
+export const gameRecord = (view: GameView, seats: SeatInfo[], finishedAt: number, id = newId()): GameRecord => ({
+    id,
     finishedAt,
     seat : view.seat,
     players : view.seats.map((player, seat) => ({
         name : player.name,
-        level : levels[seat] ?? null,
-        ...(characters[seat] ? {character : characters[seat]} : {}),
+        level : seats[seat]?.level ?? null,
+        ...(seats[seat]?.character ? {character : seats[seat].character} : {}),
         scores : player.scores,
         downs : player.downs
     })),
