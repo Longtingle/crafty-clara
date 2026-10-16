@@ -5,6 +5,7 @@ import Hand from './hand.tsx';
 import LookPrompt from './look-prompt.tsx';
 import {newCardTag} from './log-text.ts';
 import {useTable} from './table-context.ts';
+import {useLookLeft, type LookClock} from './screen-hooks.ts';
 
 // The pieces of your seat that both layouts of the table show (GameTable and
 // PhoneTable), each from the table it's part of.
@@ -27,15 +28,16 @@ export function YourHand({arched = false}: {arched?: boolean}) {
 }
 
 interface YourLookPromptProps {
-    /** ms until play starts (GameScreen counts it down) */
-    left: number;
+    /** the time until play starts (GameScreen keeps it) */
+    clock: LookClock;
     /** on a phone: a panel of its own, over the table */
     floating?: boolean;
 }
 
-/** While everyone looks over their hand: who starts, the countdown, and Ready. */
-export function YourLookPrompt({left, floating = false}: YourLookPromptProps) {
+/** While everyone looks over their hand: who starts, the countdown, and Ready. Only this re-renders as it counts down. */
+export function YourLookPrompt({clock, floating = false}: YourLookPromptProps) {
     let {turn, actions} = useTable();
+    let left = useLookLeft(clock);
     if (!turn.look) return null;
     return (
         <LookPrompt

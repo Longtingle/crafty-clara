@@ -1,5 +1,5 @@
-import {lazy, Suspense, useEffect, useRef, useState} from 'react';
-import {MotionConfig} from 'motion/react';
+import {useEffect, useRef, useState} from 'react';
+import {LazyMotion, MotionConfig} from 'motion/react';
 import type {BotLevel} from './engine/levels.ts';
 import {dealCast, type CharacterId} from './engine/cast.ts';
 import type {LocalGameSave} from './host/local-game.ts';
@@ -11,13 +11,20 @@ import {SOUNDS} from './components/game/sounds.ts';
 import type {GameRecord} from './storage/history.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
-import StatsScreen from './components/game/stats-screen.tsx';
 import {goFullscreen} from './lib/fullscreen.ts';
 
 // The game itself (its screen, the host and the bots) is a separate download,
-// fetched once the home screen is up, so the home screen comes first.
+// fetched once the home screen is up, so the home screen comes first. So are
+// your stats, and most of Motion: the page's animations are bare until it
+// arrives, a moment later (motion-features.ts). A screen is shown once its
+// download is in hand, not with React.lazy, which would hold it back a
+// moment (React shows content that waited at most every 300 ms).
 const loadGame = () => Promise.all([import('./session.ts'), import('./components/game/game-screen.tsx')]);
-const GameScreen = lazy(() => import('./components/game/game-screen.tsx'));
+const loadStats = () => import('./components/game/stats-screen.tsx');
+const loadMotion = () => import('./lib/motion-features.ts').then(module => module.default);
+
+type GameScreenView = typeof import('./components/game/game-screen.tsx').default;
+type StatsScreenView = typeof import('./components/game/stats-screen.tsx').default;
 
 // In development, ?seed=123 in the URL deals the same cards every game, to
 // reproduce a bug or set up a hand to test.
@@ -59,10 +66,14 @@ function App() {
     // a game from an earlier visit, to carry on
     let [saved, setSaved] = useState<LocalGameSave | null>(null);
     let [session, setSession] = useState<Session | null>(null);
+    // the screens downloaded on the side, once they're here
+    let [GameScreen, setGameScreen] = useState<GameScreenView | null>(null);
+    let [StatsScreen, setStatsScreen] = useState<StatsScreenView | null>(null);
 
     useEffect(() => {
-        // a failure here is tried again when you deal
+        // a failure here is tried again when you deal, or ask for your stats
         loadGame().catch(() => {});
+        loadStats().catch(() => {});
         void settings.cast().then(kept => setCast((kept?.length === OPPONENTS) ? kept : firstCast()));
         void settings.levels().then(kept => {
             if (kept?.length === OPPONENTS) setLevels(kept);
@@ -107,7 +118,8 @@ function App() {
         // the tap that deals lets the game make sound
         unlockAudio(SOUNDS);
         loadGame().then(
-            ([{startSession}]) => {
+            ([{startSession}, {default : screen}]) => {
+                setGameScreen(() => screen);
                 try {
                     setSession(startSession({...options, speed : prefs.speed, savedGame, history : gameHistory, heardLines, heard}));
                 } catch (error) {
@@ -131,14 +143,20 @@ function App() {
         void heardLines.list().then(setHeard);
     };
     let showStats = () => {
-        setSession(null);
         setRecords(null);
-        setPage("stats");
         void gameHistory.list().then(setRecords);
+        loadStats().then(
+            ({default : screen}) => {
+                setStatsScreen(() => screen);
+                setSession(null);
+                setPage("stats");
+            },
+            () => window.location.reload()
+        );
     };
 
     let screen;
-    if (session) {
+    if (session && GameScreen) {
         screen = (
             <GameScreen
                 client={session.client}
@@ -164,7 +182,7 @@ function App() {
                 />
             )
             : <div className="h-dvh bg-felt" />;
-    } else if (page === "stats") {
+    } else if (page === "stats" && StatsScreen) {
         screen = <StatsScreen records={records} onBack={() => setPage("home")} onStartGame={startGame} />;
     } else {
         screen = (
@@ -179,11 +197,12 @@ function App() {
         );
     }
 
-    // animations respect the "reduce motion" system setting
+    // animations respect the "reduce motion" system setting; strict, so a
+    // component that would load all of Motion (motion.div, not m.div) says so
     return (
-        <MotionConfig reducedMotion="user">
-            <Suspense fallback={<div className="h-dvh bg-felt" />}>{screen}</Suspense>
-        </MotionConfig>
+        <LazyMotion features={loadMotion} strict>
+            <MotionConfig reducedMotion="user">{screen}</MotionConfig>
+        </LazyMotion>
     );
 }
 

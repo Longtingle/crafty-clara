@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {motion} from 'motion/react';
+import {m} from 'motion/react';
 import {ChartColumn, Settings} from 'lucide-react';
 import {Button} from '@/components/ui/button.tsx';
 import {createCard, ROUND_REQUIREMENTS} from '@/engine/cards.ts';
@@ -47,7 +47,7 @@ function Home({savedRound, onContinue, onStartGame, onShowStats, prefs, onPrefsC
             <div className="flex flex-col items-center gap-8 text-center short:flex-row short:gap-[clamp(16px,4vw,48px)] short:text-left">
                 <div aria-hidden="true" className="flex h-[clamp(110px,22vh,190px)] flex-none items-end pt-4 short:h-auto short:px-7 short:pt-0 short:pb-4">
                     {FAN.map((card, index) => (
-                        <motion.span
+                        <m.span
                             key={card.displayString}
                             className="-mx-3 block w-[clamp(72px,9vh,120px)] origin-bottom short:w-[clamp(48px,min(10vw,26vh),84px)]"
                             initial={{rotate : 0, x : (2 - index) * 40, y : 0}}
@@ -55,7 +55,7 @@ function Home({savedRound, onContinue, onStartGame, onShowStats, prefs, onPrefsC
                             transition={{type : "spring", duration : 0.8, bounce : 0.25, delay : 0.15}}
                         >
                             <PlayingCard card={card} alt="" className="w-full shadow-xl" />
-                        </motion.span>
+                        </m.span>
                     ))}
                 </div>
                 <div className="flex flex-col items-center gap-8 short:items-start short:gap-5">

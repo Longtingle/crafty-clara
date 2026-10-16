@@ -10,7 +10,8 @@ import {useFlight} from './flight.ts';
 import {MeldRow} from './meld.tsx';
 import {aiColor} from './players.ts';
 import {Avatar, Chip, LevelTag} from './avatar.tsx';
-import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
+import SpeechBubble from './speech-bubble.tsx';
+import type {Speech} from './speech.ts';
 
 interface HiddenHandProps {
     ids: string[];
@@ -24,7 +25,10 @@ interface HiddenHandProps {
 // spot, except a card everyone saw them take, which keeps its face. A card
 // that arrives shows while it flies in, and a moment after (longer at a
 // slower game speed), then fades out over the static card backs underneath;
-// the cards dealt at the start (initial={false}) start out hidden.
+// the cards dealt at the start (initial={false}) start out hidden. The
+// cards all sit in one spot, so Motion needn't measure them again whenever
+// the table changes: only when one comes or goes. (A card that leaves is
+// measured as it goes.)
 function HiddenHand({ids, known = {}, className}: HiddenHandProps) {
     let {linger} = useFlight();
     return (
@@ -33,6 +37,7 @@ function HiddenHand({ids, known = {}, className}: HiddenHandProps) {
                 <MovingCard
                     key={id}
                     id={id}
+                    layoutDependency={ids.length}
                     initial={{opacity : 1}}
                     animate={{opacity : 0, transition : {delay : linger, duration : 0.2}}}
                     className={cn("absolute", className)}
@@ -57,8 +62,10 @@ interface OpponentPanelProps {
     /** the cards in their hand everyone knows (knownCards) */
     known?: Record<string, Card>;
     active: boolean;
-    /** what they're saying, if anything */
-    speech: Bubble | null | undefined;
+    /** their seat, for what they're saying */
+    seat: number;
+    /** what everyone's saying */
+    speech: Speech;
     lastAction: string | null;
     /** their setruns */
     children: ReactNode;
@@ -67,14 +74,14 @@ interface OpponentPanelProps {
 // An opponent's name, their last move, and their score, with their setruns
 // below. What they say pops up in a bubble from their portrait, over their
 // setruns.
-function OpponentPanel({player, index, level, character, known, active, speech, lastAction, children}: OpponentPanelProps) {
+function OpponentPanel({player, seat, index, level, character, known, active, speech, lastAction, children}: OpponentPanelProps) {
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
             <div className={cn(
                 "relative flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-2.5 compact:py-1.5",
                 active ? "border-gold" : "border-border"
             )}>
-                <SpeechBubble bubble={speech} name={player.name} from="above" className="top-full left-1.5 mt-2.5 max-w-[min(320px,100%)]" />
+                <SpeechBubble speech={speech} seat={seat} name={player.name} from="above" className="top-full left-1.5 mt-2.5 max-w-[min(320px,100%)]" />
                 <Avatar color={aiColor(index)} label={index + 1} character={character} className={cn("text-lg", character && "size-12")} />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">

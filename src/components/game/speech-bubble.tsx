@@ -1,15 +1,12 @@
-import {AnimatePresence, motion} from 'motion/react';
+import {useSyncExternalStore} from 'react';
+import {AnimatePresence, m} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
-
-/** What an opponent is saying. */
-export interface Bubble {
-    /** new for each line, so each pops up afresh */
-    key: number;
-    text: string;
-}
+import type {Speech} from './speech.ts';
 
 interface SpeechBubbleProps {
-    bubble: Bubble | null | undefined;
+    speech: Speech;
+    /** whose bubble it is */
+    seat: number;
     /** who's speaking, for screen readers */
     name: string;
     /** where the speaker's portrait is: above the bubble, or to its left */
@@ -20,11 +17,12 @@ interface SpeechBubbleProps {
 // What an opponent says, in a bubble by their portrait, for as long as the
 // line lasts. It pops out of the portrait, over cards even as they fly (z-30),
 // and lets clicks through to the melds underneath.
-function SpeechBubble({bubble, name, from, className}: SpeechBubbleProps) {
+function SpeechBubble({speech, seat, name, from, className}: SpeechBubbleProps) {
+    let bubble = useSyncExternalStore(speech.subscribe, () => speech.at(seat));
     return (
         <AnimatePresence>
             {bubble && (
-                <motion.p
+                <m.p
                     key={bubble.key}
                     initial={{opacity : 0, scale : 0.6}}
                     animate={{opacity : 1, scale : 1}}
@@ -42,7 +40,7 @@ function SpeechBubble({bubble, name, from, className}: SpeechBubbleProps) {
                     />
                     <span className="sr-only">{name} says: </span>
                     <span className="relative">{bubble.text}</span>
-                </motion.p>
+                </m.p>
             )}
         </AnimatePresence>
     );

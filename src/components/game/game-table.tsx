@@ -20,7 +20,8 @@ import {isInTurn} from './your-turn.ts';
 import {useTable, type TableDialog} from './table-context.ts';
 import type {EndChoice} from './meld.tsx';
 import type {HandSort} from './hand-order.ts';
-import type {Bubble} from './speech-bubble.tsx';
+import type {Speech} from './speech.ts';
+import type {LookClock} from './screen-hooks.ts';
 
 interface GameTableProps {
     sort: HandSort;
@@ -28,12 +29,12 @@ interface GameTableProps {
     paused: boolean;
     /** the scores, the rules or the settings, if open */
     dialog: TableDialog | null;
-    /** ms until play starts, while everyone looks over their hand */
-    lookLeft: number;
+    /** the time until play starts, while everyone looks over their hand */
+    lookClock: LookClock;
     /** the run the selected card asks which end of, by seat and setrun */
     endChoice: {seat: number; index: number; choice: EndChoice} | null;
     /** what each opponent is saying now, by seat */
-    speech: Record<number, Bubble | null>;
+    speech: Speech;
     /** the table talk you see this round, for the activity */
     talk: Talk[];
     /** why your last move was refused, for a few seconds after */
@@ -63,7 +64,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom. Short screens (phones held sideways) get their own layout
 // (PhoneTable), with the opponents in the top bar.
-function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, notice}: GameTableProps) {
+function GameTable({sort, paused, dialog, lookClock, endChoice, speech, talk, notice}: GameTableProps) {
     let {view, seats, hand, turn, actions} = useTable();
     let characters = seats.map(seat => seat.character);
     // Each card is rendered for one layout only, because each card must
@@ -72,12 +73,13 @@ function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, not
     let me = view.seats[view.seat];
     let opponents = opponentSeats(view);
 
-    let melds = (seat: number) => view.seats[seat].table.map((setrun, setrunIndex) => (
+    let melds = (seat: number) => view.seats[seat].table.map((setrun, setrunIndex, table) => (
         <Meld
             key={setrunIndex}
             seat={seat}
             index={setrunIndex}
             setrun={setrun}
+            rowSize={table.reduce((sum, other) => sum + other.cards.length, 0)}
             target={turn.targets[seat][setrunIndex]}
             dimmed={turn.selected !== null && me.isDown && !turn.targets[seat][setrunIndex]}
             onClick={() => actions.addToMeld(seat, setrunIndex)}
@@ -145,7 +147,7 @@ function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, not
     if (short) {
         return (
             <TableDnd>
-                <PhoneTable sort={sort} lookLeft={lookLeft} speech={speech} notice={notice} topBar={topBar} piles={piles} melds={melds} />
+                <PhoneTable sort={sort} lookClock={lookClock} speech={speech} notice={notice} topBar={topBar} piles={piles} melds={melds} />
                 {dialogs}
             </TableDnd>
         );
@@ -170,7 +172,8 @@ function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, not
                             character={seats[seat].character}
                             known={knownCards(view, seat)}
                             active={isInTurn(view, seat)}
-                            speech={speech[seat]}
+                            seat={seat}
+                            speech={speech}
                             lastAction={view.look ? (view.look.ready[seat] ? "Ready" : "Looking at their hand") : lastAction(view, seat)}
                         >
                             {melds(seat)}
@@ -206,7 +209,7 @@ function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, not
 
                     <div className="flex min-w-0 flex-col items-center gap-2.5">
                         {turn.look
-                            ? <YourLookPrompt left={lookLeft} />
+                            ? <YourLookPrompt clock={lookClock} />
                             : <TurnPrompt steps={turn.steps} text={turn.prompt} notice={notice} />}
                         <YourHand />
                     </div>

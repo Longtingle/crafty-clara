@@ -61,6 +61,11 @@ interface MeldProps {
     seat: number;
     index: number;
     setrun: Setrun;
+    /**
+     * changes whenever the setruns in this one's row change size, which moves
+     * or resizes its cards: the row's card count
+     */
+    rowSize: number;
     /** what the selected card would do here, if it can be played here */
     target: MeldTarget | null;
     dimmed: boolean;
@@ -75,8 +80,11 @@ interface MeldProps {
 // played on it, and a card dragged from your hand can be dropped on it then.
 // It lights up gold where the card fits, unless that hint is off. A card that
 // could go at either end of a run asks which, over the run.
-function Meld({seat, index, setrun, target, dimmed, onClick, choice, onChoose, onCancelChoice}: MeldProps) {
+function Meld({seat, index, setrun, rowSize, target, dimmed, onClick, choice, onChoose, onCancelChoice}: MeldProps) {
     let caption = setrunCaption(setrun);
+    // Motion measures the cards again only when they can have moved: when
+    // this setrun changes, or its row grows and its cards shrink to fit
+    let layout = setrun.cards.map(card => card.id).join() + ":" + rowSize;
     let hasWild = setrun.cards.some(isWild);
     let {setNodeRef, isOver} = useDroppable({id : meldTarget(seat, index)});
     let titleId = useId();
@@ -103,7 +111,7 @@ function Meld({seat, index, setrun, target, dimmed, onClick, choice, onChoose, o
         >
             <span className="meld-fan flex">
                 {setrun.cards.map(card => (
-                    <MovingCard key={card.id} id={card.id} className="w-(--meld-w)">
+                    <MovingCard key={card.id} id={card.id} layoutDependency={layout} className="w-(--meld-w)">
                         <PlayingCard card={card} setrunType={setrun.type} alt="" className="w-full" />
                     </MovingCard>
                 ))}

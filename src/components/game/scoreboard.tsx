@@ -2,7 +2,8 @@ import {Crown} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
 import {Avatar, Chip} from './avatar.tsx';
 import type {ScoreRow} from './scores.ts';
-import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
+import SpeechBubble from './speech-bubble.tsx';
+import {SILENCE, type Speech} from './speech.ts';
 
 interface ScoreboardProps {
     rows: ScoreRow[];
@@ -11,13 +12,13 @@ interface ScoreboardProps {
     highlightRound?: number;
     /** tighter, to fit beside the result on a phone */
     compact?: boolean;
-    /** what each player is saying, by seat: shown beside their name, at the end of a round */
-    speech?: Record<number, Bubble | null>;
+    /** what each player is saying: shown beside their name, at the end of a round */
+    speech?: Speech;
 }
 
 // Ranked by total, lowest (best) first. What a player says pops up beside
 // their name, over the scores, for a moment.
-function Scoreboard({rows, roundCount, highlightRound, compact = false, speech = {}}: ScoreboardProps) {
+function Scoreboard({rows, roundCount, highlightRound, compact = false, speech = SILENCE}: ScoreboardProps) {
     let ranked = [...rows].sort((a, b) => a.total - b.total);
     let best = ranked[0].total;
     let rounds = Array.from({length : roundCount}, (_, round) => round);
@@ -61,7 +62,8 @@ function Scoreboard({rows, roundCount, highlightRound, compact = false, speech =
                                     {row.wentOut && <Chip tone="gold">{compact ? "Out" : "Went out"}</Chip>}
                                     {!row.isYou && (
                                         <SpeechBubble
-                                            bubble={speech[row.key]}
+                                            speech={speech}
+                                            seat={row.key}
                                             name={row.name}
                                             from="left"
                                             className={cn(

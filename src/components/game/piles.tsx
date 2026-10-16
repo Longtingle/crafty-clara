@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {AnimatePresence, motion} from 'motion/react';
+import {AnimatePresence, m} from 'motion/react';
 import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
 import {Button} from '@/components/ui/button.tsx';
@@ -91,7 +91,8 @@ interface PilesProps {
 // their tags sit inside the part that shows, or beside the pile.
 //
 // The deck's top card and the top two discards are MovingCards, so cards fly
-// out of and onto the piles. When a card leaves, AnimatePresence keeps it
+// out of and onto the piles. A card on a pile stays where it is, so Motion
+// measures it only as it arrives and leaves (layoutDependency). When a card leaves, AnimatePresence keeps it
 // long enough to cross-fade into what it becomes (a face in your hand, a back
 // in an opponent's). The second discard sits under the top one, so the pile
 // isn't empty while a card is in the air.
@@ -124,7 +125,7 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                     <CardBack className="w-full" />
                     <AnimatePresence initial={false}>
                         {deckTopId && (
-                            <MovingCard key={deckTopId} id={deckTopId} className="absolute inset-0">
+                            <MovingCard key={deckTopId} id={deckTopId} layoutDependency={deckTopId} className="absolute inset-0">
                                 <CardBack className="size-full" />
                             </MovingCard>
                         )}
@@ -143,14 +144,14 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                             key={claim.card.id}
                             className="absolute top-[calc(var(--pile-w)*0.764)] left-full z-40 ml-4 -translate-y-1/2 short:right-full short:left-auto short:mr-3 short:ml-0"
                         >
-                            <motion.div
+                            <m.div
                                 initial={{opacity : 0, scale : 0.8, x : -12}}
                                 animate={{opacity : 1, scale : 1, x : 0}}
                                 exit={{opacity : 0, scale : 0.9}}
                                 transition={{type : "spring", duration : 0.35, bounce : 0.3}}
                             >
                                 <ClaimChoice {...claim} paused={paused} />
-                            </motion.div>
+                            </m.div>
                         </div>
                     )}
                 </AnimatePresence>
@@ -171,7 +172,7 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                     <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />
                     <AnimatePresence initial={false}>
                         {discard.slice(0, 2).reverse().map(card => (
-                            <MovingCard key={card.id} id={card.id} className="absolute inset-0">
+                            <MovingCard key={card.id} id={card.id} layoutDependency={card.id} className="absolute inset-0">
                                 <PlayingCard card={card} alt="" className="w-full" />
                             </MovingCard>
                         ))}

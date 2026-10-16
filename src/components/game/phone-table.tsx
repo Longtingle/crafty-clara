@@ -6,10 +6,12 @@ import {MeldRow} from './meld.tsx';
 import {Avatar} from './avatar.tsx';
 import {opponentIndex, opponentSeats, seatColor, seatName, seatPlaces} from './players.ts';
 import {activityEntries} from './log-text.ts';
-import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
+import SpeechBubble from './speech-bubble.tsx';
+import type {Speech} from './speech.ts';
 import {GoDownButton, YourHand, YourLookPrompt} from './your-seat.tsx';
 import {useTable} from './table-context.ts';
 import type {HandSort} from './hand-order.ts';
+import type {LookClock} from './screen-hooks.ts';
 
 // The table on a phone held sideways (any screen 560px high or less). Under
 // the top bar, a status line says what the opponents last did and what you
@@ -53,7 +55,7 @@ function StatusLine({view, prompt, notice}: StatusLineProps) {
 
 interface SeatGridProps {
     /** what each opponent is saying, by seat */
-    speech: Record<number, Bubble | null>;
+    speech: Speech;
     /** renders a seat's setruns */
     melds: (seat: number) => ReactNode;
 }
@@ -105,7 +107,8 @@ function SeatGrid({speech, melds}: SeatGridProps) {
                             />
                             {!you && (
                                 <SpeechBubble
-                                    bubble={speech[seat]}
+                                    speech={speech}
+                                    seat={seat}
                                     name={name}
                                     from="left"
                                     className="top-1/2 left-full ml-2.5 max-w-[calc(100cqw-56px)] -translate-y-1/2 rounded-[14px] px-2.75 py-1.5 text-[13px] leading-tight"
@@ -152,17 +155,17 @@ function SortButton({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 
 interface PhoneTableProps {
     sort: HandSort;
-    /** ms until play starts, while everyone looks over their hand */
-    lookLeft: number;
+    /** the time until play starts, while everyone looks over their hand */
+    lookClock: LookClock;
     /** what each opponent is saying, by seat */
-    speech: Record<number, Bubble | null>;
+    speech: Speech;
     notice: string | null;
     topBar: ReactNode;
     piles: ReactNode;
     melds: (seat: number) => ReactNode;
 }
 
-function PhoneTable({sort, lookLeft, speech, notice, topBar, piles, melds}: PhoneTableProps) {
+function PhoneTable({sort, lookClock, speech, notice, topBar, piles, melds}: PhoneTableProps) {
     let {view, turn, actions} = useTable();
     // The hand hangs off the bottom edge and the piles off the right. Clipped
     // rather than hidden, the overflow can't be scrolled into view, which
@@ -176,7 +179,7 @@ function PhoneTable({sort, lookLeft, speech, notice, topBar, piles, melds}: Phon
                 // over the melds, which are all still to come
                 <div className="pointer-events-none absolute top-19 right-[calc(var(--pile-w)*0.8+8px)] bottom-[calc(var(--hand-show)+var(--hand-w)*0.15+8px)] left-2 z-10 grid place-items-center">
                     <div className="pointer-events-auto">
-                        <YourLookPrompt floating left={lookLeft} />
+                        <YourLookPrompt floating clock={lookClock} />
                     </div>
                 </div>
             )}

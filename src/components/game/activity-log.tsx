@@ -1,4 +1,4 @@
-import {motion} from 'motion/react';
+import {m} from 'motion/react';
 import type {ActivityEntry} from './log-text.ts';
 
 const SHOWN = 5;
@@ -22,7 +22,7 @@ function ActivityLog({entries}: {entries: ActivityEntry[]}) {
                         className="flex min-h-0 flex-col gap-2 overflow-hidden pb-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-16px),transparent)]"
                     >
                         {entries.slice(0, SHOWN).map(entry => (
-                            <motion.li
+                            <m.li
                                 key={entry.id}
                                 layout="position"
                                 initial={{opacity : 0, x : -12}}
@@ -36,7 +36,7 @@ function ActivityLog({entries}: {entries: ActivityEntry[]}) {
                                     style={{backgroundColor : entry.color}}
                                 />
                                 <span><strong>{entry.name}</strong> {entry.quote ? <i>{entry.text}</i> : entry.text}</span>
-                            </motion.li>
+                            </m.li>
                         ))}
                     </ol>
                 )}

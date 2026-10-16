@@ -13,7 +13,7 @@ import SettingsDialog from './settings-dialog.tsx';
 import {FLIGHTS, FlightContext} from './flight.ts';
 import {yourTurn} from './your-turn.ts';
 import {TableContext, type TableActions, type TableDialog} from './table-context.ts';
-import {useBubbles, useHandOrder, useLookTime, useLostClaim, useNotice, useRecord, useSounds} from './screen-hooks.ts';
+import {useHandOrder, useSpeech, useLookClock, useLostClaim, useNotice, useRecord, useSounds} from './screen-hooks.ts';
 
 // The game has moved on to a newer version than this page: a page left open
 // from before an update, playing a game online. A reload brings the page up
@@ -65,7 +65,7 @@ function GameScreen({client, pausing, prefs, onPrefsChange, games, onNewGame, on
         () => talk.filter(said => said.seat !== seat && (prefs.talk === "chatty" || (prefs.talk === "quiet" && said.big))),
         [talk, prefs.talk, seat]
     );
-    let speech = useBubbles(heard);
+    let speech = useSpeech(heard);
     useSounds(view, prefs.sound);
     let {hand, sort, reorder, sortHand} = useHandOrder(view);
     let [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,7 +82,7 @@ function GameScreen({client, pausing, prefs, onPrefsChange, games, onNewGame, on
     let record = useRecord(view?.phase === "gameEnd", games);
 
     let held = paused || dialog !== null;
-    let lookLeft = useLookTime(view?.look ?? null, held);
+    let lookClock = useLookClock(view?.look ?? null, held);
     useEffect(() => {
         if (held) pausing.pause();
         else pausing.resume();
@@ -180,7 +180,7 @@ function GameScreen({client, pausing, prefs, onPrefsChange, games, onNewGame, on
                     sort={sort}
                     paused={held}
                     dialog={dialog}
-                    lookLeft={lookLeft}
+                    lookClock={lookClock}
                     endChoice={endChoice}
                     speech={speech}
                     talk={heard}

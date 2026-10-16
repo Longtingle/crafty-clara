@@ -8,7 +8,7 @@ import type {GameView} from '@/engine/view.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import Scoreboard from './scoreboard.tsx';
 import {scoreRows} from './scores.ts';
-import type {Bubble} from './speech-bubble.tsx';
+import type {Speech} from './speech.ts';
 import {roundSummary} from './round-summary.ts';
 import {gameResult, percent} from './stats.ts';
 import PlaceStrip from './place-strip.tsx';
@@ -41,7 +41,7 @@ interface RoundEndDialogProps {
     /** who sits in each seat, by seat */
     characters?: (CharacterId | null)[];
     /** what each opponent is saying, by seat, shown on the scoreboard (the table's behind the dialog) */
-    speech?: Record<number, Bubble | null>;
+    speech?: Speech;
     /** at the end of the game: your finished games, this one last, once they're loaded */
     record: GameRecord[] | null;
     onReady: () => void;

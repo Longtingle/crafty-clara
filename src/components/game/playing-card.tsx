@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react';
-import {motion, type HTMLMotionProps} from 'motion/react';
+import {m, type HTMLMotionProps} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
 import {isWild, type Card, type SetrunType} from '@/engine/cards.ts';
 import {longName, standInName} from '@/engine/card-names.ts';
@@ -68,7 +68,7 @@ function MovingCard({id, className, style, children, ...motionProps}: MovingCard
     }
     useEffect(() => () => clearTimeout(timer.current), []);
     return (
-        <motion.span
+        <m.span
             layoutId={id}
             transition={transition}
             onLayoutAnimationStart={takeOff}
@@ -78,7 +78,7 @@ function MovingCard({id, className, style, children, ...motionProps}: MovingCard
             {...motionProps}
         >
             {children}
-        </motion.span>
+        </m.span>
     );
 }
 
