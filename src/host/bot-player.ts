@@ -27,7 +27,7 @@ export const BOT_PACE: BotPace = {draw : 1000, answer : 1000, move : 800, ready 
 export const TALK_PACE = {line : 900, answer : 1600};
 
 /** After anyone says something, a bot keeps a passing remark to itself this long (ms). */
-const QUIET_MS = 4000;
+const QUIET_MS = 3000;
 
 export interface BotOptions {
     /** its level and seed, and who it is; a normal bot by default */

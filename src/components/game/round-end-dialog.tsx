@@ -8,6 +8,7 @@ import type {GameView} from '@/engine/view.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import Scoreboard from './scoreboard.tsx';
 import {scoreRows} from './scores.ts';
+import type {Bubble} from './speech-bubble.tsx';
 import {opponentSeats} from './players.ts';
 import {gameResult, percent} from './stats.ts';
 import {PlaceStrip} from './stats-screen.tsx';
@@ -39,6 +40,8 @@ interface RoundEndDialogProps {
     view: GameView;
     /** who sits in each seat, by seat */
     characters?: (CharacterId | null)[];
+    /** what each opponent is saying, by seat, shown on the scoreboard (the table's behind the dialog) */
+    speech?: Record<number, Bubble | null>;
     /** at the end of the game: your finished games, this one last, once they're loaded */
     record: GameRecord[] | null;
     onReady: () => void;
@@ -51,7 +54,7 @@ interface RoundEndDialogProps {
 // round is dealt once everyone is ready, so once you are, it says who it's
 // waiting for. On a phone it fills the screen: the result on the left, the
 // scores on the right.
-function RoundEndDialog({view, characters = [], record, onReady, onNewGame, onShowStats}: RoundEndDialogProps) {
+function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGame, onShowStats}: RoundEndDialogProps) {
     let short = useMediaQuery("(max-height: 560px)");
     if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
@@ -137,7 +140,7 @@ function RoundEndDialog({view, characters = [], record, onReady, onNewGame, onSh
                         {button}
                     </div>
                     <div className="min-h-0 self-center overflow-y-auto">
-                        <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} compact />
+                        <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} compact speech={speech} />
                     </div>
                 </DialogContent>
             </Dialog>
@@ -164,7 +167,7 @@ function RoundEndDialog({view, characters = [], record, onReady, onNewGame, onSh
                     {nextUp}
                     {yourRecord}
                 </div>
-                <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} />
+                <Scoreboard rows={rows} roundCount={roundCount} highlightRound={round} speech={speech} />
                 <DialogFooter>
                     <span className="text-sm text-muted-foreground sm:mr-auto">{standing}</span>
                     {button}

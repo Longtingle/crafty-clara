@@ -322,7 +322,7 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
                 onCancel={() => setGoingDown(false)}
                 onSubmit={goDown}
             />
-            <RoundEndDialog view={view} characters={characters} record={record} onReady={() => send({type : "ready"})} onNewGame={onNewGame} onShowStats={onShowStats} />
+            <RoundEndDialog view={view} characters={characters} speech={speech} record={record} onReady={() => send({type : "ready"})} onNewGame={onNewGame} onShowStats={onShowStats} />
             <PauseDialog open={paused} onResume={() => setPaused(false)} />
             <SettingsDialog
                 open={dialog === "settings"}

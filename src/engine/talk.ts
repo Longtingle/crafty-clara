@@ -85,6 +85,7 @@ const INVITES: Partial<Record<Moment, Invite>> = {
     downBig : "comeback",
     claimOther : "comeback",
     wonClaim : "comeback",
+    discardOther : "comeback",
     addedToMine : "comeback",
     redAce : "comeback",
     outOther : "comeback"
@@ -250,9 +251,13 @@ const aboutMove = (entry: LogEntry, index: number, view: GameView, talker: Talke
         case "draw":
             if (mine && entry.from === "discard") return chance(talker, 0.25) ? say(talker, view, "tookDiscard", {card : entry.card}) : null;
             // now and then, as its turn starts, something about its hand
-            if (mine) return (!view.seats[me].isDown && chance(talker, 0.1)) ? aboutMyHand(view, talker, false) : null;
+            if (mine) return (!view.seats[me].isDown && chance(talker, 0.15)) ? aboutMyHand(view, talker, false) : null;
             if (entry.from === "discard" && isRedAce(entry.card) && reacts([to])) return chance(talker, 0.5) ? say(talker, view, "redAce", {to}) : null;
-            return null;
+            // waiting on someone else's turn
+            return (reacts([to]) && chance(talker, 0.1)) ? say(talker, view, "idle", {to}) : null;
+        case "discard":
+            if (mine) return chance(talker, 0.2) ? say(talker, view, "discardSelf", {card : entry.card}) : null;
+            return (reacts([to]) && chance(talker, 0.12)) ? say(talker, view, "discardOther", {to}) : null;
         case "claim":
             // got it ahead of someone who wanted it too: rub it in
             if (mine && entry.beaten) return chance(talker, 0.85) ? say(talker, view, "wonClaim", {to : entry.beaten[0]}) : null;

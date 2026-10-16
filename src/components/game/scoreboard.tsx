@@ -2,6 +2,7 @@ import {Crown} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
 import {Avatar, Chip} from './opponent-panel.tsx';
 import type {ScoreRow} from './scores.ts';
+import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
 
 interface ScoreboardProps {
     rows: ScoreRow[];
@@ -10,10 +11,13 @@ interface ScoreboardProps {
     highlightRound?: number;
     /** tighter, to fit beside the result on a phone */
     compact?: boolean;
+    /** what each player is saying, by seat: shown beside their name, at the end of a round */
+    speech?: Record<number, Bubble | null>;
 }
 
-// Ranked by total, lowest (best) first.
-function Scoreboard({rows, roundCount, highlightRound, compact = false}: ScoreboardProps) {
+// Ranked by total, lowest (best) first. What a player says pops up beside
+// their name, over the scores, for a moment.
+function Scoreboard({rows, roundCount, highlightRound, compact = false, speech = {}}: ScoreboardProps) {
     let ranked = [...rows].sort((a, b) => a.total - b.total);
     let best = ranked[0].total;
     let rounds = Array.from({length : roundCount}, (_, round) => round);
@@ -46,7 +50,7 @@ function Scoreboard({rows, roundCount, highlightRound, compact = false}: Scorebo
                                     : <span className="text-muted-foreground">{position + 1}</span>}
                             </td>
                             <td className={compact ? "px-1 py-1.5" : "px-2.5 py-3"}>
-                                <span className={cn("inline-flex items-center whitespace-nowrap", compact ? "gap-1.5" : "gap-2.5")}>
+                                <span className={cn("relative inline-flex items-center whitespace-nowrap", compact ? "gap-1.5" : "gap-2.5")}>
                                     <Avatar
                                         color={row.color}
                                         label={row.label}
@@ -55,6 +59,17 @@ function Scoreboard({rows, roundCount, highlightRound, compact = false}: Scorebo
                                     />
                                     <span className="font-bold">{row.name}</span>
                                     {row.wentOut && <Chip tone="gold">{compact ? "Out" : "Went out"}</Chip>}
+                                    {!row.isYou && (
+                                        <SpeechBubble
+                                            bubble={speech[row.key]}
+                                            name={row.name}
+                                            from="left"
+                                            className={cn(
+                                                "top-1/2 left-full ml-2.5 -translate-y-1/2 whitespace-normal",
+                                                compact ? "max-w-[240px] rounded-xl px-2.5 py-1 text-[12px] leading-tight" : "max-w-[360px] rounded-[14px] px-3 py-1.5 text-[14px] leading-snug"
+                                            )}
+                                        />
+                                    )}
                                 </span>
                             </td>
                             {rounds.map(round => (

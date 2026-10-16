@@ -6,7 +6,7 @@ import {cn} from '@/lib/utils.ts';
 import type {Card} from '@/engine/cards.ts';
 import {longName} from '@/engine/card-names.ts';
 import {PlayingCard, MovingCard, CardTag} from './playing-card.tsx';
-import {useFlight} from './flight.ts';
+import {FLIGHTS} from './flight.ts';
 import type {NewCard} from './log-text.ts';
 import {HAND_AREA, PlayedCard} from './drop-targets.ts';
 import {archPlace, type ArchPlace} from './arch.ts';
@@ -49,7 +49,8 @@ function HandCard({card, index, order, isSelected, selectable, tag, playable, pl
         }
     });
     let held = (isDragging || played) ? dragged : null;
-    let flight = useFlight().transition;
+    // your own cards move quickly whatever the game speed: you know what you did
+    let flight = FLIGHTS.quick.transition;
     let moved = held ? {...held, scaleX : 1, scaleY : 1} : transform;
     return (
         <button

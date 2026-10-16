@@ -21,6 +21,10 @@ export type Moment =
     // answering a remark made at them
     | "comeback"
     | "claimSelf" | "claimOther" | "tookDiscard"
+    // throwing a card away, and someone else's discard
+    | "discardSelf" | "discardOther"
+    // waiting while someone else plays
+    | "idle"
     // a claim they got ahead of someone who asked for it too
     | "wonClaim"
     // someone adds a card to their setrun
@@ -120,6 +124,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
         tookDiscard : [
             "Thank you, that'll do nicely.",
             "The {card}? How thoughtful."
+        ],
+        discardSelf : [
+            "Does anyone want this? No? Thought not.",
+            "Here. A little present.",
+            "The {card}. Try not to fight over it."
+        ],
+        discardOther : [
+            "How generous, {name}.",
+            "Thanks for nothing, {name}."
+        ],
+        idle : [
+            "Whose go is it?",
+            "Any time today, {name}.",
+            "Is it me yet?"
         ],
         addedToMine : [
             "Make yourself at home, {name}.",
@@ -241,6 +259,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "I'll have that, thanks.",
             "Better than what's in the deck."
         ],
+        discardSelf : [
+            "Does anyone want this rubbish?",
+            "There. Have it. I don't want it.",
+            "Another useless {card}."
+        ],
+        discardOther : [
+            "Useless, that, {name}.",
+            "Could you not throw something useful, {name}?"
+        ],
+        idle : [
+            "Whose go is it?",
+            "Come on, {name}, I'm not getting any younger.",
+            "Is it my go yet?"
+        ],
         addedToMine : [
             "Oi. Get your own, {name}.",
             "Woah, steady there!"
@@ -348,6 +380,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
         tookDiscard : [
             "Ooh, just what I wanted.",
             "Lovely, thank you."
+        ],
+        discardSelf : [
+            "Does anybody want this, love?",
+            "Here you go, everyone.",
+            "Oh, I don't need this {card}. Anyone?"
+        ],
+        discardOther : [
+            "Oh, thank you, {name}. Not really my thing.",
+            "Lovely, {name}. Not for me, though."
+        ],
+        idle : [
+            "Take your time, {name}. No rush.",
+            "Whose turn is it, love?",
+            "Ooh, isn't this nice."
         ],
         addedToMine : [
             "Oh, help yourself, {name}. That's what it's there for.",
@@ -458,6 +504,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "Cheers. Exactly what I needed.",
             "Lovely little {card}."
         ],
+        discardSelf : [
+            "Don't need it. Never did.",
+            "The {card}. I'm generous like that.",
+            "Have that. I'm well ahead."
+        ],
+        discardOther : [
+            "Is that the best you've got, {name}?",
+            "Rubbish, {name}. Next."
+        ],
+        idle : [
+            "Hurry up, {name}. I've got places to be.",
+            "Whose go is it? Not that it matters.",
+            "Wake me when it's my turn."
+        ],
         addedToMine : [
             "Building on greatness, {name}? Smart.",
             "Careful with that, {name}. It's a masterpiece."
@@ -563,6 +623,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
         tookDiscard : [
             "Ta.",
             "I'll have the {card}."
+        ],
+        discardSelf : [
+            "Anyone? No? Fine.",
+            "Don't want it.",
+            "Bin."
+        ],
+        discardOther : [
+            "Rubbish, {name}.",
+            "Useless, {name}."
+        ],
+        idle : [
+            "Whose go is it?",
+            "Come on, {name}.",
+            "Today, please, {name}."
         ],
         addedToMine : [
             "Hands off, {name}.",
@@ -672,6 +746,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "One person's trash is my treasure.",
             "Discard? Dis card is mine."
         ],
+        discardSelf : [
+            "This {card} is surplus to requirements.",
+            "Discarding, with style.",
+            "Free to a good home."
+        ],
+        discardOther : [
+            "One person's trash is... still trash, {name}.",
+            "That's a bit card-less of you, {name}."
+        ],
+        idle : [
+            "Whose go is it? I've lost the plot. And the deck.",
+            "Is it my turn, or is it just me?",
+            "Tick tock, {name}."
+        ],
         addedToMine : [
             "Thanks, {name}. Many hands make light work.",
             "Join the club, {name}."
@@ -773,6 +861,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "Thank you. Just what I needed.",
             "Ooh, the {card}. Thank you, dear."
         ],
+        discardSelf : [
+            "Does anyone want this, dear?",
+            "There. Do be careful with it.",
+            "A little something for whoever's next."
+        ],
+        discardOther : [
+            "Getting rid of the evidence, {name}?",
+            "Clearing out the cupboards, {name}?"
+        ],
+        idle : [
+            "Whose turn is it, dear?",
+            "Take all the time you need, {name}. All of it.",
+            "Is it me? Oh, it's never me."
+        ],
         addedToMine : [
             "Oh, do help yourself, {name}. Everyone else does.",
             "Lovely. Do mind the edges, {name}."
@@ -865,6 +967,20 @@ export const LINES: Record<CharacterId, Repertoire> = {
         tookDiscard : [
             "That will do.",
             "The {card}. Quite."
+        ],
+        discardSelf : [
+            "Surplus to requirements.",
+            "One no longer requires this.",
+            "Do take it, if you must."
+        ],
+        discardOther : [
+            "Interesting choice, {name}.",
+            "How revealing, {name}."
+        ],
+        idle : [
+            "Do proceed, {name}.",
+            "One is waiting, {name}.",
+            "Whose turn is it? Not that one minds."
         ],
         addedToMine : [
             "How presumptuous, {name}.",

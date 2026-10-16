@@ -40,6 +40,7 @@ describe('the lines', () => {
     it('give everyone something to say at every moment', () => {
         const everyone: Moment[] = [
             "dealBlame", "dealer", "handCoy", "doubt", "downSelf", "downOther", "downBig", "comeback", "claimSelf", "claimOther", "wonClaim",
+            "discardSelf", "discardOther", "idle",
             "tookDiscard", "addedToMine", "redAce", "reshuffle", "outSelf", "outOther", "caught", "deckOut", "wonGame", "lostGame"
         ];
         for (let {id, honesty} of CAST) {

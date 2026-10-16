@@ -47,16 +47,21 @@ type MovingCardProps = Omit<HTMLMotionProps<"span">, "id" | "layoutId"> & {
 // place only: Motion hides all but the newest element with a given layoutId.
 function MovingCard({id, className, style, children, ...motionProps}: MovingCardProps) {
     let {transition} = useFlight();
-    // Raise the card while it flies, so it passes over the rest of the table.
-    // Motion doesn't report the end of an animation it cancels (it does that
-    // when the window resizes), so the raise also wears off by itself.
+    // Raise the card while it flies in from somewhere else (an animation that
+    // starts as it appears), so it passes over the rest of the table. A card
+    // that only shifts along (a hand rearranged, a run growing) keeps its
+    // place among its neighbours. Motion doesn't report the end of an
+    // animation it cancels (it does that when the window resizes), so the
+    // raise also wears off by itself.
     let [flying, setFlying] = useState(false);
+    let [born] = useState(() => performance.now());
     let timer = useRef<ReturnType<typeof setTimeout>>(undefined);
     let land = () => {
         clearTimeout(timer.current);
         setFlying(false);
     }
     let takeOff = () => {
+        if (performance.now() - born > 100) return;
         clearTimeout(timer.current);
         setFlying(true);
         timer.current = setTimeout(land, transition.duration * 1000 + 500);
