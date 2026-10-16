@@ -166,6 +166,16 @@ describe('a local game', () => {
         }
     });
 
+    it('gives you longer to claim a discard at a slower speed, and changes speed mid-game', () => {
+        const game = startLocalGame({name : "You", seed : 7, speed : "relaxed", clock : createTestClock()});
+        expect(game.host.state().claimWindowMs).toBe(10_000);
+        game.setSpeed("quick");
+        expect(game.host.state().claimWindowMs).toBe(6000);
+        game.stop();
+        // normal by default
+        expect(startLocalGame({name : "You", clock : createTestClock()}).host.state().claimWindowMs).toBe(8000);
+    });
+
     it('carries on from a save to the end of the game', () => {
         const warn = vi.spyOn(console, "warn");
         const saves: LocalGameSave[] = [];

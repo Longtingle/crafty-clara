@@ -4,6 +4,7 @@
 
 import type {BotLevel} from './engine/bot.ts';
 import type {CharacterId} from './engine/cast.ts';
+import type {GameSpeed} from './host/game-speed.ts';
 import {viewFor} from './engine/view.ts';
 import {startLocalGame, type LocalGame, type LocalGameSave} from './host/local-game.ts';
 import type {Clock} from './host/clock.ts';
@@ -26,6 +27,8 @@ export interface SessionOptions {
     cast?: CharacterId[];
     levels?: BotLevel[];
     seed?: number;
+    /** how quickly the bots play, and how long you have to claim a discard */
+    speed?: GameSpeed;
     /** or a saved game to carry on */
     from?: LocalGameSave;
     savedGame: SavedGame;
@@ -36,7 +39,7 @@ export interface SessionOptions {
     clock?: Clock;
 }
 
-export const startSession = ({cast, levels = [], seed, from, savedGame, history, heardLines, heard, clock}: SessionOptions): Session => {
+export const startSession = ({cast, levels = [], seed, speed, from, savedGame, history, heardLines, heard, clock}: SessionOptions): Session => {
     let finished = false;
     const keep = (save: LocalGameSave): void => {
         if (save.state.phase !== "gameEnd") {
@@ -48,7 +51,7 @@ export const startSession = ({cast, levels = [], seed, from, savedGame, history,
             void history.add(gameRecord(view, [null, ...save.bots.map(bot => bot.level)], Date.now(), [null, ...save.bots.map(bot => bot.character ?? null)]));
         }
     };
-    let game = startLocalGame({name : "You", cast, levels, seed, from, recentLines : heard, clock, onChange : keep});
+    let game = startLocalGame({name : "You", cast, levels, seed, speed, from, recentLines : heard, clock, onChange : keep});
     let client = createGameClient(game.port);
     // each line said is kept as heard
     let heardUpTo = 0;

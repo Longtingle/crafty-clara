@@ -1,14 +1,18 @@
 // Your choices, kept for next time: who you play, how crafty each opponent
-// is, which hints you want while you play, and how much table talk.
+// is, how quickly the game goes, which hints you want while you play, how
+// much table talk, and whether there's sound.
 
 import type {BotLevel} from '@/engine/bot.ts';
 import {isCharacterId, type CharacterId} from '@/engine/cast.ts';
+import {DEFAULT_SPEED, isGameSpeed, type GameSpeed} from '@/host/game-speed.ts';
 import type {KeyValueStore} from './store.ts';
 
 const CAST_KEY = "crafty-clara.cast";
 const LEVELS_KEY = "crafty-clara.levels";
 const HINTS_KEY = "crafty-clara.hints";
 const TALK_KEY = "crafty-clara.talk";
+const SPEED_KEY = "crafty-clara.speed";
+const SOUND_KEY = "crafty-clara.sound";
 
 /** How much of the table talk you see: none, just the big moments, or all of it. */
 export type TalkLevel = "off" | "quiet" | "chatty";
@@ -40,6 +44,12 @@ export interface Settings {
     /** how much table talk you see */
     talk(): Promise<TalkLevel>;
     setTalk(level: TalkLevel): void;
+    /** how quickly the bots play, and how long you have to claim a discard */
+    speed(): Promise<GameSpeed>;
+    setSpeed(speed: GameSpeed): void;
+    /** whether the game makes sound (it does unless you turn it off) */
+    sound(): Promise<boolean>;
+    setSound(on: boolean): void;
 }
 
 export const createSettings = (store: KeyValueStore): Settings => ({
@@ -74,5 +84,18 @@ export const createSettings = (store: KeyValueStore): Settings => ({
     },
     setTalk(level) {
         void store.set(TALK_KEY, level);
+    },
+    async speed() {
+        let saved = await store.get(SPEED_KEY);
+        return isGameSpeed(saved) ? saved : DEFAULT_SPEED;
+    },
+    setSpeed(speed) {
+        void store.set(SPEED_KEY, speed);
+    },
+    async sound() {
+        return (await store.get(SOUND_KEY)) !== false;
+    },
+    setSound(on) {
+        void store.set(SOUND_KEY, on);
     }
 });

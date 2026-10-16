@@ -38,6 +38,20 @@ it('starts chatty, and remembers how much table talk you want', async () => {
     expect(await settings.talk()).toBe("chatty");
 });
 
+it('starts at normal speed, and remembers the speed you choose', async () => {
+    const settings = createSettings(memoryStore());
+    expect(await settings.speed()).toBe("normal");
+    settings.setSpeed("relaxed");
+    expect(await settings.speed()).toBe("relaxed");
+});
+
+it('has sound on, until you turn it off', async () => {
+    const settings = createSettings(memoryStore());
+    expect(await settings.sound()).toBe(true);
+    settings.setSound(false);
+    expect(await settings.sound()).toBe(false);
+});
+
 it('fills in any hint it has no choice for', async () => {
     const store = memoryStore();
     await store.set("crafty-clara.hints", {ready : true, fits : "yes"});

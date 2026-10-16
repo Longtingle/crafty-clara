@@ -8,6 +8,7 @@ import {random} from '../engine/random.ts';
 import {createPausableClock, systemClock, type Clock} from './clock.ts';
 import {createHost, type Host} from './host.ts';
 import {startBot, type BotPace} from './bot-player.ts';
+import {DEFAULT_SPEED, GAME_SPEEDS, type GameSpeed} from './game-speed.ts';
 import {createLocalPair} from './transport.ts';
 import type {ClientMessage, HostMessage, SeatPort} from './protocol.ts';
 
@@ -22,10 +23,14 @@ export interface LocalGameOptions {
     levels?: BotLevel[];
     /** deals the same cards, and makes the bots play the same way, every time */
     seed?: number;
+    /** how quickly the bots play, and how long you have to claim a discard (normal by default) */
+    speed?: GameSpeed;
+    /** in place of the speed's */
     claimWindowMs?: number;
     /** how long you have to look over your hand at the start of each round (ms) */
     lookMs?: number;
     clock?: Clock;
+    /** in place of the speed's */
     pace?: BotPace;
     /** a saved game to carry on, in place of a new one with the options above */
     from?: LocalGameSave;
@@ -52,6 +57,8 @@ export interface LocalGame {
     levels: BotLevel[];
     /** who each bot is, by seat after yours: null for one that isn't a character */
     characters: (CharacterId | null)[];
+    /** Plays faster or slower from now on: the bots' pauses, and the claim windows still to come. */
+    setSpeed(speed: GameSpeed): void;
     /**
      * Pauses the whole game: the host, the bots and the messages between you
      * all wait on one clock, which stops. Claim windows, and the time to
@@ -85,6 +92,7 @@ export const startLocalGame = ({
     cast,
     levels = [],
     seed,
+    speed = DEFAULT_SPEED,
     claimWindowMs,
     lookMs = LOOK_MS,
     clock : baseClock = systemClock,
@@ -94,6 +102,8 @@ export const startLocalGame = ({
     onChange
 }: LocalGameOptions): LocalGame => {
     let clock = createPausableClock(baseClock);
+    let botPace = pace ?? GAME_SPEEDS[speed].pace;
+    let claimWindow = claimWindowMs ?? GAME_SPEEDS[speed].claimWindowMs;
     // Each bot's seed decides what it forgets and when it takes a risk, if
     // it's a hard bot. A character's risk is their own; any other bot's is
     // secret and lasts the game.
@@ -108,10 +118,11 @@ export const startLocalGame = ({
     let host = createHost({
         names : [name, ...names],
         seed,
-        claimWindowMs,
+        claimWindowMs : claimWindow,
         lookMs,
         clock,
-        state : from && carryOn(from, clock.now()),
+        // a game carried on goes at today's speed
+        state : from && {...carryOn(from, clock.now()), claimWindowMs : claimWindow},
         onChange : save
     });
     save(host.state());
@@ -121,12 +132,16 @@ export const startLocalGame = ({
         return seatEnd;
     };
     let port = seat(0);
-    let bots = profiles.map((profile, i) => startBot(seat(i + 1), {profile, recentLines, clock, pace}));
+    let bots = profiles.map((profile, i) => startBot(seat(i + 1), {profile, recentLines, clock, pace : () => botPace}));
     return {
         port,
         host,
         levels : profiles.map(profile => profile.level),
         characters : profiles.map(profile => profile.character ?? null),
+        setSpeed(next) {
+            botPace = GAME_SPEEDS[next].pace;
+            host.setClaimWindow(GAME_SPEEDS[next].claimWindowMs);
+        },
         pause : () => clock.pause(),
         resume : () => clock.resume(),
         stop() {

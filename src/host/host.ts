@@ -46,6 +46,8 @@ export interface Host {
     connect(seat: number, port: HostPort): void;
     /** the current state, for tests and debugging */
     state(): GameState;
+    /** How long the claim windows from now on last (ms). A window already open keeps its deadline. */
+    setClaimWindow(ms: number): void;
     /** Ends the game: closes every port and cancels any deadline. */
     close(): void;
 }
@@ -133,6 +135,9 @@ export const createHost = ({
             sendView(seat);
         },
         state : () => state,
+        setClaimWindow(ms) {
+            if (ms !== state.claimWindowMs) update({...state, claimWindowMs : ms});
+        },
         close() {
             connections.forEach((_, seat) => disconnect(seat));
             if (deadline !== undefined) clock.clearTimeout(deadline);

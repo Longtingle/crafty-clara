@@ -35,7 +35,8 @@ export interface BotOptions {
     /** lines heard in games lately, which it keeps off while it has others to say */
     recentLines?: string[];
     clock?: Clock;
-    pace?: BotPace;
+    /** how long it pauses before each move, or where to find out, as it can change mid-game */
+    pace?: BotPace | (() => BotPace);
     /**
      * Told when the host refuses one of the bot's moves, which means the bot
      * has a bug. A claim or pass that arrives after the window has closed,
@@ -120,7 +121,7 @@ export const startBot = (port: SeatPort, {
             // A pause already under way carries on. Otherwise a stream of views
             // (someone else adding cards while the bot weighs up a claim) would
             // keep putting its move off.
-            pause = clock.setTimeout(move, pauseFor(pace, command));
+            pause = clock.setTimeout(move, pauseFor((typeof pace === "function") ? pace() : pace, command));
         }
     });
 

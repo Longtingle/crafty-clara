@@ -84,6 +84,23 @@ describe('a bot player', () => {
         expect(refused).toEqual([wrong]);
     });
 
+    it('pauses as long as its pace says at the time, which can change', () => {
+        const clock = createTestClock();
+        const [botEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
+        const sent: Command[] = [];
+        hostEnd.listen(message => {
+            if (message.type === "command") sent.push(message.command);
+        });
+        let pace = {...PACE, draw : 3000};
+        startBot(botEnd, {clock, pace : () => pace});
+        pace = {...PACE, draw : 500};
+        hostEnd.send({type : "view", view : viewFor(seatOnesTurn(), 1, clock.now())});
+        clock.advance(499);
+        expect(sent).toEqual([]);
+        clock.advance(1);
+        expect(sent).toHaveLength(1);
+    });
+
     describe('talking', () => {
         // A bot in seat 3, with this test acting as its host, collecting what it says.
         const listen = (profile: BotProfile) => {

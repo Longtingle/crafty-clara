@@ -6,6 +6,9 @@ import type {LocalGameSave} from './host/local-game.ts';
 import type {Session, SessionOptions} from './session.ts';
 import {gameHistory, heardLines, savedGame, settings} from './storage/platform.ts';
 import {DEFAULT_HINTS, DEFAULT_TALK, type Hints, type TalkLevel} from './storage/settings.ts';
+import {DEFAULT_SPEED, type GameSpeed} from './host/game-speed.ts';
+import {unlockAudio} from './lib/audio.ts';
+import {SOUNDS} from './components/game/sounds.ts';
 import type {GameRecord} from './storage/history.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
@@ -48,6 +51,8 @@ function App() {
     let [levels, setLevels] = useState(ALL_NORMAL);
     let [hints, setHints] = useState(DEFAULT_HINTS);
     let [talk, setTalk] = useState<TalkLevel>(DEFAULT_TALK);
+    let [speed, setSpeed] = useState<GameSpeed>(DEFAULT_SPEED);
+    let [sound, setSound] = useState(true);
     // the table talk heard lately, which the cast keep off
     let [heard, setHeard] = useState<string[]>([]);
     // your finished games, for the stats screen
@@ -65,6 +70,8 @@ function App() {
         });
         void settings.hints().then(setHints);
         void settings.talk().then(setTalk);
+        void settings.speed().then(setSpeed);
+        void settings.sound().then(setSound);
         void heardLines.list().then(setHeard);
         void savedGame.load().then(setSaved);
     }, []);
@@ -92,6 +99,19 @@ function App() {
         settings.setTalk(next);
     };
 
+    let changeSound = (next: boolean) => {
+        setSound(next);
+        settings.setSound(next);
+        if (next) unlockAudio(SOUNDS);
+    };
+
+    // a game in progress speeds up or slows down at once
+    let changeSpeed = (next: GameSpeed) => {
+        setSpeed(next);
+        settings.setSpeed(next);
+        session?.game.setSpeed(next);
+    };
+
     // On a phone or tablet, starting a game goes full screen (if you've left
     // full screen since, dealing goes back to it)
     let startGame = () => {
@@ -101,10 +121,12 @@ function App() {
 
     let play = (options: Pick<SessionOptions, "cast" | "levels" | "seed" | "from">) => {
         void goFullscreen();
+        // the tap that deals lets the game make sound
+        unlockAudio(SOUNDS);
         loadGame().then(
             ([{startSession}]) => {
                 try {
-                    setSession(startSession({...options, savedGame, history : gameHistory, heardLines, heard}));
+                    setSession(startSession({...options, speed, savedGame, history : gameHistory, heardLines, heard}));
                 } catch (error) {
                     // a saved game this version can't carry on
                     console.error(error);
@@ -144,6 +166,10 @@ function App() {
                 onHintsChange={changeHints}
                 talk={talk}
                 onTalkChange={changeTalk}
+                speed={speed}
+                onSpeedChange={changeSpeed}
+                sound={sound}
+                onSoundChange={changeSound}
                 games={gameHistory.list}
                 onNewGame={newGame}
                 onShowStats={showStats}
@@ -176,6 +202,10 @@ function App() {
                 onHintsChange={changeHints}
                 talk={talk}
                 onTalkChange={changeTalk}
+                speed={speed}
+                onSpeedChange={changeSpeed}
+                sound={sound}
+                onSoundChange={changeSound}
             />
         );
     }

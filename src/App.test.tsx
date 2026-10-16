@@ -149,7 +149,7 @@ it('remembers how much table talk you want', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
     const dialog = await screen.findByRole('dialog', {name : 'Settings'});
-    const chatty = within(dialog).getByRole('group', {name : 'How chatty'});
+    const chatty = within(dialog).getByRole('group', {name : 'Table talk'});
     expect(within(chatty).getByRole('button', {name : 'Chatty'})).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(chatty).getByRole('button', {name : 'Quiet'}));
     expect(within(chatty).getByRole('button', {name : 'Quiet'})).toHaveAttribute('aria-pressed', 'true');
@@ -158,7 +158,23 @@ it('remembers how much table talk you want', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
     const again = await screen.findByRole('dialog', {name : 'Settings'});
-    await waitFor(() => expect(within(within(again).getByRole('group', {name : 'How chatty'})).getByRole('button', {name : 'Quiet'})).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(() => expect(within(within(again).getByRole('group', {name : 'Table talk'})).getByRole('button', {name : 'Quiet'})).toHaveAttribute('aria-pressed', 'true'));
+});
+
+it('remembers how quickly you want the game to go', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
+    const dialog = await screen.findByRole('dialog', {name : 'Settings'});
+    const speed = within(dialog).getByRole('group', {name : 'Game speed'});
+    expect(within(speed).getByRole('button', {name : 'Normal'})).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(speed).getByRole('button', {name : 'Relaxed'}));
+    expect(within(dialog).getByText(/10 seconds to claim a discard/)).toBeInTheDocument();
+
+    cleanup();
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', {name : 'Settings'}));
+    const again = await screen.findByRole('dialog', {name : 'Settings'});
+    await waitFor(() => expect(within(within(again).getByRole('group', {name : 'Game speed'})).getByRole('button', {name : 'Relaxed'})).toHaveAttribute('aria-pressed', 'true'));
 });
 
 it('remembers your hints', async () => {

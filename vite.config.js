@@ -20,7 +20,7 @@ export default defineConfig({
       manifest: false,
       workbox: {
         // everything a game needs (browsers that can run it all read woff2)
-        globPatterns: ['**/*.{html,js,css,woff2,webp,png,svg,webmanifest}'],
+        globPatterns: ['**/*.{html,js,css,woff2,webp,png,svg,webmanifest,mp3}'],
       },
     }),
   ],

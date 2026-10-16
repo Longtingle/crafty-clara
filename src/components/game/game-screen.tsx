@@ -1,11 +1,13 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {BotLevel} from '@/engine/bot.ts';
 import type {CharacterId} from '@/engine/cast.ts';
-import type {LookView} from '@/engine/view.ts';
+import type {GameView, LookView} from '@/engine/view.ts';
+import {playSound} from '@/lib/audio.ts';
 import {runEnds} from '@/engine/setruns.ts';
 import type {GameClient, Refusal, Talk} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
 import type {Hints, TalkLevel} from '@/storage/settings.ts';
+import {DEFAULT_SPEED, type GameSpeed} from '@/host/game-speed.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import GameTable, {type TableActions, type TableDialog} from './game-table.tsx';
 import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
@@ -14,11 +16,25 @@ import PauseDialog from './pause-dialog.tsx';
 import SettingsDialog from './settings-dialog.tsx';
 import {newCardTag} from './log-text.ts';
 import type {Bubble} from './speech-bubble.tsx';
+import {soundsFor, VOLUME} from './sounds.ts';
 import {yourTurn} from './your-turn.ts';
 import {moveCard, orderHand, type HandSort} from './hand-order.ts';
 
 // How long a refused move's notice stays up (ms).
 const NOTICE_MS = 3000;
+
+// The game's sounds, as things happen: for what's new in each view since the
+// last, a moment apart if several things happened at once.
+function useSounds(view: GameView | null, on: boolean): void {
+    let before = useRef<GameView | null>(null);
+    useEffect(() => {
+        if (!view) return;
+        let sounds = soundsFor(before.current, view);
+        before.current = view;
+        if (!on) return;
+        sounds.filter(sound => VOLUME[sound] !== undefined).forEach((sound, index) => playSound(sound, VOLUME[sound], index * 120));
+    }, [view, on]);
+}
 
 // How long a line of table talk stays up (ms): long enough to read.
 const bubbleMs = (text: string): number => Math.min(6000, Math.max(2500, 1500 + text.length * 55));
@@ -114,6 +130,12 @@ interface GameScreenProps {
     /** how much of the table talk you see */
     talk?: TalkLevel;
     onTalkChange?: (level: TalkLevel) => void;
+    /** how quickly the bots play; App passes a change on to the game */
+    speed?: GameSpeed;
+    onSpeedChange?: (speed: GameSpeed) => void;
+    /** whether the game makes sound */
+    sound?: boolean;
+    onSoundChange?: (on: boolean) => void;
     /** your finished games, for your record when this one ends */
     games: () => Promise<GameRecord[]>;
     onNewGame: () => void;
@@ -127,7 +149,7 @@ interface GameScreenProps {
 // Nothing in the game moves while you've paused it, or while you're reading
 // the scores, the rules or the settings. Leaving the page (for another tab,
 // or another app on a phone) pauses it, so you come back to the Paused dialog.
-function GameScreen({client, levels, characters = [], pausing, hints, onHintsChange, talk : talkLevel = "chatty", onTalkChange = () => {}, games, onNewGame, onShowStats}: GameScreenProps) {
+function GameScreen({client, levels, characters = [], pausing, hints, onHintsChange, talk : talkLevel = "chatty", onTalkChange = () => {}, speed = DEFAULT_SPEED, onSpeedChange = () => {}, sound = true, onSoundChange = () => {}, games, onNewGame, onShowStats}: GameScreenProps) {
     let {view, refusal, talk, send} = useGame(client);
     // the table talk you see: none, the big moments, or all of it
     let seat = view?.seat;
@@ -136,6 +158,7 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
         [talk, talkLevel, seat]
     );
     let speech = useBubbles(heard);
+    useSounds(view, sound);
     // The hand stays sorted the way you last chose until you arrange it
     // yourself. Your own order lasts until the next deal, which comes sorted.
     let [sorted, setSorted] = useState<Exclude<HandSort, "own">>("value");
@@ -283,6 +306,10 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
                 onHintsChange={onHintsChange}
                 talk={talkLevel}
                 onTalkChange={onTalkChange}
+                speed={speed}
+                onSpeedChange={onSpeedChange}
+                sound={sound}
+                onSoundChange={onSoundChange}
                 inGame
             />
         </>
