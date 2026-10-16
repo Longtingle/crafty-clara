@@ -3,9 +3,12 @@ import {RUN} from '@/engine/cards.ts';
 import {createGame} from '@/engine/game.ts';
 import {checkSetrun} from '@/engine/setruns.ts';
 import {cards} from '@/engine/testing.ts';
+import {viewFor} from '@/engine/view.ts';
 import {startLocalGame, type LocalGame} from '@/host/local-game.ts';
+import {createLocalPair} from '@/host/transport.ts';
+import type {ClientMessage, HostMessage} from '@/host/protocol.ts';
 import {createGameClient} from '@/client/game-client.ts';
-import {DEFAULT_HINTS} from '@/storage/settings.ts';
+import {DEFAULT_HINTS, type TalkLevel} from '@/storage/settings.ts';
 import GameScreen from './game-screen.tsx';
 
 let game: LocalGame;
@@ -91,6 +94,52 @@ it('changes your hints from the settings', async () => {
     expect(within(dialog).getByRole('switch', {name : 'When you can go down'})).not.toBeChecked();
     fireEvent.click(within(dialog).getByRole('switch', {name : 'When you can go down'}));
     expect(changeHints).toHaveBeenCalledWith({fits : true, targets : true, ready : true});
+});
+
+describe('table talk', () => {
+    // a game you see through this test's own host end, against three of the cast
+    const listening = async (talk: TalkLevel) => {
+        game.stop();
+        cleanup();
+        const [port, hostEnd] = createLocalPair<ClientMessage, HostMessage>();
+        render(
+            <GameScreen
+                client={createGameClient(port)}
+                levels={[null, "normal", "normal", "normal"]}
+                characters={[null, "clara", "alan", "gemma"]}
+                pausing={pausing}
+                hints={DEFAULT_HINTS}
+                onHintsChange={changeHints}
+                talk={talk}
+                games={async () => []}
+                onNewGame={() => {}}
+                onShowStats={() => {}}
+            />
+        );
+        const state = createGame({names : ["You", "Clara", "Alan", "Gemma"], seed : 1});
+        hostEnd.send({type : "view", view : viewFor(state, 0, 0)});
+        await screen.findByRole('group', {name : 'Your hand'});
+        hostEnd.send({type : "said", seat : 2, line : {id : "a", text : "I've got a hand like a foot."}, round : 0, after : 0});
+        hostEnd.send({type : "said", seat : 3, line : {id : "b", text : "Show-off.", big : true}, round : 0, after : 0});
+    };
+
+    it('shows what an opponent says in a bubble from their portrait, and in the activity', async () => {
+        await listening("chatty");
+        expect(await screen.findByText("I've got a hand like a foot.")).toBeInTheDocument();
+        expect(screen.getByText("Show-off.")).toBeInTheDocument();
+        const activity = screen.getByRole('complementary', {name : 'Activity'});
+        expect(within(activity).getByText("“I've got a hand like a foot.”")).toBeInTheDocument();
+    });
+
+    it('shows just the big moments when the talk is turned down, and none when it is off', async () => {
+        await listening("quiet");
+        expect(await screen.findByText("Show-off.")).toBeInTheDocument();
+        expect(screen.queryByText("I've got a hand like a foot.")).not.toBeInTheDocument();
+
+        await listening("off");
+        await new Promise(resolve => setTimeout(resolve, 50));
+        expect(screen.queryByText("Show-off.")).not.toBeInTheDocument();
+    });
 });
 
 it('asks which end of a run a red ace goes, and plays it there', async () => {

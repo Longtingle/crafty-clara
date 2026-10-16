@@ -38,7 +38,9 @@ npm run tournament -- --deals 200 --lineup normal,normal,normal,normal   # bots 
   - `erasableSyntaxOnly` rules out enums, namespaces and constructor parameter properties, so Node can run the engine just by stripping its types.
   - Type-only imports need `import type` (`verbatimModuleSyntax`).
 - Imports include explicit extensions (`./hand.tsx`, `./game.ts`), except in the shadcn components. `@/` is an alias for `src/` (`vite.config.js`, `tsconfig.json`); the UI uses it.
-- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded from Vite's base URL by `src/components/game/cards.ts`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`). The rest of `art/` is unused source card art; it is outside `public/` so it isn't copied into builds.
+- Card faces are half-size WebP images, `public/img/cards/<displayString>.webp`, loaded from Vite's base URL by `src/components/game/cards.ts`. Their full-size PNG sources are in `art/card-faces/`. The card back is drawn in CSS (`card-back` in `src/index.css`).
+- The characters' portraits are 256px WebP crops of each head, mirrored to face right (into the table): `public/img/portraits/<id>.webp`. Their 1024px sources (AI-generated) are in `art/characters/`.
+- The rest of `art/` is unused source card art. `art/` is outside `public/`, so none of it is copied into builds.
 
 ## Game rules
 
@@ -79,7 +81,7 @@ These are the engine's rules (`src/engine/game.ts`).
 - Cards left in hand score points: an ace is 25, 10 through King are 10, and other cards are their face value.
 - The next round is dealt once every player has said they're ready. Bots are ready at once.
 
-In the game on the page, you are seat 0 of four, against "Opponent 1" to "Opponent 3".
+In the game on the page, you are seat 0 of four, against three of the cast (`src/engine/cast.ts`): Clara, Alan, Julie, Steve, Gemma, Chris, Cis and Vena. You choose who, and each one's level.
 
 ## Architecture
 
@@ -107,7 +109,7 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 
 **`bot.ts`**
 - `botMove(view, profile)` returns a bot's next command, or null while it waits. A bot sees only its own view.
-- A `BotProfile` is a level, a seed and a risk tolerance (0 to 1). `startLocalGame` gives each bot a random, secret risk for the whole game. There are two levels:
+- A `BotProfile` is a level, a seed, a risk tolerance (0 to 1) and who the bot is (`character`). A character's risk is their own (`cast.ts`), the same every game, so a player can get to know it. A bot that isn't one of the cast gets a random, secret risk for the whole game. There are two levels:
   - **Normal** plays its own hand.
   - **Hard** discards by points rather than face value, so it throws away useless black aces (25 points). It also reads the table (`clues.ts`), as an `Insight` passed to `scoreHand`, `wantsCard` and `chooseDiscard`:
     - It marks down unfinished setruns short of outs (`rated`, `OUTS_WEIGHT`). So it collects what it can still finish, not runs whose cards are gone or that others are collecting.
@@ -172,6 +174,30 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 - `isWild`: a card in a setrun that is a red ace standing in for another card. Use it, not `isRedAce`, to count wilds.
 - `asWild` and `asItself`: a red ace placed in a setrun as another card, and the ace back as itself.
 
+**`cast.ts`** is the characters who sit at the table: each one's id, name, manner ("Dry and teasing", for choosing who to play), risk and honesty. A character keeps the same personality from game to game, so a player can learn them. `dealCast` picks a line-up at random.
+
+**Table talk** (`talk.ts`, with the lines in `lines.ts`):
+- **Who speaks.** A character bot talks from its own view, as it plays, so it never says what it couldn't know: about its own hand, and what everyone can see.
+  - `talkAbout(before, view, talker)` looks at what's new since the bot's last view: the deal, or a move (taking a discard, a claim, going down, adding to its setrun, a red ace shown, a reshuffle, someone going out, the end of the game).
+  - `answer(heard, view, talker)` answers a line it heard.
+  - At most one line a view, each with a chance.
+- **Who reacts.** Every bot sees the same log, so they agree without a word on who reacts to a move (`chosen`): one seat, picked from a key made of the round, the move's place in the log, and the game's card-id prefix. When the lot falls on a person, nobody does.
+- **About its hand** (`claim`, from `feel`: ready or nearly, a long way off, or between), as the character's `honesty` goes:
+  - honest (Alan, Gemma, Cis), mostly honest (Julie), or random (Chris)
+  - a bluffer who moans most when nearly down (Clara)
+  - a boaster whatever the hand (Steve)
+  - one who gives nothing away (Vena)
+  So the talk is something a player can learn to read.
+- **Lines that ask for an answer** (`invites`):
+  - blaming the dealer gets the dealer's answer
+  - a remark at someone gets their comeback
+  - talk about a hand gets doubt from one of the others
+  - Chris's puns get groans
+  A line can carry the answers written for it (`replies`), a set piece. Answers ask for none.
+- **The lines** (`lines.ts`) are each character's own, by moment, about 400 in all. A name appears only to address someone ("Get you, {name}."), so a line said to you, whose name the bots don't know ("You"), can leave it out. A test checks this.
+- **Not repeating.** A bot keeps off lines heard this game and lately (`used`, seeded from `recentLines`), and when it has said them all, says the one heard longest ago.
+- **Big moments.** Lines at big moments (going down, going out, the end of a round or game) are marked `big`, so they show even when the talk is turned down.
+
 **`card-names.ts`** turns cards and setruns into text: `shortName` ("7♦"), `longName` ("Seven of diamonds", for screen readers), `setrunCaption` ("Run 3–6 ♦") and `requirementText` ("1 set + 1 run").
 
 **`testing.ts`** has test shorthands: `card("10H")` and `cards("7C 7H 1D")`.
@@ -181,10 +207,16 @@ TypeScript with no React or DOM, so it can also run on a server. Every function 
 TypeScript with no React or DOM. It is the "server" for a game, run in the page for now. A seat is whatever is at the other end of a port, and the host treats every seat the same.
 
 - **`transport.ts`:** a `Port` is one end of a connection (`send`, `listen`, `close`). `createLocalPair` connects two ends in the page. Each message arrives a moment after it is sent, never during `send`, and as a copy made through JSON, as over a socket. A WebSocket can later be wrapped as a `Port`.
-- **`protocol.ts`:** the messages. A seat sends `{type: "command", command}`. The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
+- **`protocol.ts`:** the messages.
+  - A seat sends `{type: "command", command}`, or a line of table talk, `{type: "say", line}`.
+  - The host sends `{type: "view", view}` when the seat connects and after every change, or `{type: "refused", command, error}` to that seat alone.
+  - It passes each line on to every seat as `{type: "said", seat, line, round, after}`. `after` is how many of the round's log entries came before it. Talk isn't part of the game: it changes nothing and isn't saved. The host drops a line that isn't plain short text, or that comes too soon after the same seat's last (`TALK_GAP_MS`).
 - **`host.ts`:** `createHost({names, seed, clock, lookMs})` holds the one true state and applies each seat's commands. It closes claim windows and starts play at their deadlines with a timer (`nextDeadline`), and sends every seat its view after each change. It refuses a malformed command rather than throwing; it doesn't yet check commands' shape, which a real server will need. Given a `state`, it carries on that game instead of dealing one, and `onChange` hears of every change, to save the game.
 - **`bot-player.ts`:** `startBot(port, {profile})` plays a seat through its port, seeing only its views. It pauses before each move (`BOT_PACE`) and then decides again on the latest view. A pause already under way isn't restarted by new views, so a stream of other players' moves can't hold up its claim answer. A claim answer refused because the window closed first, or a start because play already had, is a normal race, not a bot bug.
-- **`local-game.ts`:** `startLocalGame({name, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, `pause()`/`resume()` and `stop()`. `levels` gives each bot's level (normal by default). Each round starts with `LOOK_MS` (30 seconds) to look over your hand. The bots' seeds come from the game's seed, so a seeded game replays exactly. A game starts through `src/session.ts`, one per game. In development, `?seed=N` in the URL fixes the deal.
+  - A bot that's one of the cast talks too (`talk.ts`), a moment after what it talks about, or after a line it answers (`TALK_PACE`).
+  - It keeps a passing remark to itself if anyone has spoken in the last few seconds (`QUIET_MS`). A big moment's line, or an answer, goes anyway.
+  - It never waits on its talk to move.
+- **`local-game.ts`:** `startLocalGame({name, cast, levels})` seats you at seat 0 and a bot in every other seat, and returns your port, the host, each bot's level and character, `pause()`/`resume()` and `stop()`. `cast` gives who each bot is, and their names; without it the bots are "Opponent 1" and so on, as in most tests. `levels` gives each bot's level (normal by default). Each round starts with `LOOK_MS` (30 seconds) to look over your hand. The bots' seeds come from the game's seed, so a seeded game replays exactly. A game starts through `src/session.ts`, one per game. In development, `?seed=N` in the URL fixes the deal.
   - **Saving:** `onChange` is given a `LocalGameSave` as the game starts and after every change: the state, the bots' profiles (with their secret risks), and the game's time (`savedAt`). `from` carries on a save. A deadline (a claim window's, or play starting) is a time on the clock of the game that saved it, so `carryOn` gives it the time it had left. A save from before look time (no `look` or `lookMs`) carries on without it.
 - **`clock.ts`:** the host, the bots and the local transport all take their time and timers from a `Clock`, `systemClock` by default.
   - A local game wraps its clock in `createPausableClock`, so pausing stops everything at once. Timers wait, and time spent paused doesn't count, so a claim window keeps the time it had left.
@@ -196,35 +228,37 @@ What's kept between visits, behind a layer each platform fills in its own way:
 - **`store.ts`:** a `KeyValueStore` (async `get`, `set` and `remove` of JSON values). `browserStore` uses localStorage, and `memoryStore` is for tests. An app build would add one for the phone's own storage. It's async because everything but localStorage is. A store that can't keep something lets it go quietly.
 - **On top of it:**
   - **`saved-game.ts`:** the game in progress. Saves are written one at a time, and one waiting its turn is replaced by any newer one. A save carries a version, and one from another version is dropped, so bump `VERSION` when a change to the game state would break old saves.
-  - **`history.ts`:** your finished games, for stats (up to 1000). A `GameRecord` is what happened (each player's level, scores and downs by round, and who went out), not totals, so stats can be worked out in new ways later. This is the player's history, so a change to the record needs a way to read old versions, not a reset. `list` waits for any game still being added, so the game just finished is in it.
-  - **`settings.ts`:** your choices kept for next time: the opponents' levels, and your `Hints` (each on or off; `DEFAULT_HINTS` for any never chosen).
+  - **`history.ts`:** your finished games, for stats (up to 1000). A `GameRecord` is what happened (each player's level and character, scores and downs by round, and who went out), not totals, so stats can be worked out in new ways later. This is the player's history, so a change to the record needs a way to read old versions, not a reset. `list` waits for any game still being added, so the game just finished is in it.
+  - **`heard-lines.ts`:** the lines of table talk heard lately (the newest 300), by id, so the cast keep off them next game.
+  - **`settings.ts`:** your choices kept for next time: who you play (`cast`), the opponents' levels, how much table talk you see (`TalkLevel`: off, quiet for just the big moments, or chatty, the default), and your `Hints` (each on or off; `DEFAULT_HINTS` for any never chosen).
 - **`platform.ts`** builds these on the browser's store. It's the one place to swap: an app build would give them the phone's storage, and online play would keep saves and history on the server.
 
-**`src/session.ts`** (loaded with the game screen) starts a local game and keeps it as it goes. It saves after every change, and when the game ends it forgets the save and adds the game to your history, once.
+**`src/session.ts`** (loaded with the game screen) starts a local game and keeps it as it goes. It saves after every change, and when the game ends it forgets the save and adds the game to your history, once. It gives the bots the lines heard lately, and keeps each line said as heard.
 
 ### The client (`src/client/`)
 
-- **`game-client.ts`:** `createGameClient(port)` listens to your seat's port and keeps a snapshot, `{view, refusal}`: the latest view, and the last command the host refused (`{command, error, seq}`). Each message replaces the snapshot whole. `send(command)` sends a command.
+- **`game-client.ts`:** `createGameClient(port)` listens to your seat's port and keeps a snapshot, `{view, refusal, talk}`: the latest view, the last command the host refused (`{command, error, seq}`), and the table talk this round, each line numbered (`seq`). Each message replaces the snapshot whole. `send(command)` sends a command.
 - **`use-game.ts`:** `useGame(client)` reads the snapshot with `useSyncExternalStore` and returns `{view, refusal, send}`.
 
 ### The UI
 
 Function components only; there is no global store.
-- **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose each opponent's level), your stats (`stats-screen.tsx`), or a game.
+- **`App.tsx`** shows the home screen, the pre-match screen (`new-game.tsx`, where you choose who you play and each one's level), your stats (`stats-screen.tsx`), or a game.
+  - **Who you play:** three of the cast, at random the first time, then whoever you last chose. Each opponent's row on the new-game screen shows their portrait, name, manner and seat. Change opens the whole cast (`cast-picker.tsx`), with anyone already at the table greyed out.
   - The levels and the hints are remembered (`settings`), and so is a game in progress (`savedGame`). With a saved game, the home screen offers "Continue game" first, and dealing a new one replaces it.
   - The home screen has Your stats and Settings in a corner: top right, or on a phone top left as icons, clear of the title. Settings (`settings-dialog.tsx`) holds the hints, with a picture of each; on a phone it's a sheet that fills the screen. It opens from the game too (the top bar, or the ☰ menu on a phone), and holds the game while it's open.
   - **Stats** are worked out from your history (`stats.ts`, pure and tested on its own). The lowest total wins, and a tie for the lowest counts as a win, as on the game-over screen. You beat an opponent when you finish on a lower total. The stats screen is one page on a big screen, and three tabs (Overview, Rounds, Games) on a phone.
   - Dealing (or continuing) calls `startSession`. The game (`session.ts`, `GameScreen`, the host and the bots) is a separate download (`loadGame`, `React.lazy`), fetched once the home screen is up, so the home screen loads first. If it can't be fetched when you deal (offline before the service worker has it, or a new deploy has replaced the files), the page reloads.
   - **Offline:** `vite-plugin-pwa` (`vite.config.js`) builds a service worker that precaches the whole site, card faces included. `src/index.tsx` registers it by hand, so an update never reloads the page under a game; a new version takes over and is used the next time the page opens. Once installed, the page asks the browser to keep its storage (`navigator.storage.persist`). Both are web-only, and an app build would leave them out.
   - An effect stops the game's host and bots when the game ends or App unmounts. "New game" at the end goes back to the pre-match screen.
-  - Each seat's level reaches `GameScreen` as `levels`, by seat. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
+  - Each seat's level and character reach `GameScreen` as `levels` and `characters`, by seat. A character's portrait (`Avatar`, in `opponent-panel.tsx`) sits in a ring of their seat's colour wherever the opponent's numbered badge would: their panel, their top-bar chip and meld place on a phone, and the scoreboard. A bot that isn't a character (from a game saved before the cast) keeps its number. Hard opponents get a cream "Hard" tag on their panel, and on their top-bar chip on short screens. The engine's view doesn't know about levels: which seats are bots is the host's business.
 - **`game-screen.tsx`** (`GameScreen`) reads the game with `useGame` and holds what is yours alone:
   - how your hand is laid out (`hand-order.ts`): kept sorted by value or by suit as cards come and go (by value to start), or in your own order once you drag a card. In your own order, arranged cards keep their places and new ones join on the right. A new deal is sorted again the way you last chose.
   - the selected card, by id
   - the run the selected card asks which end of (`choosing`): a card that could go at either end of a run asks first (`runEnds`), in a popover over the run (`EndChooser` in `meld.tsx`), whether it was clicked onto the run or dropped there. On a phone it opens beside the run, where there's room.
   - the countdown to play starting (`useLookTime`): what each view says, counted down a second at a time between views, and standing still while the game is held. It's kept here so a prompt mounted afresh, when the layout changes, carries on from the same time.
   - whether the go-down dialog is open
-  - opponents' speech lines (`useSpeech`, which listens to the client for new log entries)
+  - the table talk you see (as much as your `TalkLevel` allows), and what each opponent is saying now (`useBubbles`). A line stays up long enough to read, in a `SpeechBubble` (`speech-bubble.tsx`) that pops from the speaker's portrait. On a wide screen it drops from their panel over their melds, and goes in the activity in italics. On a phone it sits beside their portrait in their meld place.
   - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
   - whether the game is paused, and whether the Scores, Rules or Settings dialog is open. The game is held (`pause()` on the game) while any of these is true, and the claim countdown stops meanwhile:
     - The top bar's Pause button opens the Paused dialog (`pause-dialog.tsx`), whose Resume carries on.
@@ -250,7 +284,7 @@ Function components only; there is no global store.
   - The deck and the discard pile are stacked, overhanging the right edge.
   - Your hand is an arch along the bottom edge, showing only the top of each card (`arch.ts`, `--hand-show`). However many cards you hold, each card's corner (value and suit) stays on the screen.
   - Its root is `overflow: clip`, not `hidden`: the browser can scroll a `hidden` box to show a card you tap, and the hand and piles hang off the edges.
-- **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and what players say after a move (`speechFor`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
+- **`log-text.ts`** turns `view.log` into words: the activity panel, each opponent's last move, the "New" / "Claimed" / "Back" tag on the card you just got, and the table talk among the moves, where it was said (`activityEntries(view, talk)`). **`players.ts`** says where seats sit from your point of view. Opponents are numbered 1, 2, 3 in turn order after you, and each has a colour (`opponentSeats`, `opponentIndex`, `seatName`, `seatColor`).
 - `go-down-dialog.tsx` keeps its slot picks in local state (`useSlots`) and only hands back the finished setruns, as indices into your hand. A run that could be laid out more than one way (`runLayouts`) shows each, by the values it would go between ("10–K ♥", "J–A ♥"), and the chosen one goes down (`from`). On a phone it's a sheet that fills the screen: the slots across the top, your hand in the arch along the bottom.
 - The round-end dialog's button sends `ready`. Once you are ready, it names who it's waiting for, which only shows in a game with other people. On a phone it fills the screen, with the result on the left and a compact `Scoreboard` on the right. At the end of the game it shows your record (wins, games, and where you finished in the last ten, this game ringed) once `GameScreen` has your history, and offers Your stats beside New game.
 - `src/components/ui/` holds shadcn/ui components (Radix based, added with `npx shadcn@latest add <name>`, which writes `.tsx`). They are copied into the repo to be edited: `button.tsx` sizes were raised so every button is at least 44px.

@@ -3,7 +3,9 @@ import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Card} from '@/engine/cards.ts';
 import type {BotLevel} from '@/engine/bot.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
+import type {Talk} from '@/client/game-client.ts';
 import TopBar from './top-bar.tsx';
 import {OpponentPanel} from './opponent-panel.tsx';
 import Meld, {MeldRow} from './meld.tsx';
@@ -24,6 +26,7 @@ import {isInTurn, type YourTurn} from './your-turn.ts';
 import type {RunEnd} from '@/engine/setruns.ts';
 import type {EndChoice} from './meld.tsx';
 import type {HandSort} from './hand-order.ts';
+import type {Bubble} from './speech-bubble.tsx';
 
 /** A dialog you can open from the top bar while you play. GameScreen shows the settings. */
 export type TableDialog = "scores" | "rules" | "settings";
@@ -53,6 +56,8 @@ interface GameTableProps {
     sort: HandSort;
     /** each seat's bot level, by seat (null for a person) */
     levels: (BotLevel | null)[];
+    /** who sits in each seat, by seat (null for you, or a bot that isn't one of the cast) */
+    characters: (CharacterId | null)[];
     /** whether the game is paused, which stops the claim countdown */
     paused: boolean;
     /** the scores, the rules or the settings, if open */
@@ -64,8 +69,10 @@ interface GameTableProps {
     /** the run the selected card asks which end of, by seat and setrun */
     endChoice: {seat: number; index: number; choice: EndChoice} | null;
     newCard: NewCard | null;
-    /** what each opponent is saying, by seat */
-    speech: Record<number, string | null>;
+    /** what each opponent is saying now, by seat */
+    speech: Record<number, Bubble | null>;
+    /** the table talk you see this round, for the activity */
+    talk: Talk[];
     /** why your last move was refused, for a few seconds after */
     notice: string | null;
     actions: TableActions;
@@ -109,7 +116,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom. Short screens (phones held sideways) get their own layout
 // (PhoneTable), with the opponents in the top bar.
-function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, endChoice, newCard, speech, notice, actions}: GameTableProps) {
+function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, lookLeft, endChoice, newCard, speech, talk, notice, actions}: GameTableProps) {
     // Each card is rendered for one layout only, because each card must
     // appear once for its animations to work.
     let short = useMediaQuery("(max-height: 560px)");
@@ -154,6 +161,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, en
                 count : view.seats[seat].cards.length,
                 isDown : view.seats[seat].isDown,
                 hard : levels[seat] === "hard",
+                character : characters[seat] ?? null,
                 active : isInTurn(view, seat),
                 cards : short ? view.seats[seat].cards : null
             }))}
@@ -178,7 +186,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, en
     );
     let dialogs = (
         <>
-            <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => actions.showDialog(open ? "scores" : null)} view={view} />
+            <ScoresDialog open={dialog === "scores"} onOpenChange={(open) => actions.showDialog(open ? "scores" : null)} view={view} characters={characters} />
             <RulesDialog open={dialog === "rules"} onOpenChange={(open) => actions.showDialog(open ? "rules" : null)} />
             <RotatePrompt />
         </>
@@ -189,6 +197,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, en
             <TableDnd view={view} hand={hand} turn={turn} actions={actions}>
                 <PhoneTable
                     view={view}
+                    characters={characters}
                     hand={hand}
                     sort={sort}
                     turn={turn}
@@ -222,6 +231,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, en
                             player={view.seats[seat]}
                             index={opponentIndex(view, seat)}
                             hard={levels[seat] === "hard"}
+                            character={characters[seat]}
                             active={isInTurn(view, seat)}
                             speech={speech[seat]}
                             lastAction={view.look ? (view.look.ready[seat] ? "Ready" : "Looking at their hand") : lastAction(view, seat)}
@@ -248,7 +258,7 @@ function GameTable({view, hand, sort, levels, paused, dialog, turn, lookLeft, en
                     <div className="[grid-area:piles]">{piles}</div>
 
                     <div className="flex min-h-0 items-center justify-end self-stretch [grid-area:log]">
-                        <ActivityLog entries={activityEntries(view)} />
+                        <ActivityLog entries={activityEntries(view, talk)} />
                     </div>
                 </section>
 

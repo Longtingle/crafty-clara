@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import Scoreboard from './scoreboard.tsx';
@@ -36,6 +37,8 @@ function YourRecord({record}: {record: GameRecord[]}) {
 
 interface RoundEndDialogProps {
     view: GameView;
+    /** who sits in each seat, by seat */
+    characters?: (CharacterId | null)[];
     /** at the end of the game: your finished games, this one last, once they're loaded */
     record: GameRecord[] | null;
     onReady: () => void;
@@ -48,12 +51,12 @@ interface RoundEndDialogProps {
 // round is dealt once everyone is ready, so once you are, it says who it's
 // waiting for. On a phone it fills the screen: the result on the left, the
 // scores on the right.
-function RoundEndDialog({view, record, onReady, onNewGame, onShowStats}: RoundEndDialogProps) {
+function RoundEndDialog({view, characters = [], record, onReady, onNewGame, onShowStats}: RoundEndDialogProps) {
     let short = useMediaQuery("(max-height: 560px)");
     if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
     let {round, rounds : roundCount} = view;
-    let rows = scoreRows(view, true);
+    let rows = scoreRows(view, true, characters);
     let isFinalRound = view.phase === "gameEnd";
     let ranked = [...rows].sort((a, b) => a.total - b.total);
     let leader = ranked[0];

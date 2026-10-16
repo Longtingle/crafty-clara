@@ -3,11 +3,13 @@
 // when it ends. App loads this with the game screen, after the home screen.
 
 import type {BotLevel} from './engine/bot.ts';
+import type {CharacterId} from './engine/cast.ts';
 import {viewFor} from './engine/view.ts';
 import {startLocalGame, type LocalGame, type LocalGameSave} from './host/local-game.ts';
 import type {Clock} from './host/clock.ts';
 import {createGameClient, type GameClient} from './client/game-client.ts';
 import type {SavedGame} from './storage/saved-game.ts';
+import type {HeardLines} from './storage/heard-lines.ts';
 import {gameRecord, type GameHistory} from './storage/history.ts';
 
 export interface Session {
@@ -15,20 +17,26 @@ export interface Session {
     client: GameClient;
     /** each seat's bot level, by seat (null for you) */
     levels: (BotLevel | null)[];
+    /** who sits in each seat, by seat (null for you, and for a bot from before the cast) */
+    characters: (CharacterId | null)[];
 }
 
 export interface SessionOptions {
-    /** a new game against bots of these levels */
+    /** a new game against these characters, at these levels */
+    cast?: CharacterId[];
     levels?: BotLevel[];
     seed?: number;
     /** or a saved game to carry on */
     from?: LocalGameSave;
     savedGame: SavedGame;
     history: GameHistory;
+    /** the table talk heard lately: the bots keep off it, and this game's is added */
+    heardLines?: HeardLines;
+    heard?: string[];
     clock?: Clock;
 }
 
-export const startSession = ({levels = [], seed, from, savedGame, history, clock}: SessionOptions): Session => {
+export const startSession = ({cast, levels = [], seed, from, savedGame, history, heardLines, heard, clock}: SessionOptions): Session => {
     let finished = false;
     const keep = (save: LocalGameSave): void => {
         if (save.state.phase !== "gameEnd") {
@@ -37,9 +45,19 @@ export const startSession = ({levels = [], seed, from, savedGame, history, clock
             finished = true;
             savedGame.save(null);
             let view = viewFor(save.state, 0, save.savedAt);
-            void history.add(gameRecord(view, [null, ...save.bots.map(bot => bot.level)], Date.now()));
+            void history.add(gameRecord(view, [null, ...save.bots.map(bot => bot.level)], Date.now(), [null, ...save.bots.map(bot => bot.character ?? null)]));
         }
     };
-    let game = startLocalGame({name : "You", levels, seed, from, clock, onChange : keep});
-    return {game, client : createGameClient(game.port), levels : [null, ...game.levels]};
+    let game = startLocalGame({name : "You", cast, levels, seed, from, recentLines : heard, clock, onChange : keep});
+    let client = createGameClient(game.port);
+    // each line said is kept as heard
+    let heardUpTo = 0;
+    client.subscribe(() => {
+        for (let said of client.getSnapshot().talk) {
+            if (said.seq <= heardUpTo) continue;
+            heardUpTo = said.seq;
+            heardLines?.add(said.line.id);
+        }
+    });
+    return {game, client, levels : [null, ...game.levels], characters : [null, ...game.characters]};
 };

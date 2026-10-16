@@ -1,5 +1,6 @@
 // @vitest-environment node
 import {ROUND_REQUIREMENTS} from '../engine/cards.ts';
+import {character} from '../engine/cast.ts';
 import type {Command} from '../engine/game.ts';
 import type {GameView} from '../engine/view.ts';
 import {startBot} from './bot-player.ts';
@@ -18,7 +19,7 @@ const playAsYou = (port: SeatPort, clock: TestClock, ignore: Command["type"][] =
     const filtered: SeatPort = {
         ...port,
         send : message => {
-            if (!ignore.includes(message.command.type)) port.send(message);
+            if (message.type !== "command" || !ignore.includes(message.command.type)) port.send(message);
         }
     };
     startBot(filtered, {clock, onRefused : message => refusals.push(message.error)});
@@ -122,6 +123,47 @@ describe('a local game', () => {
         expect(saves.at(-1)!.savedAt).toBeGreaterThan(saves[0].savedAt);
         // ready to be stored
         expect(JSON.parse(JSON.stringify(saves.at(-1)))).toEqual(saves.at(-1));
+    });
+
+    it('seats the characters you chose, each with their own name and appetite for risk', () => {
+        const saves: LocalGameSave[] = [];
+        const game = startLocalGame({name : "You", seed : 7, cast : ["clara", "steve", "vena"], levels : ["hard"], clock : createTestClock(), onChange : save => saves.push(save)});
+        expect(game.host.state().seats.map(seat => seat.name)).toEqual(["You", "Clara", "Steve", "Vena"]);
+        expect(game.characters).toEqual(["clara", "steve", "vena"]);
+        expect(saves[0].bots).toMatchObject([
+            {level : "hard", character : "clara", risk : character("clara").risk},
+            {level : "normal", character : "steve", risk : character("steve").risk},
+            {level : "normal", character : "vena", risk : character("vena").risk}
+        ]);
+        game.stop();
+
+        // carried on, they're still themselves
+        const again = startLocalGame({name : "You", clock : createTestClock(), from : JSON.parse(JSON.stringify(saves[0]))});
+        expect(again.characters).toEqual(["clara", "steve", "vena"]);
+        expect(again.host.state().seats.map(seat => seat.name)).toEqual(["You", "Clara", "Steve", "Vena"]);
+        again.stop();
+
+        // bots from before the cast aren't anyone in particular
+        expect(startLocalGame({name : "You", clock : createTestClock()}).characters).toEqual([null, null, null]);
+    });
+
+    it('has the cast talk as they play, each in their own words, and never you', () => {
+        const clock = createTestClock();
+        const game = startLocalGame({name : "You", seed : 3, cast : ["clara", "chris", "gemma"], clock});
+        const said: {seat: number; id: string; text: string}[] = [];
+        game.port.listen(message => {
+            if (message.type === "said") said.push({seat : message.seat, id : message.line.id, text : message.line.text});
+        });
+        playAsYou(game.port, clock);
+        clock.runAll();
+        expect(game.host.state().phase).toBe("gameEnd");
+        expect(said.length).toBeGreaterThan(20);
+        for (let {seat, id, text} of said) {
+            expect(seat).toBeGreaterThan(0);
+            // their own lines, or the answer written for someone else's
+            expect(id.startsWith(game.characters[seat - 1] + ".") || id.includes(".reply.")).toBe(true);
+            expect(text).not.toMatch(/[{}]/);
+        }
     });
 
     it('carries on from a save to the end of the game', () => {

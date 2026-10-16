@@ -3,8 +3,8 @@ import type {ActivityEntry} from './log-text.ts';
 
 const SHOWN = 5;
 
-// The latest moves, newest first, so nothing an opponent does goes unseen.
-// entries come from activityEntries (log-text.ts). In a short window the
+// The latest moves, newest first, so nothing an opponent does goes unseen,
+// and what they've said. entries come from activityEntries (log-text.ts). In a short window the
 // oldest fade out at the bottom: the fade covers the list's bottom padding, so
 // it only shows on entries that don't fit.
 function ActivityLog({entries}: {entries: ActivityEntry[]}) {
@@ -35,7 +35,7 @@ function ActivityLog({entries}: {entries: ActivityEntry[]}) {
                                     className="mt-1 size-2.5 flex-none rounded-full ring-[1.5px] ring-white/50"
                                     style={{backgroundColor : entry.color}}
                                 />
-                                <span><strong>{entry.name}</strong> {entry.text}</span>
+                                <span><strong>{entry.name}</strong> {entry.quote ? <i>{entry.text}</i> : entry.text}</span>
                             </motion.li>
                         ))}
                     </ol>

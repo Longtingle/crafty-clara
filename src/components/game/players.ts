@@ -1,8 +1,10 @@
+import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 
 // Who sits where, from your point of view. Your opponents are numbered 1, 2,
 // 3... in turn order after you, and each has a colour for their avatar and
-// their entries in the activity log.
+// their entries in the activity log. A character has a portrait too, facing
+// right, into the table.
 const AI_COLORS = ["#2f6f99", "#a0662a", "#7650ae", "#2f7f6f", "#9a4466"];
 
 const YOU_COLOR = "#f4efe3";
@@ -21,6 +23,8 @@ const opponentIndex = (view: GameView, seat: number): number => (seat - view.sea
 const seatName = (view: GameView, seat: number): string => (seat === view.seat) ? "You" : view.seats[seat].name;
 
 const seatColor = (view: GameView, seat: number): string => (seat === view.seat) ? YOU_COLOR : aiColor(opponentIndex(view, seat));
+
+const portraitImage = (id: CharacterId): string => import.meta.env.BASE_URL + "img/portraits/" + id + ".webp";
 
 /** A place in a grid, from 0. */
 export interface GridPlace {
@@ -45,4 +49,4 @@ const seatPlaces = (count: number): {columns: number; places: GridPlace[]} => {
     return {columns, places : round.slice(0, count)};
 }
 
-export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor, seatPlaces};
+export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor, portraitImage, seatPlaces};

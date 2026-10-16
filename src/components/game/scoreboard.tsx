@@ -50,6 +50,7 @@ function Scoreboard({rows, roundCount, highlightRound, compact = false}: Scorebo
                                     <Avatar
                                         color={row.color}
                                         label={row.label}
+                                        character={row.character}
                                         className={cn(compact ? "size-6 text-[11px]" : "size-7 text-[13px]", row.isYou && "text-[10px] text-[#12402a]", row.isYou && compact && "text-[9px]")}
                                     />
                                     <span className="font-bold">{row.name}</span>

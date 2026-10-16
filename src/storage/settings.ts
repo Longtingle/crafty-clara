@@ -1,11 +1,19 @@
-// Your choices, kept for next time: how crafty each opponent is, and which
-// hints you want while you play.
+// Your choices, kept for next time: who you play, how crafty each opponent
+// is, which hints you want while you play, and how much table talk.
 
 import type {BotLevel} from '@/engine/bot.ts';
+import {isCharacterId, type CharacterId} from '@/engine/cast.ts';
 import type {KeyValueStore} from './store.ts';
 
+const CAST_KEY = "crafty-clara.cast";
 const LEVELS_KEY = "crafty-clara.levels";
 const HINTS_KEY = "crafty-clara.hints";
+const TALK_KEY = "crafty-clara.talk";
+
+/** How much of the table talk you see: none, just the big moments, or all of it. */
+export type TalkLevel = "off" | "quiet" | "chatty";
+
+export const DEFAULT_TALK: TalkLevel = "chatty";
 
 /** Help while you play, each on or off. */
 export interface Hints {
@@ -20,15 +28,28 @@ export interface Hints {
 export const DEFAULT_HINTS: Hints = {fits : true, targets : true, ready : false};
 
 export interface Settings {
+    /** who sits in each opponent's seat, as last chosen, or null if never chosen */
+    cast(): Promise<CharacterId[] | null>;
+    setCast(cast: CharacterId[]): void;
     /** each opponent's level, as last chosen, or null if never chosen */
     levels(): Promise<BotLevel[] | null>;
     setLevels(levels: BotLevel[]): void;
     /** your hints, with the defaults for any never chosen */
     hints(): Promise<Hints>;
     setHints(hints: Hints): void;
+    /** how much table talk you see */
+    talk(): Promise<TalkLevel>;
+    setTalk(level: TalkLevel): void;
 }
 
 export const createSettings = (store: KeyValueStore): Settings => ({
+    async cast() {
+        let saved = await store.get(CAST_KEY);
+        return (Array.isArray(saved) && saved.every(isCharacterId) && new Set(saved).size === saved.length) ? saved : null;
+    },
+    setCast(cast) {
+        void store.set(CAST_KEY, cast);
+    },
     async levels() {
         let saved = await store.get(LEVELS_KEY);
         return (Array.isArray(saved) && saved.every(level => level === "normal" || level === "hard")) ? saved : null;
@@ -46,5 +67,12 @@ export const createSettings = (store: KeyValueStore): Settings => ({
     },
     setHints(hints) {
         void store.set(HINTS_KEY, hints);
+    },
+    async talk() {
+        let saved = await store.get(TALK_KEY);
+        return (saved === "off" || saved === "quiet" || saved === "chatty") ? saved : DEFAULT_TALK;
+    },
+    setTalk(level) {
+        void store.set(TALK_KEY, level);
     }
 });

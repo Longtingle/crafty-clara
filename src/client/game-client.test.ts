@@ -18,7 +18,7 @@ const setUp = () => {
 
 describe('a game client', () => {
     it('has no view until the host sends one', () => {
-        expect(setUp().client.getSnapshot()).toEqual({view : null, refusal : null});
+        expect(setUp().client.getSnapshot()).toEqual({view : null, refusal : null, talk : []});
     });
 
     it('keeps the latest view, and tells its listeners', () => {
@@ -44,6 +44,22 @@ describe('a game client', () => {
         expect(after).not.toBe(first);
         expect(after.view).toBe(first.view);
         expect(after.refusal).toEqual({command : {type : "claim"}, error : "There's no discard for you to claim", seq : 2});
+    });
+
+    it("keeps what's said this round, numbered", () => {
+        const {clock, client, hostEnd} = setUp();
+        const line = (text: string) => ({id : text, text});
+        hostEnd.send({type : "said", seat : 1, line : line("Who dealt this rubbish?"), round : 0, after : 0});
+        hostEnd.send({type : "said", seat : 0, line : line("Not me."), round : 0, after : 0});
+        clock.advance(0);
+        expect(client.getSnapshot().talk).toEqual([
+            {seat : 1, line : line("Who dealt this rubbish?"), round : 0, after : 0, seq : 1},
+            {seat : 0, line : line("Not me."), round : 0, after : 0, seq : 2}
+        ]);
+        // a new round starts afresh
+        hostEnd.send({type : "said", seat : 1, line : line("Here we go again."), round : 1, after : 3});
+        clock.advance(0);
+        expect(client.getSnapshot().talk).toEqual([{seat : 1, line : line("Here we go again."), round : 1, after : 3, seq : 3}]);
     });
 
     it('sends commands to the host', () => {

@@ -63,6 +63,29 @@ describe('host', () => {
         expect(received[1][1]).toEqual({type : "refused", command : {type : "draw", from : "deck"}, error : "It's not your turn"});
     });
 
+    it("passes on what a seat says to every seat, with when it was said, and changes nothing", () => {
+        const {host, ports, received, clock, send} = setUp();
+        send(0, {type : "draw", from : "discard"});
+        const before = host.state();
+        const line = {id : "alan.dealBlame.0", text : "Who dealt this rubbish?", to : 3, invites : "dealer"} as const;
+        ports[1].send({type : "say", line});
+        clock.advance(0);
+        expect(host.state()).toBe(before);
+        for (let messages of received) expect(messages.at(-1)).toEqual({type : "said", seat : 1, line, round : 0, after : 1});
+
+        // too soon after the last, or not a line at all, and it's dropped
+        const counts = received.map(messages => messages.length);
+        ports[1].send({type : "say", line : {id : "a", text : "And another thing"}});
+        ports[2].send({type : "say", line : {id : "b", text : "x".repeat(500)}});
+        ports[2].send({type : "say", line : {id : "c"}} as never);
+        clock.advance(0);
+        expect(received.map(messages => messages.length)).toEqual(counts);
+        clock.advance(1000);
+        ports[1].send({type : "say", line : {id : "a", text : "And another thing"}});
+        clock.advance(0);
+        expect(received[0].at(-1)).toMatchObject({type : "said", seat : 1, line : {text : "And another thing"}});
+    });
+
     it('refuses a command that makes no sense', () => {
         const {send, received} = setUp();
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});

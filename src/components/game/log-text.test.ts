@@ -4,7 +4,7 @@ import {checkSetrun} from '@/engine/setruns.ts';
 import type {LogEntry} from '@/engine/game.ts';
 import type {GameView} from '@/engine/view.ts';
 import {card, cards} from '@/engine/testing.ts';
-import {describeEntry, activityEntries, lastAction, newCardTag, speechFor} from './log-text.ts';
+import {describeEntry, activityEntries, lastAction, newCardTag} from './log-text.ts';
 
 const setrun = (str: string, type: SetrunType) => {
     let result = checkSetrun(cards(str), type);
@@ -64,6 +64,28 @@ describe('activityEntries', () => {
             {id : "2-0", name : "Opponent 1", text : "drew from the deck"}
         ]);
     });
+
+    it("puts what's said among the moves, where it was said", () => {
+        const view = viewWith([
+            {type : "draw", seat : 1, from : "deck", card : null},
+            {type : "discard", seat : 1, card : card("12S")}
+        ]);
+        const said = (seat: number, text: string, after: number, seq: number, round = 2) => ({seat, line : {id : "x" + seq, text}, round, after, seq});
+        const entries = activityEntries(view, [
+            said(2, "Who dealt this rubbish?", 0, 1),
+            said(3, "Not me.", 0, 2),
+            said(1, "Ta.", 2, 3),
+            // last round's
+            said(2, "Old news.", 0, 4, 1)
+        ]);
+        expect(entries.map(({name, text, quote}) => [name, text, quote ?? false])).toEqual([
+            ["Opponent 1", "“Ta.”", true],
+            ["Opponent 1", "discarded Q♠", false],
+            ["Opponent 1", "drew from the deck", false],
+            ["Opponent 3", "“Not me.”", true],
+            ["Opponent 2", "“Who dealt this rubbish?”", true]
+        ]);
+    });
 });
 
 describe('lastAction', () => {
@@ -85,19 +107,5 @@ describe('newCardTag', () => {
         expect(newCardTag(viewWith([drew, discarded]))).toBeNull();
         expect(newCardTag(viewWith([drew, discarded, claimed]))).toEqual({id : "b", label : "Claimed"});
         expect(newCardTag(viewWith([drew, back]))).toEqual({id : "c", label : "Back"});
-    });
-});
-
-describe('speechFor', () => {
-    it('has the player speak after a move, and the next player think after a discard', () => {
-        const view = viewWith([]);
-        expect(speechFor({type : "claim", seat : 2, card : card("3C")}, view)).toEqual([[2, "I'll take that!"]]);
-        expect(speechFor({type : "discard", seat : 3, card : card("3C")}, view)).toEqual([[3, "Does anyone want this?"], [0, "...thinking..."]]);
-    });
-
-    it("has an opponent react when you add to their setrun", () => {
-        const add = (seat: number): LogEntry => ({type : "add", seat, card : card("9S"), target : {seat : 1, index : 0}, returnedAce : null});
-        expect(speechFor(add(0), viewWith([]))).toEqual([[1, "Woah, steady there!"]]);
-        expect(speechFor(add(2), viewWith([]))).toEqual([]);
     });
 });

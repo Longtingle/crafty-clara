@@ -7,9 +7,11 @@ import {browserStore} from './store.ts';
 import {createSavedGame} from './saved-game.ts';
 import {createGameHistory} from './history.ts';
 import {createSettings} from './settings.ts';
+import {createHeardLines} from './heard-lines.ts';
 
 const store = browserStore();
 
 export const savedGame = createSavedGame(store);
 export const gameHistory = createGameHistory(store);
 export const settings = createSettings(store);
+export const heardLines = createHeardLines(store);

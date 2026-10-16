@@ -14,6 +14,7 @@ import {readClues, type Clues, type Memory} from './clues.ts';
 import type {Command, Target} from './game.ts';
 import {random} from './random.ts';
 import type {GameView} from './view.ts';
+import type {CharacterId} from './cast.ts';
 
 export type BotLevel = "normal" | "hard";
 
@@ -27,6 +28,8 @@ export interface BotProfile {
      * secret and lasts the whole game.
      */
     risk?: number;
+    /** who the bot is, if one of the cast (cast.ts): their risk is their own */
+    character?: CharacterId;
 }
 
 export const NORMAL_BOT: BotProfile = {level : "normal", seed : 0};

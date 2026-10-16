@@ -1,66 +1,53 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import type {BotLevel} from '@/engine/bot.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {LookView} from '@/engine/view.ts';
 import {runEnds} from '@/engine/setruns.ts';
-import type {GameClient, Refusal} from '@/client/game-client.ts';
+import type {GameClient, Refusal, Talk} from '@/client/game-client.ts';
 import {useGame} from '@/client/use-game.ts';
-import type {Hints} from '@/storage/settings.ts';
+import type {Hints, TalkLevel} from '@/storage/settings.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import GameTable, {type TableActions, type TableDialog} from './game-table.tsx';
 import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
 import RoundEndDialog from './round-end-dialog.tsx';
 import PauseDialog from './pause-dialog.tsx';
 import SettingsDialog from './settings-dialog.tsx';
-import {opponentSeats} from './players.ts';
-import {newCardTag, speechFor} from './log-text.ts';
+import {newCardTag} from './log-text.ts';
+import type {Bubble} from './speech-bubble.tsx';
 import {yourTurn} from './your-turn.ts';
 import {moveCard, orderHand, type HandSort} from './hand-order.ts';
 
-// How long an opponent's line of speech, and a refused move's notice, stay up (ms).
-const SPEECH_MS = 2000;
+// How long a refused move's notice stays up (ms).
 const NOTICE_MS = 3000;
 
-// What each opponent is saying, by seat: a line for a moment after some
-// moves, and a grumble from one of them as each round is dealt. It listens to
-// the client, so it hears each new log entry as it arrives.
-function useSpeech(client: GameClient): Record<number, string | null> {
-    let [lines, setLines] = useState<Record<number, string | null>>({});
+// How long a line of table talk stays up (ms): long enough to read.
+const bubbleMs = (text: string): number => Math.min(6000, Math.max(2500, 1500 + text.length * 55));
+
+// What each opponent is saying now, by seat, from the talk you see. Each line
+// stays up long enough to read, or until the same player says something
+// else. Lines said before the screen opened don't show.
+function useBubbles(talk: Talk[]): Record<number, Bubble | null> {
+    let [bubbles, setBubbles] = useState<Record<number, Bubble | null>>({});
+    let shown = useRef(talk.at(-1)?.seq ?? 0);
+    let timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
     useEffect(() => {
-        let timers: Record<number, ReturnType<typeof setTimeout>> = {};
-        // the round and how much of its log has been heard
-        let heard = {round : -1, count : 0};
-        let current = client.getSnapshot().view;
-        if (current) heard = {round : current.round, count : current.log.length};
-
-        let stop = client.subscribe(() => {
-            let view = client.getSnapshot().view;
-            if (!view) return;
-            let {round, log} = view;
-            let newRound = heard.round !== round;
-            let fresh = newRound ? log : log.slice(heard.count);
-            heard = {round, count : log.length};
-
-            let said = fresh.flatMap(entry => speechFor(entry, view));
-            if (newRound && log.length === 0) {
-                let opponents = opponentSeats(view);
-                said.push([opponents[Math.floor(Math.random() * opponents.length)], "Oh I've got a hand like a foot!"]);
-            }
-            said = said.filter(([seat]) => seat !== view.seat);
-            if (said.length === 0) return;
-
-            setLines(old => ({...old, ...Object.fromEntries(said)}));
-            for (let [seat] of said) {
-                clearTimeout(timers[seat]);
-                timers[seat] = setTimeout(() => setLines(old => ({...old, [seat] : null})), SPEECH_MS);
-            }
-        });
-        return () => {
-            stop();
-            Object.values(timers).forEach(clearTimeout);
-        };
-    }, [client]);
-    return lines;
+        let fresh = talk.filter(said => said.seq > shown.current);
+        if (fresh.length === 0) return;
+        shown.current = fresh.at(-1)!.seq;
+        setBubbles(old => ({...old, ...Object.fromEntries(fresh.map(said => [said.seat, {key : said.seq, text : said.line.text}]))}));
+        for (let said of fresh) {
+            clearTimeout(timers.current[said.seat]);
+            timers.current[said.seat] = setTimeout(() => {
+                setBubbles(old => (old[said.seat]?.key === said.seq) ? {...old, [said.seat] : null} : old);
+            }, bubbleMs(said.line.text));
+        }
+    }, [talk]);
+    useEffect(() => {
+        let pending = timers.current;
+        return () => Object.values(pending).forEach(clearTimeout);
+    }, []);
+    return bubbles;
 }
 
 // How long until play starts (ms), while everyone looks over their hand:
@@ -119,9 +106,14 @@ interface GameScreenProps {
     client: GameClient;
     /** each seat's bot level, by seat (null for a person) */
     levels: (BotLevel | null)[];
+    /** who sits in each seat, by seat (null for a person, or a bot that isn't one of the cast) */
+    characters?: (CharacterId | null)[];
     pausing: Pausing;
     hints: Hints;
     onHintsChange: (hints: Hints) => void;
+    /** how much of the table talk you see */
+    talk?: TalkLevel;
+    onTalkChange?: (level: TalkLevel) => void;
     /** your finished games, for your record when this one ends */
     games: () => Promise<GameRecord[]>;
     onNewGame: () => void;
@@ -135,8 +127,15 @@ interface GameScreenProps {
 // Nothing in the game moves while you've paused it, or while you're reading
 // the scores, the rules or the settings. Leaving the page (for another tab,
 // or another app on a phone) pauses it, so you come back to the Paused dialog.
-function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNewGame, onShowStats}: GameScreenProps) {
-    let {view, refusal, send} = useGame(client);
+function GameScreen({client, levels, characters = [], pausing, hints, onHintsChange, talk : talkLevel = "chatty", onTalkChange = () => {}, games, onNewGame, onShowStats}: GameScreenProps) {
+    let {view, refusal, talk, send} = useGame(client);
+    // the table talk you see: none, the big moments, or all of it
+    let seat = view?.seat;
+    let heard = useMemo(
+        () => talk.filter(said => said.seat !== seat && (talkLevel === "chatty" || (talkLevel === "quiet" && said.line.big))),
+        [talk, talkLevel, seat]
+    );
+    let speech = useBubbles(heard);
     // The hand stays sorted the way you last chose until you arrange it
     // yourself. Your own order lasts until the next deal, which comes sorted.
     let [sorted, setSorted] = useState<Exclude<HandSort, "own">>("value");
@@ -149,7 +148,6 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
     let [choosing, setChoosing] = useState<{seat: number; index: number; card: string} | null>(null);
     let [paused, setPaused] = useState(false);
     let [dialog, setDialog] = useState<TableDialog | null>(null);
-    let speech = useSpeech(client);
     let notice = useNotice(refusal);
     let record = useRecord(view?.phase === "gameEnd", games);
 
@@ -257,6 +255,7 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
                 hand={hand}
                 sort={sort}
                 levels={levels}
+                characters={characters}
                 paused={held}
                 dialog={dialog}
                 turn={turn}
@@ -264,6 +263,7 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
                 endChoice={endChoice}
                 newCard={newCardTag(view)}
                 speech={speech}
+                talk={heard}
                 notice={notice}
                 actions={actions}
             />
@@ -274,13 +274,15 @@ function GameScreen({client, levels, pausing, hints, onHintsChange, games, onNew
                 onCancel={() => setGoingDown(false)}
                 onSubmit={goDown}
             />
-            <RoundEndDialog view={view} record={record} onReady={() => send({type : "ready"})} onNewGame={onNewGame} onShowStats={onShowStats} />
+            <RoundEndDialog view={view} characters={characters} record={record} onReady={() => send({type : "ready"})} onNewGame={onNewGame} onShowStats={onShowStats} />
             <PauseDialog open={paused} onResume={() => setPaused(false)} />
             <SettingsDialog
                 open={dialog === "settings"}
                 onOpenChange={(open) => setDialog(open ? "settings" : null)}
                 hints={hints}
                 onHintsChange={onHintsChange}
+                talk={talkLevel}
+                onTalkChange={onTalkChange}
                 inGame
             />
         </>

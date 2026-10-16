@@ -3,7 +3,7 @@ import {motion} from 'motion/react';
 import {ChartColumn, Settings} from 'lucide-react';
 import {Button} from '@/components/ui/button.tsx';
 import {createCard, ROUND_REQUIREMENTS} from '@/engine/cards.ts';
-import type {Hints} from '@/storage/settings.ts';
+import type {Hints, TalkLevel} from '@/storage/settings.ts';
 import {PlayingCard} from './playing-card.tsx';
 import {preloadCardImages} from './cards.ts';
 import RulesDialog from './rules-dialog.tsx';
@@ -19,6 +19,8 @@ interface HomeProps {
     onShowStats: () => void;
     hints: Hints;
     onHintsChange: (hints: Hints) => void;
+    talk: TalkLevel;
+    onTalkChange: (level: TalkLevel) => void;
 }
 
 // The title screen. With a game saved from last time, carrying it on comes
@@ -26,7 +28,7 @@ interface HomeProps {
 // beside the title, so it all fits on one screen. Your stats and the
 // settings are in a corner: the top right, or on a phone the top left as
 // icons, clear of the title.
-function Home({savedRound, onContinue, onStartGame, onShowStats, hints, onHintsChange}: HomeProps) {
+function Home({savedRound, onContinue, onStartGame, onShowStats, hints, onHintsChange, talk, onTalkChange}: HomeProps) {
     let [showRules, setShowRules] = useState(false);
     let [showSettings, setShowSettings] = useState(false);
     // load the card faces while the player reads the home screen
@@ -81,7 +83,7 @@ function Home({savedRound, onContinue, onStartGame, onShowStats, hints, onHintsC
                 </div>
             </div>
             <RulesDialog open={showRules} onOpenChange={setShowRules} />
-            <SettingsDialog open={showSettings} onOpenChange={setShowSettings} hints={hints} onHintsChange={onHintsChange} />
+            <SettingsDialog open={showSettings} onOpenChange={setShowSettings} hints={hints} onHintsChange={onHintsChange} talk={talk} onTalkChange={onTalkChange} />
         </main>
     );
 }

@@ -5,8 +5,9 @@ import {cn} from '@/lib/utils.ts';
 import {canGoFullscreen, goFullscreen} from '@/lib/fullscreen.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Requirement} from '@/engine/cards.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import {plural} from '@/engine/card-names.ts';
-import {aiColor} from './players.ts';
+import {aiColor, portraitImage} from './players.ts';
 import {HiddenHand} from './opponent-panel.tsx';
 
 /** An opponent as the top bar shows them on short screens. */
@@ -18,6 +19,8 @@ export interface OpponentChip {
     isDown: boolean;
     /** whether they're a hard bot */
     hard: boolean;
+    /** who they are, if one of the cast */
+    character: CharacterId | null;
     active: boolean;
     /** their cards' ids, set only on short screens, where their cards fly to and from here */
     cards: string[] | null;
@@ -51,10 +54,12 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                 >
                     <span
                         aria-hidden="true"
-                        className="relative grid size-6 place-items-center rounded-full text-white"
+                        className={cn("relative grid size-6 place-items-center rounded-full text-white", opponent.character && "size-6.5 p-0.5")}
                         style={{backgroundColor : aiColor(opponent.index)}}
                     >
-                        {opponent.index + 1}
+                        {opponent.character
+                            ? <img src={portraitImage(opponent.character)} alt="" draggable={false} className="block size-full rounded-full object-cover" />
+                            : opponent.index + 1}
                         {opponent.isDown && (
                             <span className="absolute -right-1 -bottom-1 grid size-3.5 place-items-center rounded-full bg-cream text-[#12402a]">
                                 <Check className="size-2.5" strokeWidth={4} />

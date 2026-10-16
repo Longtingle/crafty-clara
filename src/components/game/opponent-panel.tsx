@@ -1,10 +1,12 @@
 import type {ReactNode} from 'react';
 import {AnimatePresence} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {SeatView} from '@/engine/view.ts';
 import {CardBack, MovingCard} from './playing-card.tsx';
 import {MeldRow} from './meld.tsx';
-import {aiColor} from './players.ts';
+import {aiColor, portraitImage} from './players.ts';
+import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
 
 // Where an opponent's cards fly to and from. Their hand is hidden (the view
 // gives only the cards' ids), so each card is a small back, all stacked in one
@@ -42,7 +44,25 @@ function Chip({tone = "outline", children}: {tone?: "gold" | "cream" | "outline"
     );
 }
 
-function Avatar({color, label, className}: {color: string; label: ReactNode; className?: string}) {
+interface AvatarProps {
+    color: string;
+    /** what it says, without a portrait: an opponent's number, or "You" */
+    label: ReactNode;
+    /** whose portrait it shows, in a ring of their colour */
+    character?: CharacterId | null;
+    className?: string;
+}
+
+// A player's badge: a character's portrait in a ring of their colour, or else
+// their colour with a label.
+function Avatar({color, label, character, className}: AvatarProps) {
+    if (character) {
+        return (
+            <span aria-hidden="true" className={cn("block size-11 flex-none rounded-full p-[3px]", className)} style={{backgroundColor : color}}>
+                <img src={portraitImage(character)} alt="" draggable={false} className="block size-full rounded-full object-cover" />
+            </span>
+        );
+    }
     return (
         <span
             aria-hidden="true"
@@ -60,25 +80,28 @@ interface OpponentPanelProps {
     index: number;
     /** whether they're a hard bot */
     hard: boolean;
+    /** who they are, if one of the cast */
+    character?: CharacterId | null;
     active: boolean;
-    /** what they are saying, if anything */
-    speech: string | null | undefined;
+    /** what they're saying, if anything */
+    speech: Bubble | null | undefined;
     lastAction: string | null;
     /** their setruns */
     children: ReactNode;
 }
 
-// An opponent's name, status and score, with their setruns below. The line
-// under the name shows what they are saying, or else their last move.
-function OpponentPanel({player, index, hard, active, speech, lastAction, children}: OpponentPanelProps) {
-    let status = speech ? "“" + speech + "”" : (lastAction ?? "Waiting for their turn");
+// An opponent's name, their last move, and their score, with their setruns
+// below. What they say pops up in a bubble from their portrait, over their
+// setruns.
+function OpponentPanel({player, index, hard, character, active, speech, lastAction, children}: OpponentPanelProps) {
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
             <div className={cn(
-                "flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-2.5 compact:py-1.5",
+                "relative flex items-center gap-3 rounded-2xl border-2 bg-panel px-3.5 py-2.5 compact:py-1.5",
                 active ? "border-gold" : "border-border"
             )}>
-                <Avatar color={aiColor(index)} label={index + 1} className="text-lg" />
+                <SpeechBubble bubble={speech} name={player.name} from="above" className="top-full left-1.5 mt-2.5 max-w-[min(320px,100%)]" />
+                <Avatar color={aiColor(index)} label={index + 1} character={character} className={cn("text-lg", character && "size-12")} />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                         <span className="truncate font-bold">{player.name}</span>
@@ -86,8 +109,8 @@ function OpponentPanel({player, index, hard, active, speech, lastAction, childre
                         {active && <Chip tone="gold">Playing</Chip>}
                         {player.isDown && <Chip>Down</Chip>}
                     </div>
-                    <span className={cn("truncate text-[13px] text-muted-foreground", speech && "italic")}>
-                        {status}
+                    <span className="truncate text-[13px] text-muted-foreground">
+                        {lastAction ?? "Waiting for their turn"}
                     </span>
                 </div>
                 <div className="flex flex-none flex-col items-end gap-1">

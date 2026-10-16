@@ -5,8 +5,9 @@ import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog.tsx';
 import {Switch} from '@/components/ui/switch.tsx';
 import {createCard} from '@/engine/cards.ts';
-import type {Hints} from '@/storage/settings.ts';
+import type {Hints, TalkLevel} from '@/storage/settings.ts';
 import {PlayingCard} from './playing-card.tsx';
+import {portraitImage} from './players.ts';
 
 const sectionLabel = "text-xs font-bold tracking-widest text-muted-foreground uppercase short:text-[11px]";
 
@@ -124,18 +125,60 @@ function HintList({hints, onHintsChange}: {hints: Hints; onHintsChange: (hints: 
     );
 }
 
+const TALK_LEVELS: {level: TalkLevel; label: string; about: string}[] = [
+    {level : "off", label : "Off", about : "Nobody says a word."},
+    {level : "quiet", label : "Quiet", about : "Just the big moments: going down, going out, winning."},
+    {level : "chatty", label : "Chatty", about : "Banter, bluffs and the odd terrible pun."}
+];
+
+// How much of what your opponents say you see, with a picture of one of
+// them saying something.
+function TalkChoice({talk, onTalkChange}: {talk: TalkLevel; onTalkChange: (level: TalkLevel) => void}) {
+    let id = useId();
+    return (
+        <div className="flex items-center gap-4.5 rounded-2xl border border-white/10 bg-panel px-4.5 py-4 short:gap-4 short:rounded-[14px] short:px-4 short:py-2">
+            <span aria-hidden="true" className={cn(picture, "relative flex-none")}>
+                <img src={portraitImage("clara")} alt="" className="absolute bottom-0.5 left-1 size-12 rounded-full border-2 border-[#2f6f99] object-cover short:size-9" />
+                <span className="absolute top-1 left-11 rounded-xl bg-cream px-2.5 py-1 text-[13px] font-bold text-[#12402a] shadow-[0_4px_10px_rgb(0_0_0/0.35)] short:top-0 short:left-8 short:px-2 short:text-[11px]">
+                    Ooh!
+                    <span className="absolute -bottom-1 left-1.5 size-2.5 rotate-45 rounded-[2px] bg-cream" />
+                </span>
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span id={id} className="text-[17px] font-bold short:text-base">How chatty</span>
+                <span className="text-sm leading-snug text-muted-foreground short:text-[13.5px]">{TALK_LEVELS.find(option => option.level === talk)!.about}</span>
+            </span>
+            <div role="group" aria-labelledby={id} className="grid flex-none grid-cols-3 gap-1 rounded-xl bg-black/30 p-1 short:p-0.5">
+                {TALK_LEVELS.map(option => (
+                    <Button
+                        key={option.level}
+                        variant="ghost"
+                        aria-pressed={talk === option.level}
+                        onClick={() => onTalkChange(option.level)}
+                        className="px-3.5 aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a] short:px-3 short:text-[15px]"
+                    >
+                        {option.label}
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 interface SettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     hints: Hints;
     onHintsChange: (hints: Hints) => void;
+    talk: TalkLevel;
+    onTalkChange: (level: TalkLevel) => void;
     /** opened from a game, which waits while it's open */
     inGame?: boolean;
 }
 
-// Your settings, for now the hints. A dialog, or on a phone a sheet that
-// fills the screen. Each change is kept as it's made.
-function SettingsDialog({open, onOpenChange, hints, onHintsChange, inGame = false}: SettingsDialogProps) {
+// Your settings: how much table talk, and the hints. A dialog, or on a phone
+// a sheet that fills the screen. Each change is kept as it's made.
+function SettingsDialog({open, onOpenChange, hints, onHintsChange, talk, onTalkChange, inGame = false}: SettingsDialogProps) {
     let short = useMediaQuery("(max-height: 560px)");
     let done = (
         <DialogClose asChild>
@@ -159,7 +202,9 @@ function SettingsDialog({open, onOpenChange, hints, onHintsChange, inGame = fals
                             <span className="flex-1" />
                             {done}
                         </header>
-                        <h3 className={sectionLabel}>Hints</h3>
+                        <h3 className={sectionLabel}>Table talk</h3>
+                        <TalkChoice talk={talk} onTalkChange={onTalkChange} />
+                        <h3 className={cn(sectionLabel, "mt-1.5")}>Hints</h3>
                         <HintList hints={hints} onHintsChange={onHintsChange} />
                     </DialogContent>
                 )
@@ -167,15 +212,20 @@ function SettingsDialog({open, onOpenChange, hints, onHintsChange, inGame = fals
                     <DialogContent className="max-h-[calc(100dvh-2rem)] gap-4.5 overflow-y-auto px-7 py-6 sm:max-w-[640px]">
                         <DialogTitle className="text-3xl">Settings</DialogTitle>
                         <div className="flex flex-col gap-1">
+                            <h3 className={sectionLabel}>Table talk</h3>
+                            <p className="text-[15px] text-muted-foreground">What your opponents say as they play: grumbles, bluffs and banter.</p>
+                        </div>
+                        <TalkChoice talk={talk} onTalkChange={onTalkChange} />
+                        <div className="flex flex-col gap-1">
                             <h3 className={sectionLabel}>Hints</h3>
-                            <DialogDescription className="text-[15px]">Help while you play. Turn them off for a sterner game.</DialogDescription>
+                            <p className="text-[15px] text-muted-foreground">Help while you play. Turn them off for a sterner game.</p>
                         </div>
                         <HintList hints={hints} onHintsChange={onHintsChange} />
                         <div className="flex flex-wrap items-center gap-4">
-                            <p className="min-w-48 flex-1 text-[13px] leading-snug text-muted-foreground">
+                            <DialogDescription className="min-w-48 flex-1 text-[13px] leading-snug">
                                 Kept on this device.{" "}
                                 {inGame ? "The game is paused while this is open." : "You can change these during a game too."}
-                            </p>
+                            </DialogDescription>
                             {done}
                         </div>
                     </DialogContent>

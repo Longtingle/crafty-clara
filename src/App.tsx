@@ -1,10 +1,11 @@
 import {lazy, Suspense, useEffect, useState} from 'react';
 import {MotionConfig} from 'motion/react';
 import type {BotLevel} from './engine/bot.ts';
+import {dealCast, type CharacterId} from './engine/cast.ts';
 import type {LocalGameSave} from './host/local-game.ts';
 import type {Session, SessionOptions} from './session.ts';
-import {gameHistory, savedGame, settings} from './storage/platform.ts';
-import {DEFAULT_HINTS, type Hints} from './storage/settings.ts';
+import {gameHistory, heardLines, savedGame, settings} from './storage/platform.ts';
+import {DEFAULT_HINTS, DEFAULT_TALK, type Hints, type TalkLevel} from './storage/settings.ts';
 import type {GameRecord} from './storage/history.ts';
 import Home from './components/game/home.tsx';
 import NewGame from './components/game/new-game.tsx';
@@ -25,6 +26,12 @@ const devSeed = (): number | undefined => {
 
 const OPPONENTS = 3;
 const ALL_NORMAL: BotLevel[] = Array.from({length : OPPONENTS}, () => "normal");
+// who you play the first time, until you choose: kept, so it's the same next time
+const firstCast = (): CharacterId[] => {
+    let cast = dealCast(OPPONENTS);
+    settings.setCast(cast);
+    return cast;
+};
 
 /** The screens besides a game: home, the choice of opponents, and your stats. */
 type Page = "home" | "newGame" | "stats";
@@ -37,8 +44,12 @@ type Page = "home" | "newGame" | "stats";
 // src/storage.
 function App() {
     let [page, setPage] = useState<Page>("home");
+    let [cast, setCast] = useState<CharacterId[] | null>(null);
     let [levels, setLevels] = useState(ALL_NORMAL);
     let [hints, setHints] = useState(DEFAULT_HINTS);
+    let [talk, setTalk] = useState<TalkLevel>(DEFAULT_TALK);
+    // the table talk heard lately, which the cast keep off
+    let [heard, setHeard] = useState<string[]>([]);
     // your finished games, for the stats screen
     let [records, setRecords] = useState<GameRecord[] | null>(null);
     // a game from an earlier visit, to carry on
@@ -48,15 +59,23 @@ function App() {
     useEffect(() => {
         // a failure here is tried again when you deal
         loadGame().catch(() => {});
+        void settings.cast().then(kept => setCast((kept?.length === OPPONENTS) ? kept : firstCast()));
         void settings.levels().then(kept => {
             if (kept?.length === OPPONENTS) setLevels(kept);
         });
         void settings.hints().then(setHints);
+        void settings.talk().then(setTalk);
+        void heardLines.list().then(setHeard);
         void savedGame.load().then(setSaved);
     }, []);
 
     // a game's host and bots run until it's stopped
     useEffect(() => () => session?.game.stop(), [session]);
+
+    let changeCast = (next: CharacterId[]) => {
+        setCast(next);
+        settings.setCast(next);
+    };
 
     let changeLevels = (next: BotLevel[]) => {
         setLevels(next);
@@ -68,6 +87,11 @@ function App() {
         settings.setHints(next);
     };
 
+    let changeTalk = (next: TalkLevel) => {
+        setTalk(next);
+        settings.setTalk(next);
+    };
+
     // On a phone or tablet, starting a game goes full screen (if you've left
     // full screen since, dealing goes back to it)
     let startGame = () => {
@@ -75,12 +99,12 @@ function App() {
         setPage("newGame");
     };
 
-    let play = (options: Pick<SessionOptions, "levels" | "seed" | "from">) => {
+    let play = (options: Pick<SessionOptions, "cast" | "levels" | "seed" | "from">) => {
         void goFullscreen();
         loadGame().then(
             ([{startSession}]) => {
                 try {
-                    setSession(startSession({...options, savedGame, history : gameHistory}));
+                    setSession(startSession({...options, savedGame, history : gameHistory, heardLines, heard}));
                 } catch (error) {
                     // a saved game this version can't carry on
                     console.error(error);
@@ -99,6 +123,7 @@ function App() {
     let newGame = () => {
         setSession(null);
         setPage("newGame");
+        void heardLines.list().then(setHeard);
     };
     let showStats = () => {
         setSession(null);
@@ -113,23 +138,31 @@ function App() {
             <GameScreen
                 client={session.client}
                 levels={session.levels}
+                characters={session.characters}
                 pausing={session.game}
                 hints={hints}
                 onHintsChange={changeHints}
+                talk={talk}
+                onTalkChange={changeTalk}
                 games={gameHistory.list}
                 onNewGame={newGame}
                 onShowStats={showStats}
             />
         );
     } else if (page === "newGame") {
-        screen = (
-            <NewGame
-                levels={levels}
-                onLevelsChange={changeLevels}
-                onDeal={() => play({levels, seed : devSeed()})}
-                onBack={() => setPage("home")}
-            />
-        );
+        // who you play is kept on the device, and read as the page opens
+        screen = cast
+            ? (
+                <NewGame
+                    cast={cast}
+                    onCastChange={changeCast}
+                    levels={levels}
+                    onLevelsChange={changeLevels}
+                    onDeal={() => play({cast, levels, seed : devSeed()})}
+                    onBack={() => setPage("home")}
+                />
+            )
+            : <div className="h-dvh bg-felt" />;
     } else if (page === "stats") {
         screen = <StatsScreen records={records} onBack={() => setPage("home")} onStartGame={startGame} />;
     } else {
@@ -141,6 +174,8 @@ function App() {
                 onShowStats={showStats}
                 hints={hints}
                 onHintsChange={changeHints}
+                talk={talk}
+                onTalkChange={changeTalk}
             />
         );
     }

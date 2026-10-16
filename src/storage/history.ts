@@ -2,6 +2,7 @@
 // not what it adds up to, so stats can be worked out in new ways later.
 
 import type {BotLevel} from '@/engine/bot.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 import type {KeyValueStore} from './store.ts';
 
@@ -29,19 +30,22 @@ export interface PlayerRecord {
     name: string;
     /** a bot's level, or null for a person */
     level: BotLevel | null;
+    /** who a bot was, if one of the cast (not in games from before the cast) */
+    character?: CharacterId;
     /** their points in each round */
     scores: number[];
     /** whether they got down in each round */
     downs: boolean[];
 }
 
-/** The record of a game that has ended, from its last view. */
-export const gameRecord = (view: GameView, levels: (BotLevel | null)[], finishedAt: number): GameRecord => ({
+/** The record of a game that has ended, from its last view, with each seat's level and character, by seat. */
+export const gameRecord = (view: GameView, levels: (BotLevel | null)[], finishedAt: number, characters: (CharacterId | null)[] = []): GameRecord => ({
     finishedAt,
     seat : view.seat,
     players : view.seats.map((player, seat) => ({
         name : player.name,
         level : levels[seat] ?? null,
+        ...(characters[seat] ? {character : characters[seat]} : {}),
         scores : player.scores,
         downs : player.downs
     })),

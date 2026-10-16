@@ -1,7 +1,9 @@
 // @vitest-environment node
+import type {BotProfile} from '../engine/bot.ts';
 import {apply, createGame, expire, type Command, type GameState} from '../engine/game.ts';
+import type {Line} from '../engine/talk.ts';
 import {viewFor} from '../engine/view.ts';
-import {startBot} from './bot-player.ts';
+import {startBot, TALK_PACE} from './bot-player.ts';
 import {createLocalPair} from './transport.ts';
 import {createTestClock} from './testing.ts';
 import type {ClientMessage, HostMessage, RefusedMessage} from './protocol.ts';
@@ -30,7 +32,9 @@ const setUp = () => {
     const clock = createTestClock();
     const [botEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
     const sent: Command[] = [];
-    hostEnd.listen(message => sent.push(message.command));
+    hostEnd.listen(message => {
+        if (message.type === "command") sent.push(message.command);
+    });
     const refused: RefusedMessage[] = [];
     const stop = startBot(botEnd, {clock, pace : PACE, onRefused : message => refused.push(message)});
     const show = (state: GameState) => {
@@ -78,6 +82,48 @@ describe('a bot player', () => {
         hostEnd.send(wrong);
         clock.advance(0);
         expect(refused).toEqual([wrong]);
+    });
+
+    describe('talking', () => {
+        // A bot in seat 3, with this test acting as its host, collecting what it says.
+        const listen = (profile: BotProfile) => {
+            const clock = createTestClock();
+            const [botEnd, hostEnd] = createLocalPair<ClientMessage, HostMessage>(clock);
+            const said: Line[] = [];
+            hostEnd.listen(message => {
+                if (message.type === "say") said.push(message.line);
+            });
+            startBot(botEnd, {clock, profile});
+            // a moment into the round, so there's no deal to talk about
+            hostEnd.send({type : "view", view : viewFor(play(newGame(), 0, {type : "draw", from : "discard"}), 3, 0)});
+            clock.advance(0);
+            return {clock, hostEnd, said};
+        };
+        const BLAMED: Line = {id : "alan.dealBlame.1", text : "Dan, have you got something against me?", to : 3, invites : "dealer"};
+
+        it('answers back, after a moment, when blamed for the deal', () => {
+            let answered = 0;
+            for (let seed = 1; seed <= 10; seed++) {
+                const {clock, hostEnd, said} = listen({level : "normal", seed, character : "gemma"});
+                hostEnd.send({type : "said", seat : 1, line : BLAMED, round : 0, after : 1});
+                clock.advance(TALK_PACE.answer - 1);
+                expect(said).toEqual([]);
+                clock.advance(1);
+                if (said.length === 0) continue;
+                answered++;
+                expect(said).toHaveLength(1);
+                expect(said[0]).toMatchObject({to : 1});
+                expect(said[0].id).toMatch(/^gemma\.dealer\./);
+            }
+            expect(answered).toBeGreaterThan(5);
+        });
+
+        it("says nothing, if it isn't one of the cast", () => {
+            const {clock, hostEnd, said} = listen({level : "normal", seed : 1});
+            hostEnd.send({type : "said", seat : 1, line : BLAMED, round : 0, after : 1});
+            clock.advance(10_000);
+            expect(said).toEqual([]);
+        });
     });
 
     it('does nothing once stopped', () => {

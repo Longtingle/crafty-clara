@@ -2,6 +2,7 @@
 // between you, all talking through local ports as they would over a network.
 
 import type {BotLevel, BotProfile} from '../engine/bot.ts';
+import {character, type CharacterId} from '../engine/cast.ts';
 import type {GameState} from '../engine/game.ts';
 import {random} from '../engine/random.ts';
 import {createPausableClock, systemClock, type Clock} from './clock.ts';
@@ -15,6 +16,8 @@ export interface LocalGameOptions {
     name: string;
     /** a bot plays in a seat for each name */
     opponents?: string[];
+    /** or for each character, who plays as themselves (in place of opponents) */
+    cast?: CharacterId[];
     /** each bot's level, in the same order; normal for any not given */
     levels?: BotLevel[];
     /** deals the same cards, and makes the bots play the same way, every time */
@@ -26,6 +29,8 @@ export interface LocalGameOptions {
     pace?: BotPace;
     /** a saved game to carry on, in place of a new one with the options above */
     from?: LocalGameSave;
+    /** lines of table talk heard in games lately, which the bots keep off */
+    recentLines?: string[];
     /** given the game as it starts and after every change, to save it */
     onChange?: (save: LocalGameSave) => void;
 }
@@ -45,6 +50,8 @@ export interface LocalGame {
     host: Host;
     /** each bot's level, by seat after yours */
     levels: BotLevel[];
+    /** who each bot is, by seat after yours: null for one that isn't a character */
+    characters: (CharacterId | null)[];
     /**
      * Pauses the whole game: the host, the bots and the messages between you
      * all wait on one clock, which stops. Claim windows, and the time to
@@ -75,6 +82,7 @@ const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => {
 export const startLocalGame = ({
     name,
     opponents = ["Opponent 1", "Opponent 2", "Opponent 3"],
+    cast,
     levels = [],
     seed,
     claimWindowMs,
@@ -82,21 +90,23 @@ export const startLocalGame = ({
     clock : baseClock = systemClock,
     pace,
     from,
+    recentLines,
     onChange
 }: LocalGameOptions): LocalGame => {
     let clock = createPausableClock(baseClock);
-    // each bot's seed decides what it forgets and when it takes a risk, if
-    // it's a hard bot, and its risk is secret and lasts the game
+    // Each bot's seed decides what it forgets and when it takes a risk, if
+    // it's a hard bot. A character's risk is their own; any other bot's is
+    // secret and lasts the game.
     let seeded = {rng : seed ?? Math.floor(Math.random() * 2 ** 32)};
-    let profiles = from?.bots ?? opponents.map((_, i) => ({
-        level : levels[i] ?? "normal",
-        seed : Math.floor(random(seeded) * 2 ** 32),
-        risk : random(seeded)
-    }));
+    let profiles: BotProfile[] = from?.bots ?? (cast ?? opponents).map((_, i) => {
+        let profile = {level : levels[i] ?? "normal", seed : Math.floor(random(seeded) * 2 ** 32), risk : random(seeded)};
+        return cast ? {...profile, risk : character(cast[i]).risk, character : cast[i]} : profile;
+    });
+    let names = from ? from.state.seats.slice(1).map(seat => seat.name) : (cast ? cast.map(id => character(id).name) : opponents);
     const save = (state: GameState) => onChange?.({state, bots : profiles, savedAt : clock.now()});
 
     let host = createHost({
-        names : [name, ...opponents],
+        names : [name, ...names],
         seed,
         claimWindowMs,
         lookMs,
@@ -111,11 +121,12 @@ export const startLocalGame = ({
         return seatEnd;
     };
     let port = seat(0);
-    let bots = profiles.map((profile, i) => startBot(seat(i + 1), {profile, clock, pace}));
+    let bots = profiles.map((profile, i) => startBot(seat(i + 1), {profile, recentLines, clock, pace}));
     return {
         port,
         host,
         levels : profiles.map(profile => profile.level),
+        characters : profiles.map(profile => profile.character ?? null),
         pause : () => clock.pause(),
         resume : () => clock.resume(),
         stop() {

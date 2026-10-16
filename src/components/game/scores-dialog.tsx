@@ -1,5 +1,6 @@
 import {useMediaQuery} from '@/lib/use-media-query.ts';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
+import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 import Scoreboard from './scoreboard.tsx';
 import {scoreRows} from './scores.ts';
@@ -8,9 +9,11 @@ interface ScoresDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     view: GameView;
+    /** who sits in each seat, by seat */
+    characters: (CharacterId | null)[];
 }
 
-function ScoresDialog({open, onOpenChange, view}: ScoresDialogProps) {
+function ScoresDialog({open, onOpenChange, view, characters}: ScoresDialogProps) {
     let roundsPlayed = view.seats[view.seat].scores.length;
     // a phone gets the tighter table, so it fits without scrolling
     let short = useMediaQuery("(max-height: 560px)");
@@ -25,7 +28,7 @@ function ScoresDialog({open, onOpenChange, view}: ScoresDialogProps) {
                             : "Lowest total after round " + view.rounds + " wins."}
                     </DialogDescription>
                 </DialogHeader>
-                {roundsPlayed > 0 && <Scoreboard rows={scoreRows(view)} roundCount={view.rounds} compact={short} />}
+                {roundsPlayed > 0 && <Scoreboard rows={scoreRows(view, false, characters)} roundCount={view.rounds} compact={short} />}
             </DialogContent>
         </Dialog>
     );

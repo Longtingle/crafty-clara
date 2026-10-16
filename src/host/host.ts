@@ -1,11 +1,12 @@
 // The host runs a game. It holds the one true state, applies the commands
 // that come from each seat, closes claim windows and starts play at their
-// deadlines, and sends
-// every seat its view after each change. A seat is whatever is at the other
-// end of a port: the person at this screen, a bot, or later someone online.
-// The host doesn't know or mind which.
+// deadlines, and sends every seat its view after each change. It passes on
+// what each seat says to every seat (table talk), which isn't part of the
+// game. A seat is whatever is at the other end of a port: the person at this
+// screen, a bot, or later someone online. The host doesn't know or mind which.
 
 import {apply, createGame, expire, nextDeadline, type GameState, type Result} from '../engine/game.ts';
+import type {Line} from '../engine/talk.ts';
 import {viewFor} from '../engine/view.ts';
 import {systemClock, type Clock, type TimerId} from './clock.ts';
 import type {ClientMessage, HostPort} from './protocol.ts';
@@ -25,6 +26,20 @@ export interface HostOptions {
     /** told of every change to the state, to save the game */
     onChange?: (state: GameState) => void;
 }
+
+/** The least time between two lines from one seat (ms): more are dropped. */
+const TALK_GAP_MS = 800;
+
+// Whether a message's line is fit to pass on: plain, short text.
+const isLine = (line: unknown): line is Line => {
+    let {id, text, to, big, invites, replies} = (line ?? {}) as Record<string, unknown>;
+    let short = (value: unknown, length: number): boolean => typeof value === "string" && value.length <= length;
+    return short(id, 100) && short(text, 200) &&
+        (to === undefined || Number.isInteger(to)) &&
+        (big === undefined || typeof big === "boolean") &&
+        (invites === undefined || ["dealer", "doubt", "comeback", "groan"].includes(invites as string)) &&
+        (replies === undefined || (Array.isArray(replies) && replies.length <= 5 && replies.every(reply => short(reply, 200))));
+};
 
 export interface Host {
     /** Seats whoever is at the other end of the port, in place of anyone already there, and sends them their view. */
@@ -47,6 +62,8 @@ export const createHost = ({
     let state = from ?? createGame({names, seed, claimWindowMs, lookMs, now : clock.now()});
     let connections: ({port: HostPort; stop: () => void} | null)[] = state.seats.map(() => null);
     let deadline: TimerId | undefined;
+    // when each seat last said something
+    let spoke: number[] = state.seats.map(() => -Infinity);
 
     const sendView = (seat: number): void => {
         connections[seat]?.port.send({type : "view", view : viewFor(state, seat, clock.now())});
@@ -76,7 +93,19 @@ export const createHost = ({
     // a game carried on may have a deadline to come
     watchDeadline();
 
+    const talk = (seat: number, line: unknown): void => {
+        if (!isLine(line) || clock.now() - spoke[seat] < TALK_GAP_MS) return;
+        spoke[seat] = clock.now();
+        for (let connection of connections) {
+            connection?.port.send({type : "said", seat, line, round : state.round, after : state.log.length});
+        }
+    };
+
     const receive = (seat: number, message: ClientMessage): void => {
+        if (message.type === "say") {
+            talk(seat, message.line);
+            return;
+        }
         if (message.type !== "command") return;
         let result: Result;
         try {

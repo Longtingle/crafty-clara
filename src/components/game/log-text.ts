@@ -2,6 +2,7 @@ import {SET, type Setrun} from '@/engine/cards.ts';
 import {shortName} from '@/engine/card-names.ts';
 import type {LogEntry} from '@/engine/game.ts';
 import type {GameView} from '@/engine/view.ts';
+import type {Talk} from '@/client/game-client.ts';
 import {seatName, seatColor} from './players.ts';
 
 // What a round's log (view.log) says, from your point of view.
@@ -12,6 +13,8 @@ export interface ActivityEntry {
     name: string;
     color: string;
     text: string;
+    /** something they said, in quotes */
+    quote?: boolean;
 }
 
 /** The card your last move brought into your hand, and its tag. */
@@ -57,13 +60,25 @@ const describeEntry = (entry: LogEntry, view: GameView): string => {
     }
 }
 
-// The log as the activity panel shows it, newest first.
-const activityEntries = (view: GameView): ActivityEntry[] => view.log.map((entry, index) => ({
-    id : view.round + "-" + index,
-    name : seatName(view, entry.seat),
-    color : seatColor(view, entry.seat),
-    text : describeEntry(entry, view)
-})).reverse();
+// The log as the activity panel shows it, newest first, with what's been said
+// this round (talk) among the moves, where it was said.
+const activityEntries = (view: GameView, talk: Talk[] = []): ActivityEntry[] => {
+    let said = talk.filter(line => line.round === view.round);
+    let saying = (line: Talk): ActivityEntry => ({
+        id : "said-" + line.seq,
+        name : seatName(view, line.seat),
+        color : seatColor(view, line.seat),
+        text : "“" + line.line.text + "”",
+        quote : true
+    });
+    let entries = view.log.flatMap((entry, index) => [...said.filter(line => line.after === index).map(saying), {
+        id : view.round + "-" + index,
+        name : seatName(view, entry.seat),
+        color : seatColor(view, entry.seat),
+        text : describeEntry(entry, view)
+    }]);
+    return [...entries, ...said.filter(line => line.after >= view.log.length).map(saying)].reverse();
+};
 
 // The latest thing a player did this round, or null.
 const lastAction = (view: GameView, seat: number): string | null => {
@@ -85,17 +100,4 @@ const newCardTag = (view: GameView): NewCard | null => {
     return null;
 }
 
-// What players say after a move, as [seat, line] pairs. When you add a card
-// to an opponent's setrun, they react.
-const speechFor = (entry: LogEntry, view: GameView): [number, string][] => {
-    switch (entry.type) {
-        case "draw": return [[entry.seat, (entry.from === "deck") ? "Picked from deck" : "Picked from discard"]];
-        case "claim": return [[entry.seat, "I'll take that!"]];
-        case "goDown": return [[entry.seat, "Right, I'm putting my cards down now."]];
-        case "discard": return [[entry.seat, "Does anyone want this?"], [(entry.seat + 1) % view.seats.length, "...thinking..."]];
-        case "add": return (entry.seat === view.seat) ? [[entry.target.seat, "Woah, steady there!"]] : [];
-        default: return [];
-    }
-}
-
-export {describeEntry, activityEntries, lastAction, newCardTag, speechFor};
+export {describeEntry, activityEntries, lastAction, newCardTag};
