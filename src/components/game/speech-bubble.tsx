@@ -32,7 +32,7 @@ function SpeechBubble({bubble, name, from, className}: SpeechBubbleProps) {
                     transition={{type : "spring", stiffness : 500, damping : 28}}
                     style={{transformOrigin : (from === "above") ? "30px 0" : "0 50%"}}
                     className={cn(
-                        "pointer-events-none absolute z-40 w-max rounded-2xl bg-cream px-3.5 py-2 text-[15px] leading-snug font-semibold text-[#12402a] shadow-[0_8px_22px_rgb(0_0_0/0.4)]",
+                        "pointer-events-none absolute z-40 w-max rounded-2xl bg-cream px-3.5 py-2 text-[15px] leading-snug font-semibold text-cream-foreground shadow-[0_8px_22px_rgb(0_0_0/0.4)]",
                         className
                     )}
                 >

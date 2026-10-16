@@ -1,7 +1,8 @@
 // A game in this page: you in seat 0, bots in the other seats, and the host
 // between you, all talking through local ports as they would over a network.
 
-import type {BotLevel, BotProfile} from '../engine/bot.ts';
+import type {BotProfile} from '../engine/bot.ts';
+import type {BotLevel} from '../engine/levels.ts';
 import {character, type CharacterId} from '../engine/cast.ts';
 import type {GameState} from '../engine/game.ts';
 import {random} from '../engine/random.ts';

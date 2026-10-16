@@ -55,7 +55,7 @@ function Scoreboard({rows, roundCount, highlightRound, compact = false, speech =
                                         color={row.color}
                                         label={row.label}
                                         character={row.character}
-                                        className={cn(compact ? "size-6 text-[11px]" : "size-7 text-[13px]", row.isYou && "text-[10px] text-[#12402a]", row.isYou && compact && "text-[9px]")}
+                                        className={cn(compact ? "size-6 text-[11px]" : "size-7 text-[13px]", row.isYou && "text-[10px] text-cream-foreground", row.isYou && compact && "text-[9px]")}
                                     />
                                     <span className="font-bold">{row.name}</span>
                                     {row.wentOut && <Chip tone="gold">{compact ? "Out" : "Went out"}</Chip>}

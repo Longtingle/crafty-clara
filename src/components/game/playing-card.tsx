@@ -89,7 +89,7 @@ function CardBack({className}: {className?: string}) {
 // A small pill on top of a card, such as "New" on the card just drawn.
 function CardTag({children, className}: {children: ReactNode; className?: string}) {
     return (
-        <span className={cn("absolute -top-3 left-1.5 z-10 rounded-full bg-cream px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap text-[#12402a] uppercase", className)}>
+        <span className={cn("absolute -top-3 left-1.5 z-10 rounded-full bg-cream px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap text-cream-foreground uppercase", className)}>
             {children}
         </span>
     );

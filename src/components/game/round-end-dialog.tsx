@@ -9,9 +9,9 @@ import type {GameRecord} from '@/storage/history.ts';
 import Scoreboard from './scoreboard.tsx';
 import {scoreRows} from './scores.ts';
 import type {Bubble} from './speech-bubble.tsx';
-import {opponentSeats} from './players.ts';
+import {roundSummary} from './round-summary.ts';
 import {gameResult, percent} from './stats.ts';
-import {PlaceStrip} from './stats-screen.tsx';
+import PlaceStrip from './place-strip.tsx';
 
 const keepOpen = (event: {preventDefault(): void}) => event.preventDefault();
 
@@ -22,7 +22,7 @@ function YourRecord({record}: {record: GameRecord[]}) {
     let games = results.length;
     return (
         <div className="flex flex-col gap-1.5 rounded-xl bg-white/6 px-3.5 py-2.5 short:gap-1 short:px-3 short:py-1.5">
-            <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase short:text-[10.5px]">Your record</span>
+            <span className="section-label text-xs short:text-[10.5px]">Your record</span>
             <span className="font-bold short:text-sm">
                 {wins} {(wins === 1) ? "win" : "wins"} in {games} {(games === 1) ? "game" : "games"} · {percent(wins, games)}%
             </span>
@@ -61,36 +61,9 @@ function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGa
     let {round, rounds : roundCount} = view;
     let rows = scoreRows(view, true, characters);
     let isFinalRound = view.phase === "gameEnd";
-    let ranked = [...rows].sort((a, b) => a.total - b.total);
-    let leader = ranked[0];
     let you = rows[0];
-    let wentOut = rows.find(row => row.wentOut);
     let ready = view.seats[view.seat].ready;
-    let waitingFor = opponentSeats(view).filter(seat => !view.seats[seat].ready).map(seat => view.seats[seat].name);
-
-    let eyebrow = isFinalRound ? "Game over" : "Round " + (round + 1) + " of " + roundCount + " complete";
-    let title;
-    if (isFinalRound) {
-        title = leader.isYou ? "You win!" : leader.name + " wins";
-    } else if (wentOut) {
-        title = wentOut.isYou ? "You went out!" : wentOut.name + " went out";
-    } else {
-        title = "The deck ran out";
-    }
-    // the ranking puts you first among equals
-    let runnerUp = ranked[1];
-    let standing;
-    if (!isFinalRound) {
-        standing = (you.total === leader.total)
-            ? "You're in the lead."
-            : "You're " + (you.total - leader.total) + " points behind " + leader.name + ".";
-    } else if (!leader.isYou) {
-        standing = "You finished " + (you.total - leader.total) + " points behind " + leader.name + ".";
-    } else if (runnerUp.total === you.total) {
-        standing = "You tied with " + runnerUp.name + " for the lowest total.";
-    } else {
-        standing = "You finished " + (runnerUp.total - you.total) + " points ahead of " + runnerUp.name + ".";
-    }
+    let {eyebrow, title, standing, waitingFor} = roundSummary(view, rows);
 
     let button;
     if (isFinalRound) {
@@ -109,7 +82,7 @@ function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGa
     let yourRecord = isFinalRound && record && record.length > 0 && <YourRecord record={record} />;
     let nextUp = !isFinalRound && (
         <div className="flex flex-col items-end gap-1 rounded-xl bg-white/6 px-3.5 py-2.5 short:items-start short:gap-0.5 short:px-3 short:py-2">
-            <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase short:text-[10.5px]">Next up</span>
+            <span className="section-label text-xs short:text-[10.5px]">Next up</span>
             <span className="font-bold short:text-sm">Round {round + 2} · {requirementText(ROUND_REQUIREMENTS[round + 1])}</span>
         </div>
     );
@@ -122,10 +95,11 @@ function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGa
                     showCloseButton={false}
                     onEscapeKeyDown={keepOpen}
                     onPointerDownOutside={keepOpen}
-                    className="top-0 left-0 grid h-dvh max-w-none translate-x-0 translate-y-0 grid-cols-[min(15rem,32vw)_minmax(0,1fr)] gap-5 rounded-none bg-card px-5 py-4 ring-0 sm:max-w-none"
+                    sheet
+                    className="grid grid-cols-[min(15rem,32vw)_minmax(0,1fr)] gap-5 px-5 py-4"
                 >
                     <div className="flex min-h-0 flex-col gap-2">
-                        <span className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{eyebrow}</span>
+                        <span className="section-label text-[11px]">{eyebrow}</span>
                         <DialogTitle className="text-[28px] leading-none">{title}</DialogTitle>
                         <DialogDescription className="text-[13px] leading-snug">
                             {view.wentOut === null && "Nobody went out before the deck ran out for the third time. "}
@@ -157,7 +131,7 @@ function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGa
             >
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <DialogHeader>
-                        <span className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">{eyebrow}</span>
+                        <span className="section-label text-[13px]">{eyebrow}</span>
                         <DialogTitle className="text-3xl">{title}</DialogTitle>
                         <DialogDescription>
                             {view.wentOut === null && "Nobody went out before the deck ran out for the third time. "}

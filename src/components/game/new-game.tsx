@@ -1,31 +1,18 @@
-import {useState} from 'react';
+import {Fragment, useState} from 'react';
 import {ChevronLeft, RefreshCw} from 'lucide-react';
 import {Button} from '@/components/ui/button.tsx';
-import type {BotLevel} from '@/engine/bot.ts';
+import {SegmentedControl} from '@/components/ui/segmented-control.tsx';
+import {BOT_LEVELS, type BotLevel} from '@/engine/levels.ts';
 import {character, type CharacterId} from '@/engine/cast.ts';
-import {aiColor} from './players.ts';
+import {aiColor, seatNote, seatQuestion} from './players.ts';
+import {LEVEL_NAMES} from './level-names.ts';
 import {Avatar} from './avatar.tsx';
 import CastPicker from './cast-picker.tsx';
 
-const LEVELS: {level: BotLevel; label: string}[] = [
-    {level : "normal", label : "Normal"},
-    {level : "hard", label : "Hard"}
-];
+const LEVEL_CHOICES = BOT_LEVELS.map(level => ({value : level, label : LEVEL_NAMES[level].name}));
 
-// Where an opponent sits matters: the player after you sees your discards
-// first, and the player before you comes ahead of you for every claim.
-const seatNote = (index: number, names: string[]): string => {
-    if (index === 0) return "Plays straight after you, so gets your discards first";
-    if (index === names.length - 1) return "Plays just before you, so beats you to claims";
-    return (names.length === 3) ? "Plays opposite you" : "Plays after " + names[index - 1];
-};
-
-// The picker's question for a seat.
-const seatQuestion = (index: number, names: string[]): string => {
-    if (index === 0) return "Who plays straight after you?";
-    if (index === names.length - 1) return "Who plays just before you?";
-    return (names.length === 3) ? "Who plays opposite you?" : "Who plays after " + names[index - 1] + "?";
-};
+// "plays its own hand well.", to follow its name in a sentence
+const lowerFirst = (text: string): string => text[0].toLowerCase() + text.slice(1);
 
 interface NewGameProps {
     /** who sits in each opponent's seat, in turn order after you */
@@ -88,35 +75,36 @@ function NewGame({cast, onCastChange, levels, onLevelsChange, onDeal, onBack}: N
                                     <span className="text-[15px] text-cream italic short:hidden">“{manner}”</span>
                                     <span className="text-sm text-muted-foreground short:truncate short:text-[13px]">{seatNote(index, names)}</span>
                                 </div>
-                                <div role="group" aria-labelledby={"opponent-" + index} className="ml-auto grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 short:ml-0 short:p-0.5">
-                                    {LEVELS.map(option => (
-                                        <Button
-                                            key={option.level}
-                                            variant="ghost"
-                                            aria-pressed={levels[index] === option.level}
-                                            onClick={() => setLevel(index, option.level)}
-                                            className="w-26 aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a] short:w-22 short:text-[15px]"
-                                        >
-                                            {option.label}
-                                        </Button>
-                                    ))}
-                                </div>
+                                <SegmentedControl
+                                    options={LEVEL_CHOICES}
+                                    value={levels[index]}
+                                    onChange={level => setLevel(index, level)}
+                                    labelledBy={"opponent-" + index}
+                                    className="ml-auto auto-cols-fr grid-flow-col short:ml-0 short:p-0.5"
+                                    optionClassName="w-26 short:w-22 short:text-[15px]"
+                                />
                             </li>
                         );
                     })}
                 </ul>
 
                 <dl className="-mt-2 grid w-full grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-[15px] text-muted-foreground short:hidden">
-                    <dt className="font-bold text-foreground">Normal</dt>
-                    <dd>Plays its own hand well.</dd>
-                    <dt className="font-bold text-foreground">Hard</dt>
-                    <dd>Counts every point, and keeps an eye on what everyone picks up.</dd>
+                    {BOT_LEVELS.map(level => (
+                        <Fragment key={level}>
+                            <dt className="font-bold text-foreground">{LEVEL_NAMES[level].name}</dt>
+                            <dd>{LEVEL_NAMES[level].about}</dd>
+                        </Fragment>
+                    ))}
                 </dl>
 
                 <div className="flex items-center gap-4 short:mt-auto">
                     <p className="hidden flex-1 text-[13px] leading-snug text-muted-foreground short:block">
-                        <b className="text-foreground">Normal</b> plays its own hand well. <b className="text-foreground">Hard</b> counts
-                        every point, and keeps an eye on what everyone picks up.
+                        {BOT_LEVELS.map((level, index) => (
+                            <Fragment key={level}>
+                                {(index > 0) && " "}
+                                <b className="text-foreground">{LEVEL_NAMES[level].name}</b> {lowerFirst(LEVEL_NAMES[level].about)}
+                            </Fragment>
+                        ))}
                     </p>
                     <Button size="lg" onClick={onDeal} className="px-9 text-lg short:h-11 short:flex-none short:px-7">Deal the cards</Button>
                 </div>

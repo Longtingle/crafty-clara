@@ -10,6 +10,8 @@ import {seatName, seatColor} from './players.ts';
 /** A line in the activity panel. */
 export interface ActivityEntry {
     id: string;
+    /** whose it is */
+    seat: number;
     name: string;
     color: string;
     text: string;
@@ -66,6 +68,7 @@ const activityEntries = (view: GameView, talk: Talk[] = []): ActivityEntry[] => 
     let said = talk.filter(line => line.round === view.round);
     let saying = (line: Talk): ActivityEntry => ({
         id : "said-" + line.seq,
+        seat : line.seat,
         name : seatName(view, line.seat),
         color : seatColor(view, line.seat),
         text : "“" + line.line.text + "”",
@@ -73,6 +76,7 @@ const activityEntries = (view: GameView, talk: Talk[] = []): ActivityEntry[] => 
     });
     let entries = view.log.flatMap((entry, index) => [...said.filter(line => line.after === index).map(saying), {
         id : view.round + "-" + index,
+        seat : entry.seat,
         name : seatName(view, entry.seat),
         color : seatColor(view, entry.seat),
         text : describeEntry(entry, view)

@@ -85,7 +85,8 @@ function CastPicker({open, title, current, taken, onPick, onClose}: CastPickerPr
                 ? (
                     <DialogContent
                         showCloseButton={false}
-                        className="top-0 left-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col gap-1.5 overflow-y-auto rounded-none bg-card px-4 pt-0 pb-2 ring-0 sm:max-w-none"
+                        sheet
+                        className="flex flex-col gap-1.5 overflow-y-auto px-4 pt-0 pb-2"
                     >
                         <header className="flex h-12 flex-none items-center gap-3">
                             <DialogTitle className="min-w-0 truncate text-[22px] leading-none">{title}</DialogTitle>

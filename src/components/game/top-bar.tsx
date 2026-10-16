@@ -6,9 +6,11 @@ import {canGoFullscreen, goFullscreen} from '@/lib/fullscreen.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Card, Requirement} from '@/engine/cards.ts';
 import type {CharacterId} from '@/engine/cast.ts';
+import type {BotLevel} from '@/engine/levels.ts';
 import {plural} from '@/engine/card-names.ts';
 import {aiColor, portraitImage} from './players.ts';
 import {HiddenHand} from './opponent-panel.tsx';
+import {LevelTag} from './avatar.tsx';
 
 /** An opponent as the top bar shows them on short screens. */
 export interface OpponentChip {
@@ -17,8 +19,8 @@ export interface OpponentChip {
     name: string;
     count: number;
     isDown: boolean;
-    /** whether they're a hard bot */
-    hard: boolean;
+    /** their level, if a bot */
+    level: BotLevel | null;
     /** who they are, if one of the cast */
     character: CharacterId | null;
     active: boolean;
@@ -63,7 +65,7 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                             ? <img src={portraitImage(opponent.character)} alt="" draggable={false} className="block size-full rounded-full object-cover" />
                             : opponent.index + 1}
                         {opponent.isDown && (
-                            <span className="absolute -right-1 -bottom-1 grid size-3.5 place-items-center rounded-full bg-cream text-[#12402a]">
+                            <span className="absolute -right-1 -bottom-1 grid size-3.5 place-items-center rounded-full bg-cream text-cream-foreground">
                                 <Check className="size-2.5" strokeWidth={4} />
                             </span>
                         )}
@@ -72,9 +74,7 @@ function OpponentChips({opponents}: {opponents: OpponentChip[]}) {
                     <span className="sr-only">{opponent.name}:</span>
                     {opponent.count}<span className="max-[820px]:sr-only"> cards</span>
                     {opponent.isDown && <span className="sr-only">, down</span>}
-                    {opponent.hard && (
-                        <span className="rounded-full bg-cream px-1.5 text-[10px] tracking-wider text-[#12402a] uppercase">Hard</span>
-                    )}
+                    <LevelTag level={opponent.level} className="px-1.5 py-0 text-[10px]" />
                 </li>
             ))}
         </ul>
@@ -88,7 +88,7 @@ function YouChip({points, active}: {points: number; active: boolean}) {
             "hidden h-8 flex-none items-center gap-1.5 rounded-full border-2 bg-panel pr-2.5 pl-0.5 text-xs font-bold whitespace-nowrap short:inline-flex",
             active ? "border-gold" : "border-transparent"
         )}>
-            <span aria-hidden="true" className="grid size-6 place-items-center rounded-full bg-cream text-[9px] text-[#12402a]">You</span>
+            <span aria-hidden="true" className="grid size-6 place-items-center rounded-full bg-cream text-[9px] text-cream-foreground">You</span>
             <span className="sr-only">You:</span>
             {points} pts
         </span>

@@ -4,7 +4,19 @@
 import type {Command} from '../engine/game.ts';
 import type {Line} from '../engine/talk.ts';
 import type {GameView} from '../engine/view.ts';
+import type {BotLevel} from '../engine/levels.ts';
+import type {CharacterId} from '../engine/cast.ts';
 import type {Port} from './transport.ts';
+
+/**
+ * Who sits in a seat, besides the name the view gives: a bot's level (null
+ * for a person), and who they are, if one of the cast. A local game hands it
+ * to the screen; online, the host will send it.
+ */
+export interface SeatInfo {
+    level: BotLevel | null;
+    character: CharacterId | null;
+}
 
 /** From a seat to the host: a move, or a line of table talk. */
 export type ClientMessage = {type: "command"; command: Command} | {type: "say"; line: Line};

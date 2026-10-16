@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {memoryStore} from './store.ts';
-import {createSettings, DEFAULT_HINTS} from './settings.ts';
+import {createSettings, DEFAULT_HINTS, DEFAULT_PREFERENCES} from './settings.ts';
 
 it('remembers the levels you chose', async () => {
     const settings = createSettings(memoryStore());
@@ -21,41 +21,42 @@ it('remembers who you chose to play, and ignores a line-up it can\'t use', async
     expect(await settings.cast()).toBeNull();
 });
 
-it('starts with the dots and the melds lighting up, but not the go-down hint, and remembers your hints', async () => {
-    const settings = createSettings(memoryStore());
-    expect(await settings.hints()).toEqual({fits : true, targets : true, ready : false});
-    settings.setHints({fits : false, targets : false, ready : true});
-    expect(await settings.hints()).toEqual({fits : false, targets : false, ready : true});
+it('starts with the dots and the melds lighting up, chatty, at normal speed and with sound', async () => {
+    expect(await createSettings(memoryStore()).preferences()).toEqual({
+        hints : {fits : true, targets : true, ready : false},
+        talk : "chatty",
+        speed : "normal",
+        sound : true
+    });
 });
 
-it('starts chatty, and remembers how much table talk you want', async () => {
+it('remembers each preference as you change it', async () => {
+    const settings = createSettings(memoryStore());
+    settings.setPreferences({hints : {fits : false, targets : false, ready : true}});
+    settings.setPreferences({talk : "quiet", sound : false});
+    settings.setPreferences({speed : "relaxed"});
+    expect(await settings.preferences()).toEqual({
+        hints : {fits : false, targets : false, ready : true},
+        talk : "quiet",
+        speed : "relaxed",
+        sound : false
+    });
+});
+
+it('keeps each preference where it always has, so earlier choices still count', async () => {
     const store = memoryStore();
-    const settings = createSettings(store);
-    expect(await settings.talk()).toBe("chatty");
-    settings.setTalk("quiet");
-    expect(await settings.talk()).toBe("quiet");
+    await store.set("crafty-clara.talk", "off");
+    await store.set("crafty-clara.speed", "quick");
+    await store.set("crafty-clara.sound", false);
+    expect(await createSettings(store).preferences()).toMatchObject({talk : "off", speed : "quick", sound : false});
+});
+
+it('uses the default for a preference it no longer understands, and fills in any hint it has no choice for', async () => {
+    const store = memoryStore();
     await store.set("crafty-clara.talk", "shouty");
-    expect(await settings.talk()).toBe("chatty");
-});
-
-it('starts at normal speed, and remembers the speed you choose', async () => {
-    const settings = createSettings(memoryStore());
-    expect(await settings.speed()).toBe("normal");
-    settings.setSpeed("relaxed");
-    expect(await settings.speed()).toBe("relaxed");
-});
-
-it('has sound on, until you turn it off', async () => {
-    const settings = createSettings(memoryStore());
-    expect(await settings.sound()).toBe(true);
-    settings.setSound(false);
-    expect(await settings.sound()).toBe(false);
-});
-
-it('fills in any hint it has no choice for', async () => {
-    const store = memoryStore();
+    await store.set("crafty-clara.speed", "ludicrous");
     await store.set("crafty-clara.hints", {ready : true, fits : "yes"});
-    expect(await createSettings(store).hints()).toEqual({...DEFAULT_HINTS, ready : true});
+    expect(await createSettings(store).preferences()).toEqual({...DEFAULT_PREFERENCES, hints : {...DEFAULT_HINTS, ready : true}});
     await store.set("crafty-clara.hints", 7);
-    expect(await createSettings(store).hints()).toEqual(DEFAULT_HINTS);
+    expect((await createSettings(store).preferences()).hints).toEqual(DEFAULT_HINTS);
 });

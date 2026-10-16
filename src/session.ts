@@ -2,11 +2,12 @@
 // move, so it can be carried on another time, and added to your history
 // when it ends. App loads this with the game screen, after the home screen.
 
-import type {BotLevel} from './engine/bot.ts';
+import type {BotLevel} from './engine/levels.ts';
 import type {CharacterId} from './engine/cast.ts';
 import type {GameSpeed} from './host/game-speed.ts';
 import {viewFor} from './engine/view.ts';
 import {startLocalGame, type LocalGame, type LocalGameSave} from './host/local-game.ts';
+import type {SeatInfo} from './host/protocol.ts';
 import type {Clock} from './host/clock.ts';
 import {createGameClient, type GameClient} from './client/game-client.ts';
 import type {SavedGame} from './storage/saved-game.ts';
@@ -16,10 +17,8 @@ import {gameRecord, type GameHistory} from './storage/history.ts';
 export interface Session {
     game: LocalGame;
     client: GameClient;
-    /** each seat's bot level, by seat (null for you) */
-    levels: (BotLevel | null)[];
-    /** who sits in each seat, by seat (null for you, and for a bot from before the cast) */
-    characters: (CharacterId | null)[];
+    /** who sits in each seat, by seat: you, then the bots */
+    seats: SeatInfo[];
 }
 
 export interface SessionOptions {
@@ -62,5 +61,6 @@ export const startSession = ({cast, levels = [], seed, speed, from, savedGame, h
             heardLines?.add(said.line.id);
         }
     });
-    return {game, client, levels : [null, ...game.levels], characters : [null, ...game.characters]};
+    let bots = game.levels.map((level, i): SeatInfo => ({level, character : game.characters[i]}));
+    return {game, client, seats : [{level : null, character : null}, ...bots]};
 };

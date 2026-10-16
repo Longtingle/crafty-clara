@@ -6,14 +6,20 @@ import {cards} from '@/engine/testing.ts';
 import {viewFor} from '@/engine/view.ts';
 import {startLocalGame, type LocalGame} from '@/host/local-game.ts';
 import {createLocalPair} from '@/host/transport.ts';
-import type {ClientMessage, HostMessage} from '@/host/protocol.ts';
+import type {ClientMessage, HostMessage, SeatInfo} from '@/host/protocol.ts';
+import type {CharacterId} from '@/engine/cast.ts';
 import {createGameClient} from '@/client/game-client.ts';
-import {DEFAULT_HINTS, type TalkLevel} from '@/storage/settings.ts';
+import {DEFAULT_PREFERENCES, type TalkLevel} from '@/storage/settings.ts';
 import GameScreen from './game-screen.tsx';
 
 let game: LocalGame;
+// you, then three normal bots, who may be of the cast
+const seats = (cast: CharacterId[] = []): SeatInfo[] => [
+    {level : null, character : null},
+    ...[0, 1, 2].map(i => ({level : "normal" as const, character : cast[i] ?? null}))
+];
 const pausing = {pause : vi.fn<() => void>(), resume : vi.fn<() => void>()};
-const changeHints = vi.fn();
+const changePrefs = vi.fn();
 
 const leavePage = (hidden: boolean) => {
     Object.defineProperty(document, "hidden", {configurable : true, get : () => hidden});
@@ -26,10 +32,10 @@ beforeEach(async () => {
     render(
         <GameScreen
             client={createGameClient(game.port)}
-            levels={[null, "normal", "normal", "normal"]}
+            seats={seats()}
             pausing={pausing}
-            hints={DEFAULT_HINTS}
-            onHintsChange={changeHints}
+            prefs={DEFAULT_PREFERENCES}
+            onPrefsChange={changePrefs}
             games={async () => []}
             onNewGame={() => {}}
             onShowStats={() => {}}
@@ -93,7 +99,7 @@ it('changes your hints from the settings', async () => {
     expect(within(dialog).getByRole('switch', {name : 'Cards that fit a meld'})).toBeChecked();
     expect(within(dialog).getByRole('switch', {name : 'When you can go down'})).not.toBeChecked();
     fireEvent.click(within(dialog).getByRole('switch', {name : 'When you can go down'}));
-    expect(changeHints).toHaveBeenCalledWith({fits : true, targets : true, ready : true});
+    expect(changePrefs).toHaveBeenCalledWith({hints : {fits : true, targets : true, ready : true}});
 });
 
 describe('table talk', () => {
@@ -105,12 +111,10 @@ describe('table talk', () => {
         render(
             <GameScreen
                 client={createGameClient(port)}
-                levels={[null, "normal", "normal", "normal"]}
-                characters={[null, "clara", "alan", "gemma"]}
+                seats={seats(["clara", "alan", "gemma"])}
                 pausing={pausing}
-                hints={DEFAULT_HINTS}
-                onHintsChange={changeHints}
-                talk={talk}
+                prefs={{...DEFAULT_PREFERENCES, talk}}
+                onPrefsChange={changePrefs}
                 games={async () => []}
                 onNewGame={() => {}}
                 onShowStats={() => {}}
@@ -156,10 +160,10 @@ it('asks which end of a run a red ace goes, and plays it there', async () => {
     render(
         <GameScreen
             client={createGameClient(game.port)}
-            levels={[null, "normal", "normal", "normal"]}
+            seats={seats()}
             pausing={pausing}
-            hints={DEFAULT_HINTS}
-            onHintsChange={changeHints}
+            prefs={DEFAULT_PREFERENCES}
+            onPrefsChange={changePrefs}
             games={async () => []}
             onNewGame={() => {}}
             onShowStats={() => {}}

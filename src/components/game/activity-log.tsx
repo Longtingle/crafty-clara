@@ -11,7 +11,7 @@ function ActivityLog({entries}: {entries: ActivityEntry[]}) {
     return (
         <aside aria-label="Activity" className="flex max-h-full w-[300px] max-w-full flex-col rounded-2xl bg-panel px-4 pt-3">
             <div className="mb-2.5 flex flex-none items-baseline justify-between">
-                <h2 className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase">Activity</h2>
+                <h2 className="section-label text-[13px]">Activity</h2>
                 <span className="text-xs text-muted-foreground">Newest first</span>
             </div>
             {entries.length === 0

@@ -16,8 +16,12 @@ it('saves the game as it goes, and records it in your history when it ends', asy
     const clock = createTestClock();
     const {savedGame, history} = stores();
     const session = startSession({cast : ["julie", "chris", "cis"], levels : ["hard", "normal", "hard"], seed : 4, savedGame, history, clock});
-    expect(session.levels).toEqual([null, "hard", "normal", "hard"]);
-    expect(session.characters).toEqual([null, "julie", "chris", "cis"]);
+    expect(session.seats).toEqual([
+        {level : null, character : null},
+        {level : "hard", character : "julie"},
+        {level : "normal", character : "chris"},
+        {level : "hard", character : "cis"}
+    ]);
     expect((await savedGame.load())?.state.round).toBe(0);
 
     // you're played by a bot too
@@ -55,8 +59,12 @@ it('carries on a saved game with the same opponents', async () => {
     first.game.stop();
 
     const session = startSession({cast : ["clara", "steve", "julie"], levels : ["normal", "normal", "normal"], from : saved, savedGame, history, clock : createTestClock()});
-    expect(session.levels).toEqual([null, "normal", "hard", "hard"]);
-    expect(session.characters).toEqual([null, "vena", "alan", "gemma"]);
+    expect(session.seats).toEqual([
+        {level : null, character : null},
+        {level : "normal", character : "vena"},
+        {level : "hard", character : "alan"},
+        {level : "hard", character : "gemma"}
+    ]);
     expect(session.game.host.state().seats).toEqual(saved.state.seats);
     session.game.stop();
 });

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import type {BotLevel} from '@/engine/bot.ts';
+import type {BotLevel} from '@/engine/levels.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import {gameResult, gameStats, lineupText, ordinal, percent, playedWhen} from './stats.ts';
 

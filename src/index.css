@@ -26,6 +26,7 @@
     --color-ok: var(--ok);
     --color-warn: var(--warn);
     --color-cream: var(--cream);
+    --color-cream-foreground: var(--cream-foreground);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
@@ -58,6 +59,8 @@
     --felt: #155c3b;
     --panel: rgb(0 0 0 / 0.28);
     --cream: #f4efe3;
+    /* dark green, for words on cream: a chosen option, a tag, a speech bubble */
+    --cream-foreground: #12402a;
     --gold: #f5b83d;
     --gold-foreground: #2a1c00;
     --wild: #6e56cf;
@@ -132,6 +135,15 @@
 
 @utility card-face {
   aspect-ratio: 691 / 1056;
+}
+
+/* A small heading in capitals over a part of a screen ("Your hand",
+   "Activity"). Each place gives it a size. */
+@utility section-label {
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
 }
 
 @utility card-back {

@@ -1,7 +1,7 @@
 // Your finished games, for stats. Each is kept as a record of what happened,
 // not what it adds up to, so stats can be worked out in new ways later.
 
-import type {BotLevel} from '@/engine/bot.ts';
+import type {BotLevel} from '@/engine/levels.ts';
 import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 import type {KeyValueStore} from './store.ts';

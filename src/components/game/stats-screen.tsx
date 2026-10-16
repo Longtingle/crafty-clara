@@ -5,51 +5,22 @@ import {cn} from '@/lib/utils.ts';
 import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
-import {requirementText} from '@/engine/card-names.ts';
+import {plural, requirementText} from '@/engine/card-names.ts';
 import type {GameRecord} from '@/storage/history.ts';
 import {gameStats, lineupText, ordinal, percent, playedWhen, type GameResult, type Stats} from './stats.ts';
+import {LevelTag} from './avatar.tsx';
+import PlaceStrip from './place-strip.tsx';
+import {isTagged, LEVEL_NAMES} from './level-names.ts';
 
-const sectionLabel = "text-xs font-bold tracking-widest text-muted-foreground uppercase short:text-[11px]";
+const sectionLabel = "section-label text-xs short:text-[11px]";
 const box = "rounded-[18px] border border-border bg-panel short:rounded-[14px]";
 const bigNumber = "font-heading leading-[1.05] font-extrabold";
 
 // how many games the list of recent games goes back
 const RECENT = 50;
 
-const plural = (count: number, word: string): string => count + " " + word + (count === 1 ? "" : "s");
 const shown = (share: number | null): string => (share === null) ? "–" : share + "%";
 const average = (sum: number, count: number): string => (count === 0) ? "–" : Math.round(sum / count) + " pts";
-
-/** Where you finished in some games, oldest first, as a row of little tiles: gold for a win. */
-export function PlaceStrip({places, className, cellClassName, markLast = false}: {
-    places: number[];
-    className?: string;
-    cellClassName?: string;
-    /** ring the last one: the game just played */
-    markLast?: boolean;
-}) {
-    return (
-        <div
-            role="img"
-            aria-label={"Where you finished, oldest first: " + places.map(ordinal).join(", ")}
-            className={cn("flex gap-1", className)}
-        >
-            {places.map((place, index) => (
-                <span
-                    key={index}
-                    className={cn(
-                        "grid size-6 place-items-center rounded-[6px] text-[13px] font-bold",
-                        (place === 1) ? "bg-gold text-gold-foreground" : "bg-white/12",
-                        markLast && index === places.length - 1 && "ring-2 ring-cream",
-                        cellClassName
-                    )}
-                >
-                    {place}
-                </span>
-            ))}
-        </div>
-    );
-}
 
 function Tile({label, value, children}: {label: string; value: string; children: ReactNode}) {
     return (
@@ -131,9 +102,9 @@ function Levels({stats, short}: {stats: Stats; short: boolean}) {
             {stats.levels.map(({level, played, beaten}) => (
                 <div key={level} className="flex flex-col gap-1.5 short:gap-1">
                     <div className="flex items-baseline gap-2.5 short:gap-2">
-                        {(level === "hard")
-                            ? <span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-bold tracking-wider text-[#12402a] uppercase short:px-1.5 short:py-px short:text-[10.5px]">Hard</span>
-                            : <span className="font-bold short:text-sm">Normal</span>}
+                        {isTagged(level)
+                            ? <LevelTag level={level} className="py-0.5 short:px-1.5 short:py-px short:text-[10.5px]" />
+                            : <span className="font-bold short:text-sm">{LEVEL_NAMES[level].name}</span>}
                         <span className={note}>
                             {short ? "beaten " : "You beat them "}{plural(beaten, "time")} in {played}
                         </span>
@@ -375,7 +346,7 @@ function StatsScreen({records, onBack, onStartGame}: StatsScreenProps) {
                         <Tabs.Trigger
                             key={value}
                             value={value}
-                            className="h-10 cursor-pointer rounded-[9px] px-3.5 font-heading text-sm font-bold outline-none focus-visible:outline-3 focus-visible:outline-ring data-[state=active]:bg-cream data-[state=active]:text-[#12402a]"
+                            className="h-10 cursor-pointer rounded-[9px] px-3.5 font-heading text-sm font-bold outline-none focus-visible:outline-3 focus-visible:outline-ring data-[state=active]:bg-cream data-[state=active]:text-cream-foreground"
                         >
                             {label}
                         </Tabs.Trigger>

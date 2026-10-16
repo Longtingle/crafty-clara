@@ -1,10 +1,5 @@
-import {cn} from '@/lib/utils.ts';
 import {useShortScreen} from '@/lib/use-media-query.ts';
-import {Button} from '@/components/ui/button.tsx';
-import type {Card} from '@/engine/cards.ts';
-import type {BotLevel} from '@/engine/bot.ts';
-import type {CharacterId} from '@/engine/cast.ts';
-import type {GameView} from '@/engine/view.ts';
+import {SegmentedControl, type Segment} from '@/components/ui/segmented-control.tsx';
 import type {Talk} from '@/client/game-client.ts';
 import TopBar from './top-bar.tsx';
 import {OpponentPanel} from './opponent-panel.tsx';
@@ -13,102 +8,54 @@ import Piles from './piles.tsx';
 import ActivityLog from './activity-log.tsx';
 import PlayerPanel from './player-panel.tsx';
 import TurnPrompt from './turn-prompt.tsx';
-import LookPrompt from './look-prompt.tsx';
-import Hand from './hand.tsx';
-import TableDnd, {type DragActions} from './table-dnd.tsx';
+import TableDnd from './table-dnd.tsx';
 import ScoresDialog from './scores-dialog.tsx';
 import RulesDialog from './rules-dialog.tsx';
 import RotatePrompt from './rotate-prompt.tsx';
 import PhoneTable from './phone-table.tsx';
+import {GoDownButton, YourHand, YourLookPrompt} from './your-seat.tsx';
 import {opponentSeats, opponentIndex} from './players.ts';
-import {activityEntries, knownCards, lastAction, type NewCard} from './log-text.ts';
-import {isInTurn, type YourTurn} from './your-turn.ts';
-import type {RunEnd} from '@/engine/setruns.ts';
+import {activityEntries, knownCards, lastAction} from './log-text.ts';
+import {isInTurn} from './your-turn.ts';
+import {useTable, type TableDialog} from './table-context.ts';
 import type {EndChoice} from './meld.tsx';
 import type {HandSort} from './hand-order.ts';
 import type {Bubble} from './speech-bubble.tsx';
 
-/** A dialog you can open from the top bar while you play. GameScreen shows the settings. */
-export type TableDialog = "scores" | "rules" | "settings";
-
-/** Everything you can do at the table. GameScreen turns each into a command or a change to your hand. */
-export interface TableActions extends DragActions {
-    /** ready to start play, at the start of a round */
-    start(): void;
-    /** plays the selected card at this end of the run it asked about */
-    chooseEnd(end: RunEnd): void;
-    cancelChoice(): void;
-    drawFromDeck(): void;
-    takeDiscard(): void;
-    claim(): void;
-    pass(): void;
-    select(index: number): void;
-    sortHand(sort: HandSort): void;
-    pause(): void;
-    openGoDown(): void;
-    showDialog(dialog: TableDialog | null): void;
-}
-
 interface GameTableProps {
-    view: GameView;
-    /** your cards in the order you've arranged them */
-    hand: Card[];
     sort: HandSort;
-    /** each seat's bot level, by seat (null for a person) */
-    levels: (BotLevel | null)[];
-    /** who sits in each seat, by seat (null for you, or a bot that isn't one of the cast) */
-    characters: (CharacterId | null)[];
     /** whether the game is paused, which stops the claim countdown */
     paused: boolean;
     /** the scores, the rules or the settings, if open */
     dialog: TableDialog | null;
-    /** what you can do now (yourTurn) */
-    turn: YourTurn;
     /** ms until play starts, while everyone looks over their hand */
     lookLeft: number;
     /** the run the selected card asks which end of, by seat and setrun */
     endChoice: {seat: number; index: number; choice: EndChoice} | null;
-    newCard: NewCard | null;
     /** what each opponent is saying now, by seat */
     speech: Record<number, Bubble | null>;
     /** the table talk you see this round, for the activity */
     talk: Talk[];
     /** why your last move was refused, for a few seconds after */
     notice: string | null;
-    actions: TableActions;
 }
 
-const sectionLabel = "text-[13px] font-bold tracking-widest text-muted-foreground uppercase";
+const sectionLabel = "section-label text-[13px]";
 
 // The choices for laying out your hand.
-const SORTS: {sort: HandSort; label: string}[] = [
-    {sort : "value", label : "By value"},
-    {sort : "suit", label : "By suit"},
-    {sort : "own", label : "Your order"}
+const SORTS: Segment<HandSort>[] = [
+    {value : "value", label : "By value"},
+    {value : "suit", label : "By suit"},
+    {value : "own", label : "Your order", className : "col-span-2"}
 ];
 
 // How your hand is laid out. A sort keeps the hand sorted as cards come and
 // go; dragging a card switches to your own order.
 function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort) => void}) {
     return (
-        <div role="group" aria-labelledby="sort-hand" className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
             <span id="sort-hand" className={sectionLabel}>Sort hand</span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1">
-                {SORTS.map(option => (
-                    <Button
-                        key={option.sort}
-                        variant="ghost"
-                        aria-pressed={sort === option.sort}
-                        onClick={() => onChange(option.sort)}
-                        className={cn(
-                            "aria-pressed:bg-cream aria-pressed:text-[#12402a] aria-pressed:hover:bg-cream aria-pressed:hover:text-[#12402a]",
-                            option.sort === "own" && "col-span-2"
-                        )}
-                    >
-                        {option.label}
-                    </Button>
-                ))}
-            </div>
+            <SegmentedControl options={SORTS} value={sort} onChange={onChange} labelledBy="sort-hand" className="grid-cols-2" />
         </div>
     );
 }
@@ -116,7 +63,9 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 // The whole table: opponents along the top, piles in the middle, your hand at
 // the bottom. Short screens (phones held sideways) get their own layout
 // (PhoneTable), with the opponents in the top bar.
-function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, lookLeft, endChoice, newCard, speech, talk, notice, actions}: GameTableProps) {
+function GameTable({sort, paused, dialog, lookLeft, endChoice, speech, talk, notice}: GameTableProps) {
+    let {view, seats, hand, turn, actions} = useTable();
+    let characters = seats.map(seat => seat.character);
     // Each card is rendered for one layout only, because each card must
     // appear once for its animations to work.
     let short = useShortScreen();
@@ -160,8 +109,8 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
                 name : view.seats[seat].name,
                 count : view.seats[seat].cards.length,
                 isDown : view.seats[seat].isDown,
-                hard : levels[seat] === "hard",
-                character : characters[seat] ?? null,
+                level : seats[seat].level,
+                character : seats[seat].character,
                 active : isInTurn(view, seat),
                 cards : short ? view.seats[seat].cards : null,
                 known : knownCards(view, seat)
@@ -195,29 +144,15 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
 
     if (short) {
         return (
-            <TableDnd view={view} hand={hand} turn={turn} actions={actions}>
-                <PhoneTable
-                    view={view}
-                    characters={characters}
-                    hand={hand}
-                    sort={sort}
-                    turn={turn}
-                    lookLeft={lookLeft}
-                    newCard={newCard}
-                    speech={speech}
-                    notice={notice}
-                    actions={actions}
-                    topBar={topBar}
-                    piles={piles}
-                    melds={melds}
-                />
+            <TableDnd>
+                <PhoneTable sort={sort} lookLeft={lookLeft} speech={speech} notice={notice} topBar={topBar} piles={piles} melds={melds} />
                 {dialogs}
             </TableDnd>
         );
     }
 
     return (
-        <TableDnd view={view} hand={hand} turn={turn} actions={actions}>
+        <TableDnd>
             <div className="relative grid h-dvh grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden bg-felt shadow-[inset_0_0_180px_rgb(0_0_0/0.4)]">
                 {topBar}
 
@@ -231,8 +166,8 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
                             key={seat}
                             player={view.seats[seat]}
                             index={opponentIndex(view, seat)}
-                            hard={levels[seat] === "hard"}
-                            character={characters[seat]}
+                            level={seats[seat].level}
+                            character={seats[seat].character}
                             known={knownCards(view, seat)}
                             active={isInTurn(view, seat)}
                             speech={speech[seat]}
@@ -271,39 +206,15 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
 
                     <div className="flex min-w-0 flex-col items-center gap-2.5">
                         {turn.look
-                            ? (
-                                <LookPrompt
-                                    starter={turn.look.starter}
-                                    left={lookLeft}
-                                    total={turn.look.total}
-                                    waitingFor={turn.look.waitingFor}
-                                    onReady={actions.start}
-                                />
-                            )
+                            ? <YourLookPrompt left={lookLeft} />
                             : <TurnPrompt steps={turn.steps} text={turn.prompt} notice={notice} />}
-                        <Hand
-                            key={view.round}
-                            cards={hand}
-                            selected={turn.selected?.index ?? null}
-                            selectable={turn.playing}
-                            newCard={newCard}
-                            playable={turn.playable}
-                            onSelect={actions.select}
-                        />
+                        <YourHand />
                     </div>
 
                     {/* no taller than the hand in a short window, to leave the piles room */}
                     <div className="mb-4 flex flex-col gap-3 compact:mb-0 compact:gap-2">
                         <SortSwitch sort={sort} onChange={actions.sortHand} />
-                        <Button
-                            size="lg"
-                            variant={turn.goDown.ready ? "default" : "secondary"}
-                            disabled={!turn.goDown.enabled}
-                            onClick={actions.openGoDown}
-                            className={cn("relative", turn.goDown.ready && "pulse-gold")}
-                        >
-                            Go down
-                        </Button>
+                        <GoDownButton size="lg" />
                         <span className="text-center text-[13px] text-muted-foreground">{turn.goDown.hint}</span>
                     </div>
                 </section>

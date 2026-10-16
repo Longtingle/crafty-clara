@@ -3,20 +3,20 @@
 // heuristic that finds the best partial and complete setruns for the round's
 // requirement.
 //
-// There are two levels. A normal bot plays its own hand. A hard bot also
-// reads the table (clues.ts): it remembers, imperfectly, what the others
-// pick up and throw away, and which cards are gone. It avoids discarding what
-// would help them, and collects the setruns it can still finish.
+// There are two levels, each a set of traits (LEVEL_TRAITS in levels.ts). A
+// normal bot plays its own hand. A hard bot also reads the table (clues.ts):
+// it remembers, imperfectly, what the others pick up and throw away, and
+// which cards are gone. It avoids discarding what would help them, and
+// collects the setruns it can still finish.
 
 import {RUN, SET, SUITS, asWild, getPoints, isRedAce, type Card, type Requirement, type Setrun, type SetrunType} from './cards.ts';
 import {addToSetrun, checkSetrun, runEnds, runLayouts, sortHand, subsets, type RunEnd} from './setruns.ts';
-import {readClues, type Clues, type Memory} from './clues.ts';
+import {readClues, type Clues} from './clues.ts';
+import {LEVEL_TRAITS, type BotLevel} from './levels.ts';
 import type {Command, Target} from './game.ts';
 import {random} from './random.ts';
 import type {GameView} from './view.ts';
 import type {CharacterId} from './cast.ts';
-
-export type BotLevel = "normal" | "hard";
 
 /** Who a bot is: its level, a seed for what it forgets, and how much risk it takes. */
 export interface BotProfile {
@@ -42,9 +42,6 @@ const HOLD_CHANCE = 0.8;
  * same turn in tournaments; in rounds 6 and 7, 11% and 20% did.
  */
 const MAX_HOLD_CARDS = 9;
-
-/** How well a hard bot remembers what it saw (see clues.ts). */
-const HARD_MEMORY: Omit<Memory, "seed"> = {fresh : 0.95, fade : 0.92};
 
 /** What a hard bot reads from the table. A normal bot plays without it. */
 export type Insight = Pick<Clues, "danger" | "outs">;
@@ -282,11 +279,12 @@ const wantsCard = (hand: Card[], requirement: Requirement, card: Card, insight?:
  * The index of the card to discard: the highest card that isn't useful, then
  * the highest not in the best hand. Red aces are kept if possible.
  *
- * A hard bot judges what's useful by what it can still finish, and weighs
- * how dangerous each card is to discard (the chance it helps someone else)
- * against the card's points instead of discarding the highest.
+ * A hard bot judges what's useful by what it can still finish, and discards
+ * by points (`byPoints`) instead of discarding the highest, weighing how
+ * dangerous each card is to discard (the chance it helps someone else)
+ * against them.
  */
-const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, insight?: Insight): number => {
+const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, insight?: Insight, byPoints = insight !== undefined): number => {
     let indexed: Indexed[] = hand.map((card, index) => ({...card, index}));
     let candidates = indexed;
 
@@ -302,8 +300,8 @@ const chooseDiscard = (hand: Card[], requirement: Requirement, isDown: boolean, 
     let notWild = candidates.filter(card => !isRedAce(card));
     if (notWild.length > 0) candidates = notWild;
 
-    if (insight) {
-        let worth = (card: Card): number => getPoints([card]) - DANGER_WEIGHT * insight.danger(card);
+    if (byPoints) {
+        let worth = (card: Card): number => getPoints([card]) - (insight ? DANGER_WEIGHT * insight.danger(card) : 0);
         return candidates.reduce((best, card) => (worth(card) > worth(best)) ? card : best).index;
     }
     return candidates.reduce((highest, card) => (card.value > highest.value) ? card : highest).index;
@@ -540,12 +538,12 @@ const holdsOff = (view: GameView, plan: {table: Setrun[]; rest: Card[]}, profile
 //   to pair with another is no good, as nobody can lay the pair down
 // - a card the bot would throw straight back, because its hand is so full of
 //   setruns that the new card is the one it can best spare
-const worthTaking = (view: GameView, card: Card, insight?: Insight): boolean => {
+const worthTaking = (view: GameView, card: Card, insight: Insight | undefined, byPoints: boolean): boolean => {
     let {hand, requirement} = view;
     if (view.seats[view.seat].isDown) return findAddition([card], view.seats.map(seat => seat.table)) !== null;
     if (!wantsCard(hand, requirement, card, insight)) return false;
     let after = [...hand, card];
-    return after[chooseDiscard(after, requirement, false, insight)].id !== card.id;
+    return after[chooseDiscard(after, requirement, false, insight, byPoints)].id !== card.id;
 };
 
 /**
@@ -559,11 +557,12 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
     let {hand, requirement} = view;
     let me = view.seats[view.seat];
     let tables = view.seats.map(seat => seat.table);
+    let traits = LEVEL_TRAITS[profile.level];
 
-    // a hard bot reads the table when it has something to decide
+    // a bot that reads the table does so when it has something to decide
     let read: Clues | undefined;
     const insight = (): Clues | undefined =>
-        (profile.level === "hard") ? (read ??= readClues(view, {seed : profile.seed, ...HARD_MEMORY})) : undefined;
+        traits.memory ? (read ??= readClues(view, {seed : profile.seed, ...traits.memory})) : undefined;
 
     if (view.look) return view.look.ready[view.seat] ? null : {type : "start"};
     if (view.phase === "roundEnd") return me.ready ? null : {type : "ready"};
@@ -576,7 +575,7 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
 
     if (view.phase === "draw") {
         let top = view.discard[0];
-        let takeDiscard = top !== undefined && (!view.deck.canDraw || worthTaking(view, top, insight()));
+        let takeDiscard = top !== undefined && (!view.deck.canDraw || worthTaking(view, top, insight(), traits.discardsByPoints));
         return {type : "draw", from : takeDiscard ? "discard" : "deck"};
     }
     // let the others claim or pass before playing on
@@ -584,11 +583,11 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
 
     if (!me.isDown) {
         let plan = planGoDown(hand, requirement, tables);
-        if (plan && !(profile.level === "hard" && holdsOff(view, plan, profile))) {
-            if (profile.level !== "hard") {
+        if (plan && !(traits.holdsOff && holdsOff(view, plan, profile))) {
+            if (!traits.placesAces) {
                 return {type : "goDown", setruns : plan.table.map(setrun => ({type : setrun.type, cards : setrun.cards.map(card => card.id)}))};
             }
-            // a hard bot chooses which end of a run a spare wild goes
+            // it chooses which end of a run a spare wild goes
             return {type : "goDown", setruns : layOutRuns(plan, tables, insight()).map(setrun => ({
                 type : setrun.type,
                 cards : setrun.cards.map(card => card.id),
@@ -598,12 +597,12 @@ const botMove = (view: GameView, profile: BotProfile = NORMAL_BOT): Command | nu
     } else {
         let addition = findAddition(hand, tables);
         if (addition) {
-            // a hard bot chooses which end of a run a red ace goes
-            let end = (profile.level === "hard") ? chooseEnd(hand, addition, tables, insight()) : undefined;
+            // it may choose which end of a run a red ace goes
+            let end = traits.placesAces ? chooseEnd(hand, addition, tables, insight()) : undefined;
             return {type : "addToSetrun", card : addition.card.id, target : addition.target, ...(end ? {end} : {})};
         }
     }
-    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, insight())].id};
+    return {type : "discard", card : hand[chooseDiscard(hand, requirement, me.isDown, insight(), traits.discardsByPoints)].id};
 };
 
 export {

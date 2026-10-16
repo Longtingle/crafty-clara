@@ -49,4 +49,21 @@ const seatPlaces = (count: number): {columns: number; places: GridPlace[]} => {
     return {columns, places : round.slice(0, count)};
 }
 
-export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor, portraitImage, seatPlaces};
+// What an opponent's seat means, before a game, for the opponent at `index`
+// (from 0, in turn order after you) of those `names`. Where an opponent sits
+// matters: the player after you sees your discards first, and the player
+// before you comes ahead of you for every claim.
+const seatNote = (index: number, names: string[]): string => {
+    if (index === 0) return "Plays straight after you, so gets your discards first";
+    if (index === names.length - 1) return "Plays just before you, so beats you to claims";
+    return (names.length === 3) ? "Plays opposite you" : "Plays after " + names[index - 1];
+};
+
+// The question when choosing who sits in an opponent's seat.
+const seatQuestion = (index: number, names: string[]): string => {
+    if (index === 0) return "Who plays straight after you?";
+    if (index === names.length - 1) return "Who plays just before you?";
+    return (names.length === 3) ? "Who plays opposite you?" : "Who plays after " + names[index - 1] + "?";
+};
+
+export {YOU_COLOR, aiColor, opponentSeats, opponentIndex, seatName, seatColor, portraitImage, seatPlaces, seatNote, seatQuestion};

@@ -1,12 +1,11 @@
-import {lazy, Suspense, useEffect, useState} from 'react';
+import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import {MotionConfig} from 'motion/react';
-import type {BotLevel} from './engine/bot.ts';
+import type {BotLevel} from './engine/levels.ts';
 import {dealCast, type CharacterId} from './engine/cast.ts';
 import type {LocalGameSave} from './host/local-game.ts';
 import type {Session, SessionOptions} from './session.ts';
 import {gameHistory, heardLines, savedGame, settings} from './storage/platform.ts';
-import {DEFAULT_HINTS, DEFAULT_TALK, type Hints, type TalkLevel} from './storage/settings.ts';
-import {DEFAULT_SPEED, type GameSpeed} from './host/game-speed.ts';
+import {DEFAULT_PREFERENCES, type Preferences} from './storage/settings.ts';
 import {unlockAudio} from './lib/audio.ts';
 import {SOUNDS} from './components/game/sounds.ts';
 import type {GameRecord} from './storage/history.ts';
@@ -43,16 +42,16 @@ type Page = "home" | "newGame" | "stats";
 // bots. Each game has its own host running in this page (src/host), and the
 // screen sees the game only through your seat's client, the way it would see
 // a game online. What's kept between visits (the game in progress, the
-// opponents you chose last time, your hints, your finished games) is in
+// opponents you chose last time, your settings, your finished games) is in
 // src/storage.
 function App() {
     let [page, setPage] = useState<Page>("home");
     let [cast, setCast] = useState<CharacterId[] | null>(null);
     let [levels, setLevels] = useState(ALL_NORMAL);
-    let [hints, setHints] = useState(DEFAULT_HINTS);
-    let [talk, setTalk] = useState<TalkLevel>(DEFAULT_TALK);
-    let [speed, setSpeed] = useState<GameSpeed>(DEFAULT_SPEED);
-    let [sound, setSound] = useState(true);
+    let [prefs, setPrefs] = useState(DEFAULT_PREFERENCES);
+    // what you've changed since the page opened, which the preferences kept
+    // from last time, read as it opens, mustn't undo
+    let changed = useRef<Partial<Preferences>>({});
     // the table talk heard lately, which the cast keep off
     let [heard, setHeard] = useState<string[]>([]);
     // your finished games, for the stats screen
@@ -68,10 +67,7 @@ function App() {
         void settings.levels().then(kept => {
             if (kept?.length === OPPONENTS) setLevels(kept);
         });
-        void settings.hints().then(setHints);
-        void settings.talk().then(setTalk);
-        void settings.speed().then(setSpeed);
-        void settings.sound().then(setSound);
+        void settings.preferences().then(kept => setPrefs({...kept, ...changed.current}));
         void heardLines.list().then(setHeard);
         void savedGame.load().then(setSaved);
     }, []);
@@ -89,27 +85,14 @@ function App() {
         settings.setLevels(next);
     };
 
-    let changeHints = (next: Hints) => {
-        setHints(next);
-        settings.setHints(next);
-    };
-
-    let changeTalk = (next: TalkLevel) => {
-        setTalk(next);
-        settings.setTalk(next);
-    };
-
-    let changeSound = (next: boolean) => {
-        setSound(next);
-        settings.setSound(next);
-        if (next) unlockAudio(SOUNDS);
-    };
-
-    // a game in progress speeds up or slows down at once
-    let changeSpeed = (next: GameSpeed) => {
-        setSpeed(next);
-        settings.setSpeed(next);
-        session?.game.setSpeed(next);
+    let changePrefs = (changes: Partial<Preferences>) => {
+        changed.current = {...changed.current, ...changes};
+        setPrefs(old => ({...old, ...changes}));
+        settings.setPreferences(changes);
+        // the tap that turns sound on lets the game make it
+        if (changes.sound) unlockAudio(SOUNDS);
+        // a game in progress speeds up or slows down at once
+        if (changes.speed) session?.game.setSpeed(changes.speed);
     };
 
     // On a phone or tablet, starting a game goes full screen (if you've left
@@ -126,7 +109,7 @@ function App() {
         loadGame().then(
             ([{startSession}]) => {
                 try {
-                    setSession(startSession({...options, speed, savedGame, history : gameHistory, heardLines, heard}));
+                    setSession(startSession({...options, speed : prefs.speed, savedGame, history : gameHistory, heardLines, heard}));
                 } catch (error) {
                     // a saved game this version can't carry on
                     console.error(error);
@@ -159,17 +142,10 @@ function App() {
         screen = (
             <GameScreen
                 client={session.client}
-                levels={session.levels}
-                characters={session.characters}
+                seats={session.seats}
                 pausing={session.game}
-                hints={hints}
-                onHintsChange={changeHints}
-                talk={talk}
-                onTalkChange={changeTalk}
-                speed={speed}
-                onSpeedChange={changeSpeed}
-                sound={sound}
-                onSoundChange={changeSound}
+                prefs={prefs}
+                onPrefsChange={changePrefs}
                 games={gameHistory.list}
                 onNewGame={newGame}
                 onShowStats={showStats}
@@ -198,14 +174,8 @@ function App() {
                 onContinue={() => saved && play({from : saved})}
                 onStartGame={startGame}
                 onShowStats={showStats}
-                hints={hints}
-                onHintsChange={changeHints}
-                talk={talk}
-                onTalkChange={changeTalk}
-                speed={speed}
-                onSpeedChange={changeSpeed}
-                sound={sound}
-                onSoundChange={changeSound}
+                prefs={prefs}
+                onPrefsChange={changePrefs}
             />
         );
     }

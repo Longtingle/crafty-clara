@@ -2,7 +2,7 @@
 // is, how quickly the game goes, which hints you want while you play, how
 // much table talk, and whether there's sound.
 
-import type {BotLevel} from '@/engine/bot.ts';
+import {isBotLevel, type BotLevel} from '@/engine/levels.ts';
 import {isCharacterId, type CharacterId} from '@/engine/cast.ts';
 import {DEFAULT_SPEED, isGameSpeed, type GameSpeed} from '@/host/game-speed.ts';
 import type {KeyValueStore} from './store.ts';
@@ -31,6 +31,30 @@ export interface Hints {
 
 export const DEFAULT_HINTS: Hints = {fits : true, targets : true, ready : false};
 
+/** How you like the game, whichever game it is: the Settings dialog. */
+export interface Preferences {
+    hints: Hints;
+    /** how much table talk you see */
+    talk: TalkLevel;
+    /** how quickly the bots play, and how long you have to claim a discard */
+    speed: GameSpeed;
+    /** whether the game makes sound */
+    sound: boolean;
+}
+
+export const DEFAULT_PREFERENCES: Preferences = {hints : DEFAULT_HINTS, talk : DEFAULT_TALK, speed : DEFAULT_SPEED, sound : true};
+
+const readHints = (saved: unknown): Hints => {
+    let hints = {...DEFAULT_HINTS};
+    let kept = saved as Partial<Record<keyof Hints, unknown>> | null;
+    for (let key of Object.keys(hints) as (keyof Hints)[]) {
+        if (typeof kept?.[key] === "boolean") hints[key] = kept[key];
+    }
+    return hints;
+};
+
+const isTalkLevel = (value: unknown): value is TalkLevel => value === "off" || value === "quiet" || value === "chatty";
+
 export interface Settings {
     /** who sits in each opponent's seat, as last chosen, or null if never chosen */
     cast(): Promise<CharacterId[] | null>;
@@ -38,19 +62,14 @@ export interface Settings {
     /** each opponent's level, as last chosen, or null if never chosen */
     levels(): Promise<BotLevel[] | null>;
     setLevels(levels: BotLevel[]): void;
-    /** your hints, with the defaults for any never chosen */
-    hints(): Promise<Hints>;
-    setHints(hints: Hints): void;
-    /** how much table talk you see */
-    talk(): Promise<TalkLevel>;
-    setTalk(level: TalkLevel): void;
-    /** how quickly the bots play, and how long you have to claim a discard */
-    speed(): Promise<GameSpeed>;
-    setSpeed(speed: GameSpeed): void;
-    /** whether the game makes sound (it does unless you turn it off) */
-    sound(): Promise<boolean>;
-    setSound(on: boolean): void;
+    /** your preferences, with the default for any never chosen (or no longer understood) */
+    preferences(): Promise<Preferences>;
+    /** keeps the preferences given */
+    setPreferences(changes: Partial<Preferences>): void;
 }
+
+// Each preference has a key of its own.
+const PREFERENCE_KEYS: Record<keyof Preferences, string> = {hints : HINTS_KEY, talk : TALK_KEY, speed : SPEED_KEY, sound : SOUND_KEY};
 
 export const createSettings = (store: KeyValueStore): Settings => ({
     async cast() {
@@ -62,40 +81,24 @@ export const createSettings = (store: KeyValueStore): Settings => ({
     },
     async levels() {
         let saved = await store.get(LEVELS_KEY);
-        return (Array.isArray(saved) && saved.every(level => level === "normal" || level === "hard")) ? saved : null;
+        return (Array.isArray(saved) && saved.every(isBotLevel)) ? saved : null;
     },
     setLevels(levels) {
         void store.set(LEVELS_KEY, levels);
     },
-    async hints() {
-        let saved = await store.get(HINTS_KEY) as Partial<Record<keyof Hints, unknown>> | null;
-        let hints = {...DEFAULT_HINTS};
-        for (let key of Object.keys(hints) as (keyof Hints)[]) {
-            if (typeof saved?.[key] === "boolean") hints[key] = saved[key];
+    async preferences() {
+        let [hints, talk, speed, sound] = await Promise.all([HINTS_KEY, TALK_KEY, SPEED_KEY, SOUND_KEY].map(key => store.get(key)));
+        return {
+            hints : readHints(hints),
+            talk : isTalkLevel(talk) ? talk : DEFAULT_TALK,
+            speed : isGameSpeed(speed) ? speed : DEFAULT_SPEED,
+            // on unless you turn it off
+            sound : sound !== false
+        };
+    },
+    setPreferences(changes) {
+        for (let key of Object.keys(changes) as (keyof Preferences)[]) {
+            void store.set(PREFERENCE_KEYS[key], changes[key]);
         }
-        return hints;
-    },
-    setHints(hints) {
-        void store.set(HINTS_KEY, hints);
-    },
-    async talk() {
-        let saved = await store.get(TALK_KEY);
-        return (saved === "off" || saved === "quiet" || saved === "chatty") ? saved : DEFAULT_TALK;
-    },
-    setTalk(level) {
-        void store.set(TALK_KEY, level);
-    },
-    async speed() {
-        let saved = await store.get(SPEED_KEY);
-        return isGameSpeed(saved) ? saved : DEFAULT_SPEED;
-    },
-    setSpeed(speed) {
-        void store.set(SPEED_KEY, speed);
-    },
-    async sound() {
-        return (await store.get(SOUND_KEY)) !== false;
-    },
-    setSound(on) {
-        void store.set(SOUND_KEY, on);
     }
 });

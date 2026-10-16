@@ -1,4 +1,5 @@
-import type {BotLevel} from '@/engine/bot.ts';
+import {BOT_LEVELS, type BotLevel} from '@/engine/levels.ts';
+import {LEVEL_NAMES} from './level-names.ts';
 import type {GameRecord} from '@/storage/history.ts';
 
 // Your stats, worked out from the records of your finished games
@@ -56,8 +57,6 @@ export interface Stats {
     /** your games, newest first */
     results: GameResult[];
 }
-
-const LEVELS: BotLevel[] = ["normal", "hard"];
 
 const totalOf = (scores: number[]): number => scores.reduce((sum, points) => sum + points, 0);
 
@@ -124,7 +123,7 @@ export const gameStats = (records: GameRecord[]): Stats => {
         averageScore : (results.length === 0) ? 0 : totalOf(results.map(result => result.total)) / results.length,
         bestScore : (results.length === 0) ? 0 : Math.min(...results.map(result => result.total)),
         places : Array.from({length : most}, (_, i) => results.filter(result => result.place === i + 1).length),
-        levels : LEVELS.flatMap(level => levels.get(level) ?? []),
+        levels : BOT_LEVELS.flatMap(level => levels.get(level) ?? []),
         rounds,
         byRound,
         results : results.toReversed()
@@ -163,4 +162,4 @@ export const playedWhen = (finishedAt: number, now: number): string => {
 
 /** "Normal · Normal · Hard" */
 export const lineupText = (lineup: (BotLevel | null)[]): string =>
-    lineup.map(level => (level === null) ? "Person" : (level === "hard") ? "Hard" : "Normal").join(" · ");
+    lineup.map(level => (level === null) ? "Person" : LEVEL_NAMES[level].name).join(" · ");

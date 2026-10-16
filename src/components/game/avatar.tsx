@@ -1,23 +1,31 @@
 import type {ReactNode} from 'react';
 import {cn} from '@/lib/utils.ts';
 import type {CharacterId} from '@/engine/cast.ts';
+import type {BotLevel} from '@/engine/levels.ts';
 import {portraitImage} from './players.ts';
+import {isTagged, LEVEL_NAMES} from './level-names.ts';
 
 // The badges by a player's name, used all over: on the table, the
 // scoreboard and the new-game screen. They're kept apart from the table's
 // components, so a screen that shows them doesn't load the table.
 
-// A small tag by a name: gold for whose turn it is, cream for a hard bot,
-// and an outline for anything else.
-function Chip({tone = "outline", children}: {tone?: "gold" | "cream" | "outline"; children: ReactNode}) {
+// A small tag by a name: gold for whose turn it is or who went out, cream for
+// a bot's level, and an outline for anything else.
+function Chip({tone = "outline", className, children}: {tone?: "gold" | "cream" | "outline"; className?: string; children: ReactNode}) {
     return (
         <span className={cn(
             "rounded-full px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap uppercase",
-            {gold : "bg-gold text-gold-foreground", cream : "bg-cream text-[#12402a]", outline : "border border-white/40"}[tone]
+            {gold : "bg-gold text-gold-foreground", cream : "bg-cream text-cream-foreground", outline : "border border-white/40"}[tone],
+            className
         )}>
             {children}
         </span>
     );
+}
+
+// A bot's level by its name, if it's worth saying: any but normal.
+function LevelTag({level, className}: {level: BotLevel | null; className?: string}) {
+    return (level !== null && isTagged(level)) && <Chip tone="cream" className={className}>{LEVEL_NAMES[level].name}</Chip>;
 }
 
 interface AvatarProps {
@@ -50,4 +58,4 @@ function Avatar({color, label, character, className}: AvatarProps) {
     );
 }
 
-export {Avatar, Chip};
+export {Avatar, Chip, LevelTag};

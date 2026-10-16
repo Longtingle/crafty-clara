@@ -3,12 +3,13 @@ import {AnimatePresence} from 'motion/react';
 import {cn} from '@/lib/utils.ts';
 import type {Card} from '@/engine/cards.ts';
 import type {CharacterId} from '@/engine/cast.ts';
+import type {BotLevel} from '@/engine/levels.ts';
 import type {SeatView} from '@/engine/view.ts';
 import {CardBack, MovingCard, PlayingCard} from './playing-card.tsx';
 import {useFlight} from './flight.ts';
 import {MeldRow} from './meld.tsx';
 import {aiColor} from './players.ts';
-import {Avatar, Chip} from './avatar.tsx';
+import {Avatar, Chip, LevelTag} from './avatar.tsx';
 import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
 
 interface HiddenHandProps {
@@ -49,8 +50,8 @@ interface OpponentPanelProps {
     player: SeatView;
     /** their opponent number, from 0 */
     index: number;
-    /** whether they're a hard bot */
-    hard: boolean;
+    /** their level, if a bot */
+    level: BotLevel | null;
     /** who they are, if one of the cast */
     character?: CharacterId | null;
     /** the cards in their hand everyone knows (knownCards) */
@@ -66,7 +67,7 @@ interface OpponentPanelProps {
 // An opponent's name, their last move, and their score, with their setruns
 // below. What they say pops up in a bubble from their portrait, over their
 // setruns.
-function OpponentPanel({player, index, hard, character, known, active, speech, lastAction, children}: OpponentPanelProps) {
+function OpponentPanel({player, index, level, character, known, active, speech, lastAction, children}: OpponentPanelProps) {
     return (
         <div className="flex min-w-0 flex-col gap-3 compact:gap-2">
             <div className={cn(
@@ -78,7 +79,7 @@ function OpponentPanel({player, index, hard, character, known, active, speech, l
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                         <span className="truncate font-bold">{player.name}</span>
-                        {hard && <Chip tone="cream">Hard</Chip>}
+                        <LevelTag level={level} />
                         {active && <Chip tone="gold">Playing</Chip>}
                         {player.isDown && <Chip>Down</Chip>}
                     </div>

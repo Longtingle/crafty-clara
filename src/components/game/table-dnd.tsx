@@ -3,12 +3,10 @@ import {
     DndContext, PointerSensor, closestCenter, pointerWithin, useSensor, useSensors,
     type Announcements, type CollisionDetection, type UniqueIdentifier
 } from '@dnd-kit/core';
-import type {Card} from '@/engine/cards.ts';
-import type {GameView} from '@/engine/view.ts';
 import {longName, setrunCaption} from '@/engine/card-names.ts';
 import {seatName} from './players.ts';
 import {PlayedCard, parseTarget, type DropTarget} from './drop-targets.ts';
-import type {YourTurn} from './your-turn.ts';
+import {useTable} from './table-context.ts';
 
 /** What dragging a card can do. GameScreen turns each into a command or a change to your hand. */
 export interface DragActions {
@@ -36,21 +34,13 @@ const collisions: CollisionDetection = args => {
     return closestCenter({...args, droppableContainers : args.droppableContainers.filter(card => isCard(card.id))});
 };
 
-interface TableDndProps {
-    view: GameView;
-    /** your cards in the order you've arranged them */
-    hand: Card[];
-    /** what you can do now, worked out with the dragged card as the selected one */
-    turn: YourTurn;
-    actions: DragActions;
-    children: ReactNode;
-}
-
 // Dragging cards from your hand, with the mouse or by touch: within the hand
 // to reorder it, onto the discard pile to discard, or onto a meld to add to
-// it. While a card is dragged it counts as the selected card, so the table
-// lights up where it can go. Dropped anywhere it can't go, it goes back.
-function TableDnd({view, hand, turn, actions, children}: TableDndProps) {
+// it. While a card is dragged it counts as the selected card (in the table's
+// `turn`), so the table lights up where it can go. Dropped anywhere it can't
+// go, it goes back.
+function TableDnd({children}: {children: ReactNode}) {
+    let {view, hand, turn, actions} = useTable();
     // a small movement threshold, so a tap or click still selects
     let sensors = useSensors(useSensor(PointerSensor, {activationConstraint : {distance : 8}}));
     let ids = hand.map(card => card.id);
