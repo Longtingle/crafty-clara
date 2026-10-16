@@ -144,12 +144,31 @@
     repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.14) 0 2px, transparent 2px 10px);
 }
 
-/* a gold ring that pulses on whatever the player should click next */
+/* A gold ring that pulses on whatever the player should click next. The
+   ring and its halo are drawn by ::before and ::after, and only the halo's
+   opacity and size animate, which a phone does on its GPU (animating a
+   box-shadow repaints every frame). The element needs a position. */
 @utility pulse-gold {
-  animation: target-pulse 1.4s ease-in-out infinite;
+  &::before, &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  &::before {
+    box-shadow: 0 0 0 3px var(--gold);
+  }
+  &::after {
+    box-shadow: 0 0 0 3px var(--gold), 0 0 0 10px rgb(245 184 61 / 0.3);
+    animation: halo-pulse 1.4s ease-in-out infinite;
+    will-change: opacity, transform;
+  }
   @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    box-shadow: 0 0 0 3px var(--gold), 0 0 0 7px rgb(245 184 61 / 0.3);
+    &::after {
+      animation: none;
+      opacity: 0.6;
+    }
   }
 }
 
@@ -166,12 +185,7 @@
   }
 }
 
-@keyframes claim-countdown {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: 100; }
-}
-
-@keyframes target-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--gold), 0 0 0 7px rgb(245 184 61 / 0.3); }
-  50% { box-shadow: 0 0 0 3px var(--gold), 0 0 0 14px rgb(245 184 61 / 0); }
+@keyframes halo-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0; transform: scale(1.05); }
 }

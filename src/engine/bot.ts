@@ -321,6 +321,24 @@ const combinations = <T>(items: T[], size: number): T[][] => (size === 0)
     ? [[]]
     : items.flatMap((item, i) => combinations(items.slice(i + 1), size - 1).map(rest => [item, ...rest]));
 
+// Every way of choosing `size` of the options that share no natural card and
+// need no more than `wilds` wild aces between them, in the same order as
+// combinations. It skips a clashing option as it goes, rather than listing
+// every combination first: three runs from a long stretch of one suit can
+// otherwise mean thousands.
+const disjoint = (options: Option[], size: number, wilds: number, used = new Set<Card>(), from = 0, spent = 0): Option[][] => {
+    if (size === 0) return [[]];
+    let ways: Option[][] = [];
+    for (let i = from; i < options.length; i++) {
+        let option = options[i];
+        if (spent + option.wilds > wilds || option.naturals.some(card => used.has(card))) continue;
+        let taken = new Set(used);
+        option.naturals.forEach(card => taken.add(card));
+        for (let rest of disjoint(options, size - 1, wilds, taken, i + 1, spent + option.wilds)) ways.push([option, ...rest]);
+    }
+    return ways;
+};
+
 // The runs the bot could make: in each suit, each stretch of 4 or more values
 // with at least 3 natural cards and wild aces in the gaps. A stretch starts
 // and ends on natural cards, unless it needs a wild at an end to be long enough.
@@ -399,10 +417,8 @@ const planGoDown = (hand: Card[], requirement: Requirement, tables: Setrun[][] =
         let naturals = hand.filter(card => !isRedAce(card) || asAces.includes(card));
         let wilds = redAces.filter(ace => !asAces.includes(ace));
 
-        for (let runs of combinations(runOptions(naturals, wilds.length), requirement.R)) {
+        for (let runs of disjoint(runOptions(naturals, wilds.length), requirement.R, wilds.length)) {
             let inRuns = new Set(runs.flatMap(run => run.naturals));
-            if (inRuns.size !== runs.reduce((sum, run) => sum + run.naturals.length, 0)) continue;
-            if (wildsIn(runs) > wilds.length) continue;
             let left = naturals.filter(card => !inRuns.has(card));
 
             for (let sets of combinations(setOptions(left, wilds.length - wildsIn(runs)), requirement.S)) {

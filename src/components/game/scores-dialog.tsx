@@ -1,4 +1,4 @@
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
@@ -16,7 +16,7 @@ interface ScoresDialogProps {
 function ScoresDialog({open, onOpenChange, view, characters}: ScoresDialogProps) {
     let roundsPlayed = view.seats[view.seat].scores.length;
     // a phone gets the tighter table, so it fits without scrolling
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[880px] short:max-h-[calc(100dvh-1rem)] short:gap-3 short:p-4">

@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
 import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
@@ -27,12 +27,26 @@ export interface ClaimOffer {
     onPass: () => void;
 }
 
+// The time left of `ms`, counted down a second at a time, standing still
+// while paused.
+function useCountdown(ms: number, paused: boolean): number {
+    let [left, setLeft] = useState(ms);
+    useEffect(() => {
+        if (paused || left <= 0) return;
+        let timer = setTimeout(() => setLeft(Math.max(0, left - (left % 1000 || 1000))), left % 1000 || 1000);
+        return () => clearTimeout(timer);
+    }, [left, paused]);
+    return left;
+}
+
 // Claim or pass on the top discard. The claim button counts down the time
-// left from when it mounts; later views don't restart it, and it stops while
+// left from when it mounts, a second at a time (not smoothly: a phone would
+// repaint it every frame); later views don't restart it, and it stops while
 // the game is paused. It sits beside the discard pile so the table doesn't
 // move when it appears.
 function ClaimChoice({card, closesIn, paused, onClaim, onPass}: ClaimOffer & {paused: boolean}) {
     let [duration] = useState(closesIn);
+    let left = useCountdown(duration, paused);
     return (
         <div className="flex items-center gap-1 rounded-2xl bg-card p-1 shadow-lg ring-1 ring-border">
             <button
@@ -44,8 +58,7 @@ function ClaimChoice({card, closesIn, paused, onClaim, onPass}: ClaimOffer & {pa
                     <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
                     <circle
                         cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
-                        pathLength="100" strokeDasharray="100"
-                        style={{animation : `claim-countdown ${duration}ms linear forwards`, animationPlayState : paused ? "paused" : "running"}}
+                        pathLength="100" strokeDasharray="100" strokeDashoffset={100 - 100 * left / duration}
                     />
                 </svg>
                 Claim {shortName(card)}

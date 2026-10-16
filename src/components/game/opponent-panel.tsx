@@ -7,7 +7,8 @@ import type {SeatView} from '@/engine/view.ts';
 import {CardBack, MovingCard, PlayingCard} from './playing-card.tsx';
 import {useFlight} from './flight.ts';
 import {MeldRow} from './meld.tsx';
-import {aiColor, portraitImage} from './players.ts';
+import {aiColor} from './players.ts';
+import {Avatar, Chip} from './avatar.tsx';
 import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
 
 interface HiddenHandProps {
@@ -41,49 +42,6 @@ function HiddenHand({ids, known = {}, className}: HiddenHandProps) {
                 </MovingCard>
             ))}
         </AnimatePresence>
-    );
-}
-
-// A small tag by a name: gold for whose turn it is, cream for a hard bot,
-// and an outline for anything else.
-function Chip({tone = "outline", children}: {tone?: "gold" | "cream" | "outline"; children: ReactNode}) {
-    return (
-        <span className={cn(
-            "rounded-full px-2 py-px text-[11px] font-bold tracking-wider whitespace-nowrap uppercase",
-            {gold : "bg-gold text-gold-foreground", cream : "bg-cream text-[#12402a]", outline : "border border-white/40"}[tone]
-        )}>
-            {children}
-        </span>
-    );
-}
-
-interface AvatarProps {
-    color: string;
-    /** what it says, without a portrait: an opponent's number, or "You" */
-    label: ReactNode;
-    /** whose portrait it shows, in a ring of their colour */
-    character?: CharacterId | null;
-    className?: string;
-}
-
-// A player's badge: a character's portrait in a ring of their colour, or else
-// their colour with a label.
-function Avatar({color, label, character, className}: AvatarProps) {
-    if (character) {
-        return (
-            <span aria-hidden="true" className={cn("block size-11 flex-none rounded-full p-[3px]", className)} style={{backgroundColor : color}}>
-                <img src={portraitImage(character)} alt="" draggable={false} className="block size-full rounded-full object-cover" />
-            </span>
-        );
-    }
-    return (
-        <span
-            aria-hidden="true"
-            className={cn("grid size-11 flex-none place-items-center rounded-full font-bold text-white", className)}
-            style={{backgroundColor : color}}
-        >
-            {label}
-        </span>
     );
 }
 
@@ -152,4 +110,4 @@ function OpponentPanel({player, index, hard, character, known, active, speech, l
     );
 }
 
-export {OpponentPanel, HiddenHand, Chip, Avatar};
+export {OpponentPanel, HiddenHand};

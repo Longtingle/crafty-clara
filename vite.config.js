@@ -21,6 +21,14 @@ export default defineConfig({
       workbox: {
         // everything a game needs (browsers that can run it all read woff2)
         globPatterns: ['**/*.{html,js,css,woff2,webp,png,svg,webmanifest,mp3}'],
+        // the browser fetches the app's icons itself, when it's installed
+        globIgnores: ['icons/**'],
+        // A new version takes over as soon as it's installed, rather than
+        // waiting for every tab and the installed app to close, which on a
+        // phone might be never. A page already open keeps running what it
+        // has; if it then can't fetch the game, it reloads (App.tsx).
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],

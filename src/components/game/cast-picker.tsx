@@ -1,6 +1,6 @@
 import {Shuffle, X} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog.tsx';
 import {CAST, type CharacterId} from '@/engine/cast.ts';
@@ -24,7 +24,7 @@ const DESCRIPTION = "Everyone has their own way of playing, and talking. You'll 
 // manner. Anyone already at the table is greyed out. A dialog, or on a phone
 // a sheet that fills the screen, with each portrait beside its name to fit.
 function CastPicker({open, title, current, taken, onPick, onClose}: CastPickerProps) {
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let free = CAST.filter(c => c.id !== current && !taken.includes(c.id));
     let random = (
         <Button

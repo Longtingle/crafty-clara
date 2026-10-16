@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils.ts';
-import {Avatar, Chip} from './opponent-panel.tsx';
+import {Avatar, Chip} from './avatar.tsx';
 import {YOU_COLOR} from './players.ts';
 
 interface PlayerPanelProps {

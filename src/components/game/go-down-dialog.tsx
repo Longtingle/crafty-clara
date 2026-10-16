@@ -2,7 +2,7 @@ import {useState, type CSSProperties, type ReactNode} from 'react';
 import {LayoutGroup} from 'motion/react';
 import {Check, CircleAlert} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {SET, RUN, type Card, type Requirement, type Setrun, type SetrunType} from '@/engine/cards.ts';
@@ -434,7 +434,7 @@ function Flights({children}: {children: ReactNode}) {
 // missing; Go down only works once every slot is valid. On a phone (a short
 // screen) it's a sheet that fills the screen.
 function GoDownDialog({open, hand, requirement, onCancel, onSubmit}: GoDownDialogProps) {
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let props = {hand, requirement, onCancel, onSubmit};
     return (
         <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel(); }}>

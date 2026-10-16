@@ -1,7 +1,7 @@
 import {useId, type ReactNode} from 'react';
 import {Volume2, VolumeX} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog.tsx';
 import {Switch} from '@/components/ui/switch.tsx';
@@ -272,7 +272,7 @@ interface SettingsDialogProps {
 // on a phone a sheet that fills the screen. Each change is kept as it's made.
 function SettingsDialog({open, onOpenChange, hints, onHintsChange, speed, onSpeedChange, talk, onTalkChange, sound, onSoundChange, inGame = false}: SettingsDialogProps) {
     let game = <GameSettings speed={speed} onSpeedChange={onSpeedChange} talk={talk} onTalkChange={onTalkChange} sound={sound} onSoundChange={onSoundChange} />;
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let done = (
         <DialogClose asChild>
             <Button size="lg" className="px-8 text-[17px] short:h-11 short:px-6.5 short:text-base">Done</Button>

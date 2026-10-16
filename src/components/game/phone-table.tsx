@@ -7,7 +7,7 @@ import type {CharacterId} from '@/engine/cast.ts';
 import type {GameView} from '@/engine/view.ts';
 import Hand from './hand.tsx';
 import {MeldRow} from './meld.tsx';
-import {Avatar} from './opponent-panel.tsx';
+import {Avatar} from './avatar.tsx';
 import {opponentIndex, opponentSeats, seatColor, seatName, seatPlaces} from './players.ts';
 import {activityEntries, type NewCard} from './log-text.ts';
 import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
@@ -127,7 +127,7 @@ function SeatGrid({view, characters, speech, melds, onGoDown, ready}: SeatGridPr
                             </div>
                         )}
                         {!player.isDown && you && onGoDown && (
-                            <Button variant={ready ? "default" : "secondary"} onClick={onGoDown} className={cn(ready && "pulse-gold")}>Go down</Button>
+                            <Button variant={ready ? "default" : "secondary"} onClick={onGoDown} className={cn("relative", ready && "pulse-gold")}>Go down</Button>
                         )}
                         {!player.isDown && !(you && onGoDown) && (
                             <span className="text-xs text-muted-foreground">Not down yet</span>

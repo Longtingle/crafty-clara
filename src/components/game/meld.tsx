@@ -1,7 +1,7 @@
 import {useId, type CSSProperties, type ReactNode} from 'react';
 import {useDroppable} from '@dnd-kit/core';
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Popover, PopoverAnchor, PopoverContent} from '@/components/ui/popover.tsx';
 import {RUN, isWild, type Card, type Setrun} from '@/engine/cards.ts';
 import type {RunEnd, RunPlace} from '@/engine/setruns.ts';
@@ -81,7 +81,7 @@ function Meld({seat, index, setrun, target, dimmed, onClick, choice, onChoose, o
     let {setNodeRef, isOver} = useDroppable({id : meldTarget(seat, index)});
     let titleId = useId();
     // on a phone there's no room above a meld, but there is beside it
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let meld = (
         <button
             ref={setNodeRef}

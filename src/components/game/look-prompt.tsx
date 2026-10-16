@@ -38,11 +38,11 @@ function LookPrompt({starter, left, total, waitingFor, onReady, floating = false
             <span aria-hidden="true" className={cn("relative flex-none", floating ? "size-10.5" : "size-11.5")}>
                 <svg viewBox="0 0 36 36" className="size-full -rotate-90 text-gold">
                     <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeOpacity="0.22" strokeWidth="3.5" />
-                    {/* the ring empties as the time runs out, a second at a time */}
+                    {/* the ring empties as the time runs out, a second at a time (not
+                        smoothly: a phone would repaint it every frame) */}
                     <circle
                         cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round"
                         pathLength="100" strokeDasharray="100" strokeDashoffset={100 - 100 * left / total}
-                        className="transition-[stroke-dashoffset] duration-1000 ease-linear motion-reduce:transition-none"
                     />
                 </svg>
                 <span className="absolute inset-0 grid place-items-center text-base font-extrabold text-gold">{seconds}</span>

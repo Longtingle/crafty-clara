@@ -1,6 +1,6 @@
 import {Crown} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
-import {Avatar, Chip} from './opponent-panel.tsx';
+import {Avatar, Chip} from './avatar.tsx';
 import type {ScoreRow} from './scores.ts';
 import SpeechBubble, {type Bubble} from './speech-bubble.tsx';
 

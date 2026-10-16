@@ -2,7 +2,7 @@ import {useState, type ReactNode} from 'react';
 import {Tabs} from 'radix-ui';
 import {ChartColumn, ChevronLeft} from 'lucide-react';
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
 import {requirementText} from '@/engine/card-names.ts';
@@ -350,7 +350,7 @@ interface StatsScreenProps {
 
 // Your stats, from the games you've finished on this device.
 function StatsScreen({records, onBack, onStartGame}: StatsScreenProps) {
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let [tab, setTab] = useState("overview");
     // games are dated from when the screen opened
     let [now] = useState(() => Date.now());

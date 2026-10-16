@@ -4,7 +4,7 @@ import {Button} from '@/components/ui/button.tsx';
 import type {BotLevel} from '@/engine/bot.ts';
 import {character, type CharacterId} from '@/engine/cast.ts';
 import {aiColor} from './players.ts';
-import {Avatar} from './opponent-panel.tsx';
+import {Avatar} from './avatar.tsx';
 import CastPicker from './cast-picker.tsx';
 
 const LEVELS: {level: BotLevel; label: string}[] = [

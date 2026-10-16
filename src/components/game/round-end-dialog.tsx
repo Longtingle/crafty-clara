@@ -1,4 +1,4 @@
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog.tsx';
 import {ROUND_REQUIREMENTS} from '@/engine/cards.ts';
@@ -55,7 +55,7 @@ interface RoundEndDialogProps {
 // waiting for. On a phone it fills the screen: the result on the left, the
 // scores on the right.
 function RoundEndDialog({view, characters = [], speech, record, onReady, onNewGame, onShowStats}: RoundEndDialogProps) {
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     if (view.phase !== "roundEnd" && view.phase !== "gameEnd") return null;
 
     let {round, rounds : roundCount} = view;

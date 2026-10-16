@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils.ts';
-import {useMediaQuery} from '@/lib/use-media-query.ts';
+import {useShortScreen} from '@/lib/use-media-query.ts';
 import {Button} from '@/components/ui/button.tsx';
 import type {Card} from '@/engine/cards.ts';
 import type {BotLevel} from '@/engine/bot.ts';
@@ -119,7 +119,7 @@ function SortSwitch({sort, onChange}: {sort: HandSort; onChange: (sort: HandSort
 function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, lookLeft, endChoice, newCard, speech, talk, notice, actions}: GameTableProps) {
     // Each card is rendered for one layout only, because each card must
     // appear once for its animations to work.
-    let short = useMediaQuery("(max-height: 560px)");
+    let short = useShortScreen();
     let me = view.seats[view.seat];
     let opponents = opponentSeats(view);
 
@@ -300,7 +300,7 @@ function GameTable({view, hand, sort, levels, characters, paused, dialog, turn, 
                             variant={turn.goDown.ready ? "default" : "secondary"}
                             disabled={!turn.goDown.enabled}
                             onClick={actions.openGoDown}
-                            className={cn(turn.goDown.ready && "pulse-gold")}
+                            className={cn("relative", turn.goDown.ready && "pulse-gold")}
                         >
                             Go down
                         </Button>
