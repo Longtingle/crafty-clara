@@ -70,7 +70,8 @@ These are the engine's rules (`src/engine/game.ts`).
 
 **Claims (out of turn)**
 - When the player in turn draws from the deck, everyone else except whoever discarded the card may claim the top discard.
-- The first claimant in seat order after the player in turn gets it. The window closes as soon as that is settled, or after `claimWindowMs`: 6 seconds in the engine, but the game on the page sets it by your game speed (`game-speed.ts`), 10, 8 or 6 seconds.
+- Everyone may ask for it, and the first claimant in seat order after the player in turn gets it, so you can ask and still miss out. The log's claim entry names who else asked (`beaten`).
+- The window closes once everyone has answered; or once the claim is settled (the first in line has claimed it, say) and it has been open at least `claimShowMs`, so nobody sees it come and go in a flash; or after `claimWindowMs`, when anyone who hasn't answered passes. In the engine these are 0 and 6 seconds. The game on the page sets them by your game speed (`game-speed.ts`): 3, 2.5 or 2 seconds, and 10, 8 or 6 seconds.
 - The player in turn can go down and add cards meanwhile, but can't discard until the window closes.
 
 **The deck running out**
@@ -261,7 +262,7 @@ Function components only; there is no global store.
   - the countdown to play starting (`useLookTime`): what each view says, counted down a second at a time between views, and standing still while the game is held. It's kept here so a prompt mounted afresh, when the layout changes, carries on from the same time.
   - whether the go-down dialog is open
   - the table talk you see (as much as your `TalkLevel` allows), and what each opponent is saying now (`useBubbles`). A line stays up long enough to read, in a `SpeechBubble` (`speech-bubble.tsx`) that pops from the speaker's portrait. On a wide screen it drops from their panel over their melds, and goes in the activity in italics. On a phone it sits beside their portrait in their meld place.
-  - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`)
+  - a refused move's message, shown in the turn prompt for a few seconds (`useNotice`), or, when someone ahead of you in line got a discard you asked for too, who (`useLostClaim`)
   - whether the game is paused, and whether the Scores, Rules or Settings dialog is open. The game is held (`pause()` on the game) while any of these is true, and the claim countdown stops meanwhile:
     - The top bar's Pause button opens the Paused dialog (`pause-dialog.tsx`), whose Resume carries on.
     - Leaving the page (another tab, or another app on a phone) pauses the game the same way, so you come back to the Paused dialog. Not between rounds, though, and not while a dialog is open, since that's already holding the game.

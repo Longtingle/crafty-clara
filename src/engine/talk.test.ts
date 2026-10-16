@@ -39,7 +39,7 @@ describe('the lines', () => {
 
     it('give everyone something to say at every moment', () => {
         const everyone: Moment[] = [
-            "dealBlame", "dealer", "handCoy", "doubt", "downSelf", "downOther", "downBig", "comeback", "claimSelf", "claimOther",
+            "dealBlame", "dealer", "handCoy", "doubt", "downSelf", "downOther", "downBig", "comeback", "claimSelf", "claimOther", "wonClaim",
             "tookDiscard", "addedToMine", "redAce", "reshuffle", "outSelf", "outOther", "caught", "deckOut", "wonGame", "lostGame"
         ];
         for (let {id, honesty} of CAST) {
@@ -171,6 +171,27 @@ describe('talking about the game', () => {
             return;
         }
         throw new Error("nobody oohed");
+    });
+});
+
+describe('claims', () => {
+    it('has whoever got a claim ahead of someone else rub it in', () => {
+        for (let seed = 1; seed < 30; seed++) {
+            const before = dealt(seed);
+            before.phase = "play";
+            before.look = null;
+            const after = structuredClone(before);
+            const card = after.discard.shift()!;
+            after.seats[1].hand.push(card);
+            after.log = [{type : "claim", seat : 1, card, beaten : [0]}];
+            const line = talkAbout(viewFor(before, 1, 0), viewFor(after, 1, 0), createTalker("clara", seed));
+            if (!line) continue;
+            expect(line.id).toMatch(/^clara\.wonClaim\./);
+            expect(line.to).toBe(0);
+            readable(line);
+            return;
+        }
+        throw new Error("nobody rubbed it in");
     });
 });
 

@@ -175,6 +175,17 @@ const describeTurn = (view: GameView, selected: Card | null, targets: MeldTarget
             brief : "Claim the " + shortName(claim.card) + ", or pass?"
         };
     }
+    if (claim?.answer === "claim") {
+        // the first in line gets it: you, or someone ahead of you who wants it too
+        let first = claim.seats[0] === view.seat;
+        return {
+            steps : null,
+            prompt : first
+                ? "The " + shortName(claim.card) + " is yours, once the others have had a chance to see it."
+                : "You've asked for the " + shortName(claim.card) + ". It's yours, unless someone ahead of you wants it too.",
+            brief : "Asked for the " + shortName(claim.card)
+        };
+    }
     if (view.log.length === 0) return {steps : null, prompt : name + " starts this round.", brief : name + " starts this round"};
     return {steps : null, prompt : name + " is playing.", brief : name + " is playing"};
 }

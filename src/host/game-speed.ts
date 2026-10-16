@@ -8,10 +8,15 @@ export type GameSpeed = "relaxed" | "normal" | "quick";
 
 export const DEFAULT_SPEED: GameSpeed = "normal";
 
-export const GAME_SPEEDS: Record<GameSpeed, {pace: BotPace; claimWindowMs: number}> = {
-    relaxed : {pace : {draw : 1900, answer : 1400, move : 1500, ready : 0}, claimWindowMs : 10_000},
-    normal : {pace : {draw : 1400, answer : 1200, move : 1100, ready : 0}, claimWindowMs : 8000},
-    quick : {pace : {draw : 1000, answer : 1000, move : 800, ready : 0}, claimWindowMs : 6000}
+/**
+ * At each speed: the bots' pace; how long you have to claim a discard; and
+ * how long a claim window stays open at least (so it never comes and goes
+ * in a flash), unless everyone has answered.
+ */
+export const GAME_SPEEDS: Record<GameSpeed, {pace: BotPace; claimWindowMs: number; claimShowMs: number}> = {
+    relaxed : {pace : {draw : 1900, answer : 1400, move : 1500, ready : 0}, claimWindowMs : 10_000, claimShowMs : 3000},
+    normal : {pace : {draw : 1400, answer : 1200, move : 1100, ready : 0}, claimWindowMs : 8000, claimShowMs : 2500},
+    quick : {pace : {draw : 1000, answer : 1000, move : 800, ready : 0}, claimWindowMs : 6000, claimShowMs : 2000}
 };
 
 export const isGameSpeed = (value: unknown): value is GameSpeed => value === "relaxed" || value === "normal" || value === "quick";

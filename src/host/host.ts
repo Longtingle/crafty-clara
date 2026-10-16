@@ -18,6 +18,8 @@ export interface HostOptions {
     seed?: number;
     /** how long the other players have to claim a discard (ms) */
     claimWindowMs?: number;
+    /** how long a claim window stays open at least, unless everyone has answered (ms) */
+    claimShowMs?: number;
     /** how long everyone has to look over their hand at the start of each round (ms) */
     lookMs?: number;
     clock?: Clock;
@@ -46,8 +48,8 @@ export interface Host {
     connect(seat: number, port: HostPort): void;
     /** the current state, for tests and debugging */
     state(): GameState;
-    /** How long the claim windows from now on last (ms). A window already open keeps its deadline. */
-    setClaimWindow(ms: number): void;
+    /** How long the claim windows from now on last, and stay open at least (ms). A window already open keeps its times. */
+    setClaimTimes(windowMs: number, showMs: number): void;
     /** Ends the game: closes every port and cancels any deadline. */
     close(): void;
 }
@@ -56,12 +58,13 @@ export const createHost = ({
     names = [],
     seed = Math.floor(Math.random() * 2 ** 32),
     claimWindowMs,
+    claimShowMs,
     lookMs,
     clock = systemClock,
     state : from,
     onChange
 }: HostOptions): Host => {
-    let state = from ?? createGame({names, seed, claimWindowMs, lookMs, now : clock.now()});
+    let state = from ?? createGame({names, seed, claimWindowMs, claimShowMs, lookMs, now : clock.now()});
     let connections: ({port: HostPort; stop: () => void} | null)[] = state.seats.map(() => null);
     let deadline: TimerId | undefined;
     // when each seat last said something
@@ -135,8 +138,8 @@ export const createHost = ({
             sendView(seat);
         },
         state : () => state,
-        setClaimWindow(ms) {
-            if (ms !== state.claimWindowMs) update({...state, claimWindowMs : ms});
+        setClaimTimes(windowMs, showMs) {
+            if (windowMs !== state.claimWindowMs || showMs !== state.claimShowMs) update({...state, claimWindowMs : windowMs, claimShowMs : showMs});
         },
         close() {
             connections.forEach((_, seat) => disconnect(seat));

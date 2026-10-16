@@ -27,6 +27,8 @@ export interface LocalGameOptions {
     speed?: GameSpeed;
     /** in place of the speed's */
     claimWindowMs?: number;
+    /** in place of the speed's */
+    claimShowMs?: number;
     /** how long you have to look over your hand at the start of each round (ms) */
     lookMs?: number;
     clock?: Clock;
@@ -81,7 +83,7 @@ const carryOn = ({state, savedAt}: LocalGameSave, now: number): GameState => {
     let later = (deadline: number) => now + Math.max(0, deadline - savedAt);
     return {
         ...state,
-        claim : state.claim && {...state.claim, deadline : later(state.claim.deadline)},
+        claim : state.claim && {...state.claim, deadline : later(state.claim.deadline), shownUntil : later(state.claim.shownUntil ?? 0)},
         look : state.look && {...state.look, deadline : later(state.look.deadline)}
     };
 };
@@ -94,6 +96,7 @@ export const startLocalGame = ({
     seed,
     speed = DEFAULT_SPEED,
     claimWindowMs,
+    claimShowMs,
     lookMs = LOOK_MS,
     clock : baseClock = systemClock,
     pace,
@@ -104,6 +107,7 @@ export const startLocalGame = ({
     let clock = createPausableClock(baseClock);
     let botPace = pace ?? GAME_SPEEDS[speed].pace;
     let claimWindow = claimWindowMs ?? GAME_SPEEDS[speed].claimWindowMs;
+    let claimShow = claimShowMs ?? GAME_SPEEDS[speed].claimShowMs;
     // Each bot's seed decides what it forgets and when it takes a risk, if
     // it's a hard bot. A character's risk is their own; any other bot's is
     // secret and lasts the game.
@@ -119,10 +123,11 @@ export const startLocalGame = ({
         names : [name, ...names],
         seed,
         claimWindowMs : claimWindow,
+        claimShowMs : claimShow,
         lookMs,
         clock,
         // a game carried on goes at today's speed
-        state : from && {...carryOn(from, clock.now()), claimWindowMs : claimWindow},
+        state : from && {...carryOn(from, clock.now()), claimWindowMs : claimWindow, claimShowMs : claimShow},
         onChange : save
     });
     save(host.state());
@@ -140,7 +145,7 @@ export const startLocalGame = ({
         characters : profiles.map(profile => profile.character ?? null),
         setSpeed(next) {
             botPace = GAME_SPEEDS[next].pace;
-            host.setClaimWindow(GAME_SPEEDS[next].claimWindowMs);
+            host.setClaimTimes(GAME_SPEEDS[next].claimWindowMs, GAME_SPEEDS[next].claimShowMs);
         },
         pause : () => clock.pause(),
         resume : () => clock.resume(),

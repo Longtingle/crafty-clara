@@ -100,6 +100,13 @@ const newCardTag = (view: GameView): NewCard | null => {
     return null;
 }
 
+// When someone ahead of you in line claimed a discard you asked for too: who,
+// and the card. Null for any other move.
+const lostClaim = (entry: LogEntry, view: GameView): string | null => {
+    if (entry.type !== "claim" || !entry.beaten?.includes(view.seat)) return null;
+    return seatName(view, entry.seat) + " was ahead of you in line, and got the " + shortName(entry.card) + ".";
+};
+
 // The cards in a player's hand that everyone knows, by id: taken from the
 // discard pile, claimed, or a wild ace they took back, this round.
 const knownCards = (view: GameView, seat: number): Record<string, Card> => {
@@ -113,4 +120,4 @@ const knownCards = (view: GameView, seat: number): Record<string, Card> => {
     return Object.fromEntries(Object.entries(known).filter(([id]) => holding.has(id)));
 };
 
-export {describeEntry, activityEntries, lastAction, newCardTag, knownCards};
+export {describeEntry, activityEntries, lastAction, newCardTag, knownCards, lostClaim};

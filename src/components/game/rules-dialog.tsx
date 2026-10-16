@@ -49,7 +49,7 @@ function RulesDialog({open, onOpenChange}: {open: boolean; onOpenChange: (open: 
                 </Section>
 
                 <Section title="Claiming out of turn">
-                    <p>When a player draws from the deck instead of taking the discard, everyone else (except whoever discarded it) has a few seconds to <strong>claim</strong> it. If several players claim, the first one after the current player gets it.</p>
+                    <p>When a player draws from the deck instead of taking the discard, everyone else (except whoever discarded it) has a few seconds to <strong>claim</strong> it. If several players claim it, the first in line after the current player gets it, so you can ask for a card and still miss out.</p>
                     <p>When you're the one who drew, you can play your melds meanwhile, but you discard once the others have decided.</p>
                 </Section>
 

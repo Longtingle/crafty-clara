@@ -42,15 +42,19 @@ export interface SeatState {
 
 /**
  * When the player in turn draws from the deck, the other players may claim
- * the top discard. The first in line who claims it gets it, so the window
- * closes as soon as that is settled, or at its deadline, when anyone who
- * hasn't answered passes.
+ * the top discard. Everyone may ask for it, and the first in line who asks
+ * gets it. The window closes once everyone has answered; or once it's
+ * settled (the first in line has claimed it, say) and it has been open a
+ * while (`shownUntil`), so nobody sees it come and go in a flash; or at its
+ * deadline, when anyone who hasn't answered passes.
  */
 export interface ClaimWindow {
     /** id of the card on offer, the top discard */
     card: string;
     /** when the window closes, on the host's clock (ms) */
     deadline: number;
+    /** until when a window that's settled stays open, unless everyone has answered (absent in games saved before) */
+    shownUntil?: number;
     /** the seats that may claim, in line: from the player in turn onwards */
     seats: number[];
     /** each seat's answer, by seat (null: not answered, or can't claim) */
@@ -79,7 +83,8 @@ export interface Target {
 export type LogEntry =
     | {type: "draw"; seat: number; from: "deck"; card: Card | null}
     | {type: "draw"; seat: number; from: "discard"; card: Card}
-    | {type: "claim"; seat: number; card: Card}
+    /** beaten: those further back in line who asked for it too */
+    | {type: "claim"; seat: number; card: Card; beaten?: number[]}
     | {type: "discard"; seat: number; card: Card}
     | {type: "goDown"; seat: number}
     | {type: "add"; seat: number; card: Card; target: Target; returnedAce: Card | null}
@@ -112,6 +117,8 @@ export interface GameState {
     idPrefix: string;
     nextId: number;
     claimWindowMs: number;
+    /** how long a claim window stays open, at least, unless everyone has answered (ms; absent in games saved before) */
+    claimShowMs?: number;
     /** how long everyone has to look over their hand at the start of a round (ms); 0 for no time */
     lookMs: number;
     /** 0 to ROUND_REQUIREMENTS.length - 1 */
@@ -145,6 +152,8 @@ export interface GameOptions {
     seed: number;
     /** how long the other players have to claim a discard (ms) */
     claimWindowMs?: number;
+    /** how long a claim window stays open at least, unless everyone has answered (ms); none by default */
+    claimShowMs?: number;
     /** how long everyone has to look over their hand at the start of each round (ms); none by default */
     lookMs?: number;
     /** the time on the host's clock as the game starts, for the first round's look time */
@@ -153,7 +162,7 @@ export interface GameOptions {
 
 export const requirementFor = (round: number): Requirement => ROUND_REQUIREMENTS[round];
 
-export const createGame = ({names, seed, claimWindowMs = 6000, lookMs = 0, now = 0}: GameOptions): GameState => {
+export const createGame = ({names, seed, claimWindowMs = 6000, claimShowMs = 0, lookMs = 0, now = 0}: GameOptions): GameState => {
     if (names.length < 2 || names.length > MAX_SEATS) {
         throw new Error("A game needs 2 to " + MAX_SEATS + " players");
     }
@@ -162,6 +171,7 @@ export const createGame = ({names, seed, claimWindowMs = 6000, lookMs = 0, now =
         idPrefix : "",
         nextId : 1,
         claimWindowMs,
+        claimShowMs,
         lookMs,
         round : 0,
         phase : "draw",
@@ -190,8 +200,11 @@ export const apply = (state: GameState, seat: number, command: Command, now: num
 };
 
 /** When the game next moves on by itself: the claim window closes, or play starts. Null if it waits for a player. */
-export const nextDeadline = (state: GameState): number | null =>
-    state.claim?.deadline ?? state.look?.deadline ?? null;
+export const nextDeadline = (state: GameState): number | null => {
+    let claim = state.claim;
+    if (claim) return outcome(claim, false).settled ? Math.min(claim.shownUntil ?? 0, claim.deadline) : claim.deadline;
+    return state.look?.deadline ?? null;
+};
 
 /** Closes the claim window, or starts play, if its deadline has passed. The host calls this when the deadline comes. */
 export const expire = (state: GameState, now: number): GameState => {
@@ -248,9 +261,10 @@ const startPlay = (state: GameState): void => {
 };
 
 // A deadline that has passed: the claim window closes, with anyone who
-// hasn't answered passing, or play starts.
+// hasn't answered passing, or a settled one has been open long enough; or
+// play starts.
 const expireDeadlines = (state: GameState, now: number): void => {
-    if (state.claim && now >= state.claim.deadline) settleClaims(state, true);
+    if (state.claim) settleClaims(state, now);
     if (state.look && now >= state.look.deadline) startPlay(state);
 };
 
@@ -267,7 +281,7 @@ const run = (state: GameState, seat: number, command: Command, now: number): str
     switch (command.type) {
         case "draw": return draw(state, seat, command.from, now);
         case "claim":
-        case "pass": return answerClaim(state, seat, command.type);
+        case "pass": return answerClaim(state, seat, command.type, now);
         case "goDown": return goDown(state, seat, command.setruns);
         case "addToSetrun": return addCard(state, seat, command.card, command.target, command.end);
         case "discard": return discard(state, seat, command.card);
@@ -327,34 +341,51 @@ const openClaims = (state: GameState, now: number): void => {
         if (seat !== state.discardedBy) seats.push(seat);
     }
     if (seats.length === 0) return;
-    state.claim = {card : top.id, deadline : now + state.claimWindowMs, seats, answers : state.seats.map(() => null)};
+    state.claim = {
+        card : top.id,
+        deadline : now + state.claimWindowMs,
+        shownUntil : now + (state.claimShowMs ?? 0),
+        seats,
+        answers : state.seats.map(() => null)
+    };
 };
 
-const answerClaim = (state: GameState, seat: number, answer: Answer): string | null => {
+const answerClaim = (state: GameState, seat: number, answer: Answer, now: number): string | null => {
     let claim = state.claim;
     if (!claim || !claim.seats.includes(seat)) return "There's no discard for you to claim";
     if (claim.answers[seat] !== null) return "You've already answered";
     claim.answers[seat] = answer;
-    settleClaims(state, false);
+    settleClaims(state, now);
     return null;
 };
 
-// Gives the top discard to the first seat in line that claimed it, once
-// everyone ahead of them has passed. When `closing`, seats that haven't
-// answered pass.
-const settleClaims = (state: GameState, closing: boolean): void => {
-    let claim = state.claim!;
+// Who gets the discard: the first seat in line that claimed it, once
+// everyone ahead of them has passed, or nobody, once everyone has passed.
+// When `closing`, seats that haven't answered pass.
+const outcome = (claim: ClaimWindow, closing: boolean): {settled: boolean; winner: number | null} => {
     for (let seat of claim.seats) {
         let answer = claim.answers[seat];
-        if (answer === "claim") {
-            let card = state.discard.shift()!;
-            state.seats[seat].hand.push(card);
-            state.discardedBy = null;
-            state.log.push({type : "claim", seat, card});
-            state.claim = null;
-            return;
-        }
-        if (answer === null && !closing) return;
+        if (answer === "claim") return {settled : true, winner : seat};
+        if (answer === null && !closing) return {settled : false, winner : null};
+    }
+    return {settled : true, winner : null};
+};
+
+// Closes the claim window, if it's time (see ClaimWindow), and gives the
+// discard to whoever gets it.
+const settleClaims = (state: GameState, now: number): void => {
+    let claim = state.claim!;
+    let closing = now >= claim.deadline;
+    let {settled, winner} = outcome(claim, closing);
+    if (!settled) return;
+    let everyone = claim.seats.every(seat => claim.answers[seat] !== null);
+    if (!closing && !everyone && now < (claim.shownUntil ?? 0)) return;
+    if (winner !== null) {
+        let card = state.discard.shift()!;
+        state.seats[winner].hand.push(card);
+        state.discardedBy = null;
+        let beaten = claim.seats.filter(seat => seat !== winner && claim.answers[seat] === "claim");
+        state.log.push(beaten.length > 0 ? {type : "claim", seat : winner, card, beaten} : {type : "claim", seat : winner, card});
     }
     state.claim = null;
 };

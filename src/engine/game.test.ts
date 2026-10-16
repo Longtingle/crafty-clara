@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {RUN, SET, getPoints, type Setrun} from './cards.ts';
 import {checkSetrun} from './setruns.ts';
-import {apply, createGame, expire, type Command, type GameState, type Result} from './game.ts';
+import {apply, createGame, expire, nextDeadline, type Command, type GameState, type Result} from './game.ts';
 import {card} from './testing.ts';
 
 const NAMES = ["Ann", "Bob", "Cat", "Dan"];
@@ -174,6 +174,7 @@ describe('claiming the discard', () => {
         expect(state.claim).toEqual({
             card : state.discard[0].id,
             deadline : 7000,
+            shownUntil : 1000,
             seats : [1, 2, 3],
             answers : [null, null, null, null]
         });
@@ -196,7 +197,26 @@ describe('claiming the discard', () => {
         expect(state.seats[2].hand).toContainEqual(top);
         expect(state.seats[3].hand).not.toContainEqual(top);
         expect(state.discard[0]).not.toEqual(top);
-        expect(state.log.at(-1)).toEqual({type : "claim", seat : 2, card : top});
+        // and the log says who else asked for it
+        expect(state.log.at(-1)).toEqual({type : "claim", seat : 2, card : top, beaten : [3]});
+    });
+
+    it("stays open a while once settled, so it doesn't come and go in a flash, unless everyone has answered", () => {
+        const opened = play({...seatOnesTurn(), claimShowMs : 2500}, 1, {type : "draw", from : "deck"}, 0);
+        const top = opened.discard[0];
+        // the first in line claims it at once: settled, but still open
+        let state = play(opened, 2, {type : "claim"}, 100);
+        expect(state.claim).not.toBeNull();
+        expect(nextDeadline(state)).toBe(2500);
+        // the next in line can still ask, and once everyone has answered, it closes
+        const asked = play(state, 3, {type : "claim"}, 200);
+        expect(asked.claim).toBeNull();
+        expect(asked.log.at(-1)).toEqual({type : "claim", seat : 2, card : top, beaten : [3]});
+        // or, with nobody else answering, it closes once it has been open long enough
+        expect(expire(state, 2499)).toBe(state);
+        state = expire(state, 2500);
+        expect(state.claim).toBeNull();
+        expect(state.seats[2].hand).toContainEqual(top);
     });
 
     it('goes to a later claimant as soon as everyone ahead has passed', () => {

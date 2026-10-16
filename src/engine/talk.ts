@@ -84,6 +84,7 @@ const INVITES: Partial<Record<Moment, Invite>> = {
     downOther : "comeback",
     downBig : "comeback",
     claimOther : "comeback",
+    wonClaim : "comeback",
     addedToMine : "comeback",
     redAce : "comeback",
     outOther : "comeback"
@@ -253,7 +254,11 @@ const aboutMove = (entry: LogEntry, index: number, view: GameView, talker: Talke
             if (entry.from === "discard" && isRedAce(entry.card) && reacts([to])) return chance(talker, 0.5) ? say(talker, view, "redAce", {to}) : null;
             return null;
         case "claim":
+            // got it ahead of someone who wanted it too: rub it in
+            if (mine && entry.beaten) return chance(talker, 0.85) ? say(talker, view, "wonClaim", {to : entry.beaten[0]}) : null;
             if (mine) return chance(talker, 0.45) ? say(talker, view, "claimSelf") : null;
+            // wanted it too, and lost
+            if (entry.beaten?.includes(me)) return chance(talker, 0.5) ? say(talker, view, "claimOther", {to}) : null;
             if (!reacts([to])) return null;
             if (isRedAce(entry.card)) return chance(talker, 0.6) ? say(talker, view, "redAce", {to}) : null;
             return chance(talker, 0.3) ? say(talker, view, "claimOther", {to}) : null;

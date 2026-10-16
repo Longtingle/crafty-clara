@@ -21,6 +21,8 @@ export type Moment =
     // answering a remark made at them
     | "comeback"
     | "claimSelf" | "claimOther" | "tookDiscard"
+    // a claim they got ahead of someone who asked for it too
+    | "wonClaim"
     // someone adds a card to their setrun
     | "addedToMine"
     // someone shows a red ace: laid down, added, claimed or taken
@@ -110,6 +112,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
         claimOther : [
             "Oh, help yourself, {name}.",
             "I was going to take that. Probably."
+        ],
+        wonClaim : [
+            "Sorry, {name}. First in line, I'm afraid.",
+            "Was that yours, {name}? Not any more."
         ],
         tookDiscard : [
             "Thank you, that'll do nicely.",
@@ -227,6 +233,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "I wanted that, {name}.",
             "Course. Course you did."
         ],
+        wonClaim : [
+            "Ha! First in line, for once.",
+            "Not this time, {name}. Mine."
+        ],
         tookDiscard : [
             "I'll have that, thanks.",
             "Better than what's in the deck."
@@ -330,6 +340,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
         claimOther : [
             "Oh, have it, {name}. I didn't want it anyway.",
             "Of course, love. You have it."
+        ],
+        wonClaim : [
+            "Oh, sorry, {name}. I was first, love.",
+            "Sorry, {name}! The next one's yours, I'm sure."
         ],
         tookDiscard : [
             "Ooh, just what I wanted.",
@@ -436,6 +450,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "Enjoy it, {name}. You'll need it.",
             "Have that one. I'm feeling generous."
         ],
+        wonClaim : [
+            "Better luck next time, {name}.",
+            "First in line, {name}. Story of my life."
+        ],
         tookDiscard : [
             "Cheers. Exactly what I needed.",
             "Lovely little {card}."
@@ -537,6 +555,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
         claimOther : [
             "Fine. Take it, {name}.",
             "That was mine, {name}."
+        ],
+        wonClaim : [
+            "Mine, {name}. I was first.",
+            "Tough, {name}."
         ],
         tookDiscard : [
             "Ta.",
@@ -642,6 +664,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "Well, that's a turn-up for the books, {name}.",
             "You've claimed my heart, {name}. And my card."
         ],
+        wonClaim : [
+            "First come, first served, {name}. And I've been served!",
+            "I've staked my claim, {name}. Stake. Steak. Never mind."
+        ],
         tookDiscard : [
             "One person's trash is my treasure.",
             "Discard? Dis card is mine."
@@ -739,6 +765,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
             "Go on then, {name}. You clearly need it more than me.",
             "Take it, dear. Every little helps."
         ],
+        wonClaim : [
+            "First come, first served, dear.",
+            "Sorry, {name}, dear. I was ahead of you."
+        ],
         tookDiscard : [
             "Thank you. Just what I needed.",
             "Ooh, the {card}. Thank you, dear."
@@ -827,6 +857,10 @@ export const LINES: Record<CharacterId, Repertoire> = {
         claimOther : [
             "Do enjoy it, {name}.",
             "How opportunistic, {name}."
+        ],
+        wonClaim : [
+            "Precedence, {name}. Precedence.",
+            "One was ahead of you, {name}."
         ],
         tookDiscard : [
             "That will do.",

@@ -4,7 +4,7 @@ import {checkSetrun} from '@/engine/setruns.ts';
 import type {LogEntry} from '@/engine/game.ts';
 import type {GameView} from '@/engine/view.ts';
 import {card, cards} from '@/engine/testing.ts';
-import {describeEntry, activityEntries, lastAction, newCardTag, knownCards} from './log-text.ts';
+import {describeEntry, activityEntries, lastAction, newCardTag, knownCards, lostClaim} from './log-text.ts';
 
 const setrun = (str: string, type: SetrunType) => {
     let result = checkSetrun(cards(str), type);
@@ -108,6 +108,15 @@ describe('knownCards', () => {
         ]);
         view.seats[1].cards = ["q", "a", "x"];
         expect(knownCards(view, 1)).toEqual({q : card("12S", "q"), a : card("1H", "a")});
+    });
+});
+
+describe('lostClaim', () => {
+    it('says who was ahead of you, when you asked for a discard and lost it', () => {
+        const view = viewWith([]);
+        expect(lostClaim({type : "claim", seat : 1, card : card("3C"), beaten : [0]}, view)).toBe("Opponent 1 was ahead of you in line, and got the 3♣.");
+        expect(lostClaim({type : "claim", seat : 1, card : card("3C"), beaten : [2]}, view)).toBeNull();
+        expect(lostClaim({type : "claim", seat : 1, card : card("3C")}, view)).toBeNull();
     });
 });
 

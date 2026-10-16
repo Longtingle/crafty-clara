@@ -170,5 +170,11 @@ describe('yourTurn', () => {
         expect(turn.prompt).toBe("Opponent 2 drew from the deck. Claim the " + shortName(view.claim!.card) + ", or pass?");
         expect(turn.brief).toBe("Claim the " + shortName(view.claim!.card) + ", or pass?");
         expect(turn.goDown.hint).toBe("You can go down on your turn");
+
+        // asking for it, while Opponent 3, ahead of you in line, hasn't answered
+        const asked = viewFor(play(state, 0, {type : "claim"}), 0, 0);
+        const waiting = yourTurn(asked, asked.hand, null);
+        expect(waiting.prompt).toBe("You've asked for the " + shortName(asked.claim!.card) + ". It's yours, unless someone ahead of you wants it too.");
+        expect(waiting.brief).toBe("Asked for the " + shortName(asked.claim!.card));
     });
 });

@@ -14,7 +14,7 @@ import GoDownDialog, {type GoDownSlot} from './go-down-dialog.tsx';
 import RoundEndDialog from './round-end-dialog.tsx';
 import PauseDialog from './pause-dialog.tsx';
 import SettingsDialog from './settings-dialog.tsx';
-import {newCardTag} from './log-text.ts';
+import {lostClaim, newCardTag} from './log-text.ts';
 import type {Bubble} from './speech-bubble.tsx';
 import {soundsFor, VOLUME} from './sounds.ts';
 import {FLIGHTS, FlightContext} from './flight.ts';
@@ -35,6 +35,27 @@ function useSounds(view: GameView | null, on: boolean): void {
         if (!on) return;
         sounds.filter(sound => VOLUME[sound] !== undefined).forEach((sound, index) => playSound(sound, VOLUME[sound], index * 120));
     }, [view, on]);
+}
+
+// When someone ahead of you in line claims a discard you asked for too, a
+// notice says so, for a few seconds.
+function useLostClaim(view: GameView | null): string | null {
+    let [lost, setLost] = useState<string | null>(null);
+    let before = useRef<GameView | null>(null);
+    useEffect(() => {
+        if (!view) return;
+        let last = before.current;
+        before.current = view;
+        if (!last || last.round !== view.round) return;
+        let text = view.log.slice(last.log.length).map(entry => lostClaim(entry, view)).findLast(text => text !== null);
+        if (text) setLost(text);
+    }, [view]);
+    useEffect(() => {
+        if (!lost) return;
+        let timer = setTimeout(() => setLost(null), NOTICE_MS + 1500);
+        return () => clearTimeout(timer);
+    }, [lost]);
+    return lost;
 }
 
 // How long a line of table talk stays up (ms): long enough to read.
@@ -172,7 +193,9 @@ function GameScreen({client, levels, characters = [], pausing, hints, onHintsCha
     let [choosing, setChoosing] = useState<{seat: number; index: number; card: string} | null>(null);
     let [paused, setPaused] = useState(false);
     let [dialog, setDialog] = useState<TableDialog | null>(null);
-    let notice = useNotice(refusal);
+    let refused = useNotice(refusal);
+    let lost = useLostClaim(view);
+    let notice = refused ?? lost;
     let record = useRecord(view?.phase === "gameEnd", games);
 
     let held = paused || dialog !== null;
