@@ -36,8 +36,8 @@ interface YourLookPromptProps {
 
 /** While everyone looks over their hand: who starts, the countdown, and Ready. Only this re-renders as it counts down. */
 export function YourLookPrompt({clock, floating = false}: YourLookPromptProps) {
-    let {turn, actions} = useTable();
-    let left = useLookLeft(clock);
+    let {view, turn, actions} = useTable();
+    let left = useLookLeft(clock, view.look);
     if (!turn.look) return null;
     return (
         <LookPrompt

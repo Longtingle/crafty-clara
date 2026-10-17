@@ -84,7 +84,7 @@ function Meld({seat, index, setrun, rowSize, target, dimmed, onClick, choice, on
     let caption = setrunCaption(setrun);
     // Motion measures the cards again only when they can have moved: when
     // this setrun changes, or its row grows and its cards shrink to fit
-    let layout = setrun.cards.map(card => card.id).join() + ":" + rowSize;
+    let layout = "meld:" + setrun.cards.map(card => card.id).join() + ":" + rowSize;
     let hasWild = setrun.cards.some(isWild);
     let {setNodeRef, isOver} = useDroppable({id : meldTarget(seat, index)});
     let titleId = useId();

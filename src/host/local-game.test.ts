@@ -155,7 +155,8 @@ describe('a local game', () => {
         const game = startLocalGame({name : "You", seed : 3, cast : ["clara", "chris", "gemma"], clock});
         const said: {seat: number; id: string; text: string}[] = [];
         game.port.listen(message => {
-            if (message.type === "said") said.push({seat : message.seat, id : message.line.id, text : lineText(message.line, seat => game.host.state().seats[seat].name)});
+            // as you hear it: your name left out
+            if (message.type === "said") said.push({seat : message.seat, id : message.line.id, text : lineText(message.line, seat => (seat === 0) ? null : game.host.state().seats[seat].name)});
         });
         playAsYou(game.port, clock);
         clock.runAll();
@@ -166,6 +167,7 @@ describe('a local game', () => {
             // their own lines, or the answer written for someone else's
             expect(id.startsWith(game.seats[seat].character + ".") || id.includes(".re.")).toBe(true);
             expect(text).not.toMatch(/[{}]/);
+            expect(text).not.toMatch(/\bYou\b/);
         }
     });
 

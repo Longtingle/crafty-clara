@@ -45,6 +45,12 @@ type MovingCardProps = Omit<HTMLMotionProps<"span">, "id" | "layoutId"> & {
 // between the deck, the discard pile, a hand and a setrun, Motion flies it
 // from where it was, at the game's speed (flight.ts). Render each id in one
 // place only: Motion hides all but the newest element with a given layoutId.
+//
+// A place that gives its cards a layoutDependency (so Motion measures them
+// only when it changes) names it after the place ("hand:…", "discard:…"):
+// Motion doesn't fly a card between two elements whose dependencies are
+// equal, which a bare card id or card list could be (your last card, tapped
+// onto the discard pile).
 function MovingCard({id, className, style, children, ...motionProps}: MovingCardProps) {
     let {transition} = useFlight();
     // Raise the card while it flies in from somewhere else (an animation that

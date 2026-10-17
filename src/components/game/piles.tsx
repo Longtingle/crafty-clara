@@ -125,7 +125,7 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                     <CardBack className="w-full" />
                     <AnimatePresence initial={false}>
                         {deckTopId && (
-                            <MovingCard key={deckTopId} id={deckTopId} layoutDependency={deckTopId} className="absolute inset-0">
+                            <MovingCard key={deckTopId} id={deckTopId} layoutDependency={"deck:" + deckTopId} className="absolute inset-0">
                                 <CardBack className="size-full" />
                             </MovingCard>
                         )}
@@ -172,7 +172,7 @@ function Piles({deckTopId, deckCount, deckActive, onDeckClick, discard, discardA
                     <span className="block card-face w-full rounded-[7%/4.6%] border-2 border-dashed border-white/25" />
                     <AnimatePresence initial={false}>
                         {discard.slice(0, 2).reverse().map(card => (
-                            <MovingCard key={card.id} id={card.id} layoutDependency={card.id} className="absolute inset-0">
+                            <MovingCard key={card.id} id={card.id} layoutDependency={"discard:" + card.id} className="absolute inset-0">
                                 <PlayingCard card={card} alt="" className="w-full" />
                             </MovingCard>
                         ))}

@@ -37,7 +37,7 @@ function HiddenHand({ids, known = {}, className}: HiddenHandProps) {
                 <MovingCard
                     key={id}
                     id={id}
-                    layoutDependency={ids.length}
+                    layoutDependency={"hidden:" + ids.length}
                     initial={{opacity : 1}}
                     animate={{opacity : 0, transition : {delay : linger, duration : 0.2}}}
                     className={cn("absolute", className)}

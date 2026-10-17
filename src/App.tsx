@@ -21,7 +21,21 @@ import {goFullscreen} from './lib/fullscreen.ts';
 // moment (React shows content that waited at most every 300 ms).
 const loadGame = () => Promise.all([import('./session.ts'), import('./components/game/game-screen.tsx')]);
 const loadStats = () => import('./components/game/stats-screen.tsx');
-const loadMotion = () => import('./lib/motion-features.ts').then(module => module.default);
+// Without Motion's features nothing animates, and a card that's dealt in
+// stays where it starts, out of sight. So if they can't be fetched, the page
+// reloads, as it does when the game can't be; once, in case it never can.
+const loadMotion = () => import('./lib/motion-features.ts').then(module => module.default, () => {
+    try {
+        if (!sessionStorage.getItem(RELOADED_FOR_MOTION)) {
+            sessionStorage.setItem(RELOADED_FOR_MOTION, "1");
+            window.location.reload();
+        }
+    } catch {
+        // no session storage: carry on without animations
+    }
+    return new Promise<never>(() => {});
+});
+const RELOADED_FOR_MOTION = "crafty-clara.reloaded-for-motion";
 
 type GameScreenView = typeof import('./components/game/game-screen.tsx').default;
 type StatsScreenView = typeof import('./components/game/stats-screen.tsx').default;

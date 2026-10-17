@@ -116,8 +116,11 @@ export function useSpeech(talk: Talk[]): Speech {
 
 /** How long until play starts, while everyone looks over their hand. */
 export interface LookClock {
-    /** ms left */
-    left(): number;
+    /**
+     * ms left, for the look time in this view: until the clock has been set
+     * from that view (just before the screen is painted), what the view says
+     */
+    left(look: LookView | null): number;
     /** whether it's standing still, while the game is held */
     held(): boolean;
     /** Calls the listener whenever the clock is set afresh. Returns a function that stops it. */
@@ -135,40 +138,41 @@ export interface LookClock {
  */
 export function useLookClock(look: LookView | null, held: boolean): LookClock {
     let [clock] = useState(() => {
-        let state = {ms : 0, since : 0, held : false, version : 0};
+        let state = {look : null as LookView | null, ms : 0, since : 0, held : false, version : 0};
         let listeners = new Set<() => void>();
-        let left = (): number => state.held ? state.ms : Math.max(0, state.ms - (performance.now() - state.since));
+        let running = (): number => state.held ? state.ms : Math.max(0, state.ms - (performance.now() - state.since));
         return {
-            left,
+            left : (current: LookView | null): number => (current === state.look) ? running() : (current?.startsIn ?? 0),
             held : () => state.held,
             subscribe(listener: () => void) {
                 listeners.add(listener);
                 return () => { listeners.delete(listener); };
             },
             version : () => state.version,
-            set(ms: number, isHeld: boolean) {
-                Object.assign(state, {ms, since : performance.now(), held : isHeld, version : state.version + 1});
+            set(current: LookView | null, ms: number, isHeld: boolean) {
+                Object.assign(state, {look : current, ms, since : performance.now(), held : isHeld, version : state.version + 1});
                 for (let listener of listeners) listener();
-            }
+            },
+            running
         };
     });
     // a new view says afresh
     useLayoutEffect(() => {
-        clock.set(look?.startsIn ?? 0, clock.held());
+        clock.set(look, look?.startsIn ?? 0, clock.held());
     }, [look, clock]);
     // holding stops the clock where it is; letting go starts it from there
     useLayoutEffect(() => {
-        if (held !== clock.held()) clock.set(clock.left(), held);
-    }, [held, clock]);
+        if (held !== clock.held()) clock.set(look, clock.running(), held);
+    }, [held, look, clock]);
     return clock;
 }
 
-/** The time left on a look clock (ms), re-rendering as the seconds shown change. */
-export function useLookLeft(clock: LookClock): number {
+/** The time left on a look clock for this view's look time (ms), re-rendering as the seconds shown change. */
+export function useLookLeft(clock: LookClock, look: LookView | null): number {
     // set afresh, before the screen is painted
     useSyncExternalStore(clock.subscribe, clock.version);
     let [, tick] = useState(0);
-    let left = clock.left();
+    let left = clock.left(look);
     useEffect(() => {
         if (clock.held() || left <= 0) return;
         let timer = setTimeout(() => tick(count => count + 1), left % 1000 || 1000);

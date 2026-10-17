@@ -72,7 +72,7 @@ function HandCard({card, index, order, isSelected, selectable, tag, playable, pl
                 id={card.id}
                 // measure only when the hand changes, not while dnd-kit shifts cards
                 // around, and where a played card was dropped, so it flies from there
-                layoutDependency={played ? order + ":played" : order}
+                layoutDependency={"hand:" + order + (played ? ":played" : "")}
                 initial={dealing ? {opacity : 0, y : -80, rotate : -8} : false}
                 // in the arch, a card leans from its bottom edge, which is off the screen
                 animate={{opacity : 1, y : isSelected ? "-17%" : 0, rotate : (place && !held) ? place.angle : 0}}
